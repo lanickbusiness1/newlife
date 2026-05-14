@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deploybot:check": "node scripts/deploybot-check.mjs"
   },
   "dependencies": {
     "framer-motion": "^11.11.17",
