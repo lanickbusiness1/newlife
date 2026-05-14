@@ -1,0 +1,52 @@
+name: GDIZ Vercel Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/gdiz-vercel-deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      NEXT_PUBLIC_FORM_WEBHOOK: ${{ secrets.NEXT_PUBLIC_FORM_WEBHOOK }}
+      NEXT_PUBLIC_DEMO_VIDEO_URL: ${{ secrets.NEXT_PUBLIC_DEMO_VIDEO_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run DeployBot readiness check
+        run: npm run deploybot:check
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+
+      - name: Build with Vercel
+        run: vercel build --prod --token=$VERCEL_TOKEN
+
+      - name: Deploy to Vercel production
+        run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
