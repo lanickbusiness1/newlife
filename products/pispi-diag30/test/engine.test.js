@@ -64,6 +64,7 @@ test('I4 failure caps global status at HIGH_RISK', () => {
 test('economic score below 60 caps at CONDITIONALLY_READY', () => {
   let answers = all('DOCUMENTE');
   answers = replace(answers, 'I3', 'NON');
+  answers = replace(answers, 'I4', 'PARTIEL');
   answers = replace(answers, 'I5', 'NON');
   const result = scoreDiagnostic(answers, { evidenceGatePassed: true });
   assert.ok(result.economic_subscore < 60 || result.aess.score < 60);
@@ -99,6 +100,6 @@ test('unknown questions and invalid values are rejected', () => {
 
 test('five dimension subscores are returned', () => {
   const result = scoreDiagnostic(all('DOCUMENTE'), { evidenceGatePassed: true });
-  assert.deepEqual(Object.keys(result.dimensions).sort(), ['ecosysteme', 'economique', 'operationnel', 'reglementaire', 'technique']);
+  assert.deepEqual(Object.keys(result.dimensions).sort(), ['economique', 'ecosysteme', 'operationnel', 'reglementaire', 'technique']);
   Object.values(result.dimensions).forEach((score) => assert.equal(score, 100));
 });
