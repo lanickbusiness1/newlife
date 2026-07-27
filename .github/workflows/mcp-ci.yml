@@ -1,0 +1,27 @@
+name: MCP CI
+on:
+  push:
+    paths:
+      - 'services/mcp-server/**'
+      - 'render.yaml'
+      - '.github/workflows/mcp-ci.yml'
+  pull_request:
+    paths:
+      - 'services/mcp-server/**'
+      - 'render.yaml'
+      - '.github/workflows/mcp-ci.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp-server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
