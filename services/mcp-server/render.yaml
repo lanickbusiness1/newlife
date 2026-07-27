@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: afriagenesis-intelligence-mcp
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    rootDir: services/mcp-server
+    healthCheckPath: /health
+    envVars:
+      - key: MCP_TRANSPORT
+        value: http
+      - key: NODE_ENV
+        value: production
