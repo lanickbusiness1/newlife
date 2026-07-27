@@ -1,0 +1,13 @@
+{
+  "name": "@afriagenesis/pispi-diag30-engine",
+  "version": "2.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/engine.js && node --check src/questions.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
