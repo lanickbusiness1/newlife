@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canTransition } from './workflow';
+import { canTransition } from './workflow.js';
 
 describe('APDP BJ dossier workflow', () => {
   it('accepts the canonical happy path', () => {
