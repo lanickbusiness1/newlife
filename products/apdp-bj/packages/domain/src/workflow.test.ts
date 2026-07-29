@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { canTransition } from './workflow';
 
 describe('APDP BJ dossier workflow', () => {
