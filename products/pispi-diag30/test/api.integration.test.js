@@ -34,7 +34,7 @@ async function json(url, options = {}) {
     headers: { 'content-type': 'application/json', ...(options.headers ?? {}) },
     body: options.body === undefined ? undefined : JSON.stringify(options.body)
   });
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, headers: response.headers, body: await response.json() };
 }
 
 test('complete API journey persists, scores, reports and prepares evidence request', async () => {
@@ -42,6 +42,8 @@ test('complete API journey persists, scores, reports and prepares evidence reque
   try {
     const created = await json(`${app.baseUrl}/api/v1/diagnostics`, { method: 'POST', body: { country: 'BJ' } });
     assert.equal(created.status, 201);
+    assert.equal(created.headers.get('cache-control'), 'no-store');
+    assert.equal(created.headers.get('x-content-type-options'), 'nosniff');
     const id = created.body.id;
 
     const answers = QUESTIONS.map((question) => ({
