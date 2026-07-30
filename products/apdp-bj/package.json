@@ -1,14 +1,16 @@
 {
   "name": "apdp-bj",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "dev:api": "tsx apps/api/src/server.ts",
     "start:api": "node dist/apps/api/src/server.js",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "seed:ci": "tsx scripts/seed-ci.ts",
+    "smoke:e2e": "tsx scripts/e2e-smoke.ts"
   },
   "dependencies": {
     "@fastify/jwt": "^9.1.0",
