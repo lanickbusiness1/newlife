@@ -12,10 +12,12 @@ Moteur et API de scoring pour le diagnostic de préparation PI-SPI d’AfrIAgene
 - gates bloquants I1, I2 et I4 ;
 - gate de preuve pour le statut stratégique ;
 - cinq sous-scores : technique, réglementaire, opérationnel, économique et écosystème ;
-- persistance JSON de sessions avec reprise ;
+- persistance JSON atomique de sessions avec reprise ;
 - rapport structuré et clause de non-certification BCEAO ;
 - consentement explicite avant préparation d’une demande de preuves ;
 - API HTTP native Node.js, sans dépendance externe ;
+- limitation des métadonnées et champs textuels persistés ;
+- headers HTTP de sécurité et absence de cache ;
 - tests unitaires et d’intégration.
 
 ## Exécution
@@ -62,6 +64,10 @@ La demande de passage vers l’audit probant est refusée tant qu’un consentem
 
 Le PI-SPI Readiness Checker™ est un outil indépendant de diagnostic et de préparation. Il ne constitue ni un agrément, ni une certification de la BCEAO, ni une confirmation de participation ou de connexion à PI-SPI.
 
+## Validation
+
+Le workflow GitHub Actions est configuré pour exécuter la vérification syntaxique et les tests sur les changements du répertoire. L’absence d’un statut CI visible interdit de qualifier cette branche de testée en environnement GitHub.
+
 ## Reste avant preview publique
 
-Interface web DIAG30, accessibilité complète, stockage de production, authentification d’administration, protection anti-abus, journal d’audit externalisé, génération PDF, E2E navigateur, headers de sécurité, preview Netlify et rollback vérifié.
+Interface web DIAG30, accessibilité complète, stockage de production, authentification d’administration, protection anti-abus, journal d’audit externalisé, génération PDF, E2E navigateur, preview Netlify et rollback vérifié.
