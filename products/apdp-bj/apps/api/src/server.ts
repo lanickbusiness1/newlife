@@ -1,14 +1,18 @@
 import Fastify from 'fastify';
-import jwt from '@fastify/jwt';
+import fastifyJwt from '@fastify/jwt';
 import { z } from 'zod';
 import { registerAuthRoutes } from './auth-routes.js';
 import { registerCaseRoutes } from './case-routes.js';
 import { pool } from './db.js';
+import { registerReportingRoutes } from './reporting-routes.js';
+import { registerWorkflowRoutes } from './workflow-routes.js';
 import { canTransition, dossierStates, type DossierState } from '../../../packages/domain/src/workflow.js';
 
 const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 });
 
-await app.register(jwt, {
+// @fastify/jwt and Fastify can expose structurally compatible plugin types from
+// distinct dependency instances. The runtime plugin contract is unchanged.
+await app.register(fastifyJwt as any, {
   secret: process.env.JWT_SECRET ?? 'development-only-change-me-minimum-32-characters',
   sign: { issuer: 'apdp-bj', audience: 'apdp-bj-api' },
   verify: { issuer: 'apdp-bj', audience: 'apdp-bj-api' },
@@ -24,9 +28,14 @@ const transitionSchema = z.object({
 app.get('/health', async (_request, reply) => {
   try {
     await pool.query('select 1');
-    return { service: 'apdp-bj-api', status: 'ok', database: 'ok', version: '0.2.0' };
+    return { service: 'apdp-bj-api', status: 'ok', database: 'ok', version: '0.3.0' };
   } catch {
-    return reply.code(503).send({ service: 'apdp-bj-api', status: 'degraded', database: 'unavailable', version: '0.2.0' });
+    return reply.code(503).send({
+      service: 'apdp-bj-api',
+      status: 'degraded',
+      database: 'unavailable',
+      version: '0.3.0',
+    });
   }
 });
 
@@ -39,11 +48,23 @@ app.post('/v1/workflow/validate-transition', async (request, reply) => {
     return reply.code(403).send({ allowed: false, reason: 'FINAL_DECISION_REQUIRES_VALIDATED_APDP_HUMAN' });
   }
   const allowed = canTransition(from as DossierState, to as DossierState);
-  return reply.code(allowed ? 200 : 409).send({ allowed, from, to, reason: allowed ? 'TRANSITION_ALLOWED' : 'TRANSITION_FORBIDDEN' });
+  return reply.code(allowed ? 200 : 409).send({
+    allowed,
+    from,
+    to,
+    reason: allowed ? 'TRANSITION_ALLOWED' : 'TRANSITION_FORBIDDEN',
+  });
 });
 
 await registerAuthRoutes(app);
 await registerCaseRoutes(app);
+await registerWorkflowRoutes(app);
+await registerReportingRoutes(app);
+
+app.setErrorHandler((error, request, reply) => {
+  request.log.error({ err: error, requestId: request.id }, 'Unhandled API error');
+  return reply.code(500).send({ error: 'INTERNAL_SERVER_ERROR', requestId: request.id });
+});
 
 app.addHook('onClose', async () => {
   await pool.end();
