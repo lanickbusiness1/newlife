@@ -64,6 +64,7 @@ test('complete API journey persists, scores, reports and prepares evidence reque
     const report = await json(`${app.baseUrl}/api/v1/diagnostics/${id}/report`);
     assert.equal(report.status, 200);
     assert.equal(report.body.answers.length, 30);
+    assert.equal(report.body.critical_risks.length, 0);
     assert.match(report.body.disclaimer, /ne constitue ni un agrément/i);
 
     const blocked = await json(`${app.baseUrl}/api/v1/diagnostics/${id}/evidence-request`, { method: 'POST', body: {} });
@@ -78,6 +79,20 @@ test('complete API journey persists, scores, reports and prepares evidence reque
     });
     assert.equal(evidence.status, 201);
     assert.equal(evidence.body.status, 'PREPARED');
+  } finally {
+    await app.close();
+  }
+});
+
+test('report exposes critical risks using the canonical question schema', async () => {
+  const app = await setup();
+  try {
+    const created = await json(`${app.baseUrl}/api/v1/diagnostics`, { method: 'POST', body: {} });
+    const answers = QUESTIONS.map((question) => ({ question_id: question.id, value: question.id === 'I1' ? 'NON' : 'DOCUMENTE' }));
+    await json(`${app.baseUrl}/api/v1/diagnostics/${created.body.id}/answers`, { method: 'PUT', body: { answers } });
+    await json(`${app.baseUrl}/api/v1/diagnostics/${created.body.id}/score`, { method: 'POST', body: {} });
+    const report = await json(`${app.baseUrl}/api/v1/diagnostics/${created.body.id}/report`);
+    assert.deepEqual(report.body.critical_risks, [{ question_id: 'I1', block_id: 'I', reason: 'NON' }]);
   } finally {
     await app.close();
   }
