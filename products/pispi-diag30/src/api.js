@@ -3,13 +3,23 @@ import { pathToFileURL } from 'node:url';
 import { DiagnosticStore } from './store.js';
 import { DiagnosticService } from './service.js';
 
-const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
+const JSON_HEADERS = {
+  'content-type': 'application/json; charset=utf-8',
+  'cache-control': 'no-store',
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
+  'content-security-policy': "default-src 'none'; frame-ancestors 'none'"
+};
 
 async function readJson(request) {
   const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > 1_000_000) throw Object.assign(new Error('Payload too large'), { statusCode: 413 });
+    chunks.push(chunk);
+  }
   if (!chunks.length) return {};
-  if (Buffer.concat(chunks).length > 1_000_000) throw Object.assign(new Error('Payload too large'), { statusCode: 413 });
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch {
