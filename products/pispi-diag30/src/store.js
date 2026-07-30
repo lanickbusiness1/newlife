@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
@@ -22,9 +22,9 @@ export class DiagnosticStore {
 
   async persist() {
     await mkdir(path.dirname(this.filePath), { recursive: true });
-    const temp = `${this.filePath}.tmp`;
-    await writeFile(temp, JSON.stringify({ sessions: [...this.sessions.values()] }, null, 2));
-    await writeFile(this.filePath, await readFile(temp));
+    const temp = `${this.filePath}.${process.pid}.tmp`;
+    await writeFile(temp, JSON.stringify({ sessions: [...this.sessions.values()] }, null, 2), { mode: 0o600 });
+    await rename(temp, this.filePath);
   }
 
   async create(metadata = {}) {
