@@ -3,7 +3,7 @@ import { QUESTIONS } from './questions.js';
 export const DISCLAIMER = 'Le PI-SPI Readiness Checker™ est un outil indépendant de diagnostic et de préparation. Il ne constitue ni un agrément, ni une certification de la BCEAO, ni une confirmation de participation ou de connexion à PI-SPI.';
 
 export function buildReport(session) {
-  if (!session.score) throw new Error('Diagnostic must be scored before report generation');
+  if (!session.score) throw Object.assign(new Error('Diagnostic must be scored before report generation'), { statusCode: 409 });
   const answers = new Map(session.answers.map((answer) => [answer.question_id, answer]));
   const criticalRisks = QUESTIONS
     .filter((question) => question.critical)
