@@ -1,5 +1,8 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import Fastify from 'fastify';
 import fastifyJwt from '@fastify/jwt';
+import fastifyStatic from '@fastify/static';
 import { z } from 'zod';
 import { registerAuthRoutes } from './auth-routes.js';
 import { registerCaseRoutes } from './case-routes.js';
@@ -10,8 +13,8 @@ import { canTransition, dossierStates, type DossierState } from '../../../packag
 
 const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 });
 
-// @fastify/jwt and Fastify can expose structurally compatible plugin types from
-// distinct dependency instances. The runtime plugin contract is unchanged.
+// Plugins are runtime-compatible with Fastify 5; the cast isolates duplicate
+// transitive plugin type instances without weakening route typing.
 await app.register(fastifyJwt as any, {
   secret: process.env.JWT_SECRET ?? 'development-only-change-me-minimum-32-characters',
   sign: { issuer: 'apdp-bj', audience: 'apdp-bj-api' },
@@ -28,13 +31,14 @@ const transitionSchema = z.object({
 app.get('/health', async (_request, reply) => {
   try {
     await pool.query('select 1');
-    return { service: 'apdp-bj-api', status: 'ok', database: 'ok', version: '0.3.0' };
+    return { service: 'apdp-bj-api', status: 'ok', database: 'ok', cockpit: 'connected', version: '0.4.0' };
   } catch {
     return reply.code(503).send({
       service: 'apdp-bj-api',
       status: 'degraded',
       database: 'unavailable',
-      version: '0.3.0',
+      cockpit: 'unknown',
+      version: '0.4.0',
     });
   }
 });
@@ -60,6 +64,23 @@ await registerAuthRoutes(app);
 await registerCaseRoutes(app);
 await registerWorkflowRoutes(app);
 await registerReportingRoutes(app);
+
+const webRoot = resolve(process.cwd(), 'dist-web');
+const cockpitAvailable = existsSync(webRoot);
+if (cockpitAvailable) {
+  await app.register(fastifyStatic as any, {
+    root: webRoot,
+    prefix: '/',
+  });
+}
+
+app.setNotFoundHandler((request, reply) => {
+  if (request.url.startsWith('/v1/') || request.url === '/health') {
+    return reply.code(404).send({ error: 'ROUTE_NOT_FOUND', requestId: request.id });
+  }
+  if (cockpitAvailable) return (reply as any).sendFile('index.html');
+  return reply.code(404).send({ error: 'COCKPIT_BUILD_NOT_FOUND', requestId: request.id });
+});
 
 app.setErrorHandler((error, request, reply) => {
   request.log.error({ err: error, requestId: request.id }, 'Unhandled API error');
