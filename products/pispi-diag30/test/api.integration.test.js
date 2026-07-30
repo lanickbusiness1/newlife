@@ -46,6 +46,9 @@ test('complete API journey persists, scores, reports and prepares evidence reque
     assert.equal(created.headers.get('x-content-type-options'), 'nosniff');
     const id = created.body.id;
 
+    const beforeScore = await json(`${app.baseUrl}/api/v1/diagnostics/${id}/report`);
+    assert.equal(beforeScore.status, 409);
+
     const answers = QUESTIONS.map((question) => ({
       question_id: question.id,
       value: 'DOCUMENTE',
