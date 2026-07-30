@@ -1,18 +1,32 @@
 import { createAnswer, scoreDiagnostic } from './engine.js';
 import { buildReport } from './report.js';
 
+function cleanText(value, maxLength = 250) {
+  if (value === undefined || value === null || value === '') return null;
+  return String(value).trim().slice(0, maxLength);
+}
+
 export class DiagnosticService {
   constructor(store) {
     this.store = store;
   }
 
   createDiagnostic(metadata = {}) {
-    return this.store.create(metadata);
+    const safeMetadata = {
+      country: cleanText(metadata.country, 8),
+      institution_type: cleanText(metadata.institution_type, 80),
+      source: cleanText(metadata.source, 80)
+    };
+    return this.store.create(safeMetadata);
   }
 
   async saveAnswers(id, inputAnswers) {
     if (!Array.isArray(inputAnswers)) throw new TypeError('answers must be an array');
-    const normalized = inputAnswers.map((input) => createAnswer(input.question_id, input.value, input));
+    const normalized = inputAnswers.map((input) => createAnswer(input.question_id, input.value, {
+      ...input,
+      evidence_reference: cleanText(input.evidence_reference, 500),
+      comment: cleanText(input.comment, 1000)
+    }));
     const updated = await this.store.update(id, (session) => {
       const merged = new Map(session.answers.map((answer) => [answer.question_id, answer]));
       normalized.forEach((answer) => merged.set(answer.question_id, answer));
@@ -46,7 +60,7 @@ export class DiagnosticService {
     const updated = await this.store.update(id, (session) => {
       session.consent = {
         accepted: true,
-        purpose: String(consent.purpose ?? 'lead_follow_up'),
+        purpose: cleanText(consent.purpose, 120) ?? 'lead_follow_up',
         captured_at: new Date().toISOString()
       };
       return session;
@@ -61,8 +75,8 @@ export class DiagnosticService {
       session.evidence_request = {
         status: 'PREPARED',
         requested_at: new Date().toISOString(),
-        institution_name: payload.institution_name ? String(payload.institution_name) : null,
-        contact_reference: payload.contact_reference ? String(payload.contact_reference) : null
+        institution_name: cleanText(payload.institution_name, 160),
+        contact_reference: cleanText(payload.contact_reference, 160)
       };
       return session;
     });
