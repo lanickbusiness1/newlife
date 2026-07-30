@@ -45,10 +45,20 @@ export function canAccessDossier(
   dossier: { applicant_id: string; assigned_to?: string | null; status: string },
   action: 'read' | 'update',
 ): boolean {
-  if (claims.roles.includes('SYSTEM_ADMIN') || claims.permissions.includes('DOSSIER_READ_ALL')) return true;
-  if (claims.actorType === 'APPLICANT') {
-    if (dossier.applicant_id !== claims.sub) return false;
-    return action === 'read' || dossier.status === 'DRAFT';
+  if (claims.roles.includes('SYSTEM_ADMIN')) return true;
+
+  if (action === 'read') {
+    if (claims.permissions.includes('DOSSIER_READ_ALL')) return true;
+    if (claims.actorType === 'APPLICANT') return dossier.applicant_id === claims.sub;
+    return dossier.assigned_to === claims.sub;
   }
-  return dossier.assigned_to === claims.sub;
+
+  if (claims.actorType === 'APPLICANT') {
+    return dossier.applicant_id === claims.sub
+      && claims.permissions.includes('DOSSIER_UPDATE_OWN')
+      && ['DRAFT', 'COMPLEMENT_REQUESTED'].includes(dossier.status);
+  }
+
+  const privilegedInternal = claims.roles.includes('SUPERVISOR') || claims.permissions.includes('DOSSIER_TRANSITION');
+  return privilegedInternal && (dossier.assigned_to === claims.sub || claims.roles.includes('SUPERVISOR'));
 }
