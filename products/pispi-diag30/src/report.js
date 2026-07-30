@@ -6,9 +6,9 @@ export function buildReport(session) {
   if (!session.score) throw new Error('Diagnostic must be scored before report generation');
   const answers = new Map(session.answers.map((answer) => [answer.question_id, answer]));
   const criticalRisks = QUESTIONS
-    .filter((question) => question.is_critical)
+    .filter((question) => question.critical)
     .filter((question) => !answers.has(question.id) || ['NON', 'NON_RENSEIGNE'].includes(answers.get(question.id).value))
-    .map((question) => ({ question_id: question.id, block_id: question.block_id, reason: answers.get(question.id)?.value ?? 'MANQUANTE' }));
+    .map((question) => ({ question_id: question.id, block_id: question.block, reason: answers.get(question.id)?.value ?? 'MANQUANTE' }));
 
   return {
     report_version: 'DIAG30-v2.1',
@@ -21,8 +21,8 @@ export function buildReport(session) {
     missing: session.score.missing_questions,
     answers: QUESTIONS.map((question) => ({
       question_id: question.id,
-      block_id: question.block_id,
-      is_critical: question.is_critical,
+      block_id: question.block,
+      is_critical: question.critical,
       value: answers.get(question.id)?.value ?? 'MANQUANTE',
       evidence_level: answers.get(question.id)?.evidence_level ?? null,
       evidence_reference: answers.get(question.id)?.evidence_reference ?? null,
