@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AfrIAgenesis® Startup Accelerator Genome™</title>
+  <style>
+    :root{--bg:#130d0a;--panel:#21150f;--panel2:#2d1c12;--gold:#f4b942;--orange:#e8752d;--green:#48b788;--text:#fff7e8;--muted:#cbbba7;--red:#e35d6a;--border:#5b3a22}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui;background:radial-gradient(circle at top right,#42210f 0,#130d0a 45%);color:var(--text);min-height:100vh}
+    header{padding:28px 6vw 20px;border-bottom:1px solid var(--border);background:rgba(19,13,10,.86);position:sticky;top:0;backdrop-filter:blur(10px);z-index:5}
+    h1{margin:0;font-size:clamp(1.6rem,4vw,3rem);line-height:1.05} .accent{color:var(--gold)}
+    header p{margin:.7rem 0 0;color:var(--muted);max-width:900px}
+    main{padding:28px 6vw 60px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,.8fr);gap:24px}
+    .card{background:linear-gradient(160deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:20px;padding:22px;box-shadow:0 18px 40px rgba(0,0,0,.22)}
+    h2{margin-top:0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:7px}
+    label{font-size:.88rem;color:var(--muted)} input,select,textarea{width:100%;background:#130d0a;color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px;font:inherit} textarea{min-height:90px;resize:vertical}
+    .full{grid-column:1/-1}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}button{border:0;border-radius:12px;padding:12px 18px;font-weight:800;cursor:pointer}.primary{background:linear-gradient(135deg,var(--gold),var(--orange));color:#1b1008}.secondary{background:#3b2416;color:var(--text);border:1px solid var(--border)}
+    .score{font-size:4.2rem;font-weight:900;color:var(--gold);line-height:1}.badge{display:inline-block;padding:7px 10px;border-radius:999px;background:#3b2416;color:var(--muted);margin-top:10px}.meter{height:14px;background:#130d0a;border-radius:999px;overflow:hidden;margin:18px 0}.meter span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--red),var(--gold),var(--green));transition:.4s}
+    .status{font-size:1.2rem;font-weight:800}.list{margin:12px 0 0;padding-left:18px}.list li{margin:8px 0;color:var(--muted)}
+    .gate{display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:10px 0}.gate:last-child{border:0}.ok{color:var(--green)}.warn{color:var(--gold)}.bad{color:var(--red)}
+    .notice{padding:12px;border-radius:12px;background:#2c1b12;border-left:4px solid var(--gold);color:var(--muted);font-size:.9rem}
+    footer{padding:0 6vw 40px;color:var(--muted);font-size:.82rem}
+    @media(max-width:900px){main{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.full{grid-column:auto}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>AfrIAgenesis® <span class="accent">Startup Accelerator Genome™</span></h1>
+  <p>Cockpit de qualification, evidence readiness et contrôle M6 / S7+ / M8 pour les candidatures aux accélérateurs et programmes de scale-up africains.</p>
+</header>
+<main>
+  <section class="card">
+    <h2>Diagnostic candidat</h2>
+    <div class="notice">Aucune donnée n’est inventée. Toute information non prouvée doit être considérée comme manquante.</div>
+    <div class="grid" style="margin-top:18px">
+      <div class="field"><label>Entreprise</label><input id="company" placeholder="Nom de l'entreprise" /></div>
+      <div class="field"><label>Programme</label><select id="program"><option>Ivoire Tech Next 15</option><option>Ivoire Tech Scale Up</option><option>Autre programme</option></select></div>
+      <div class="field"><label>Implantation locale prouvée</label><select id="legal"><option value="0">Non</option><option value="15">Oui</option></select></div>
+      <div class="field"><label>Ancienneté suffisante</label><select id="age"><option value="0">Non</option><option value="10">Oui</option></select></div>
+      <div class="field"><label>Traction commerciale</label><select id="traction"><option value="0">Faible / non prouvée</option><option value="8">Moyenne</option><option value="15">Forte et prouvée</option></select></div>
+      <div class="field"><label>Performance financière</label><select id="finance"><option value="0">Non documentée</option><option value="8">Partielle</option><option value="15">Solide et documentée</option></select></div>
+      <div class="field"><label>Équipe & organisation</label><select id="team"><option value="0">Faible</option><option value="5">Moyenne</option><option value="10">Solide</option></select></div>
+      <div class="field"><label>Innovation technologique</label><select id="innovation"><option value="0">Non démontrée</option><option value="5">Moyenne</option><option value="10">Forte</option></select></div>
+      <div class="field"><label>Potentiel de croissance</label><select id="growth"><option value="0">Faible</option><option value="5">Moyen</option><option value="10">Fort</option></select></div>
+      <div class="field"><label>Impact</label><select id="impact"><option value="0">Non prouvé</option><option value="3">Partiel</option><option value="5">Fort et mesuré</option></select></div>
+      <div class="field"><label>Conformité & gouvernance</label><select id="governance"><option value="0">Insuffisante</option><option value="3">Partielle</option><option value="5">Solide</option></select></div>
+      <div class="field"><label>Qualité des preuves</label><select id="evidence"><option value="0">P0</option><option value="2">P1</option><option value="4">P2</option><option value="5">P3</option></select></div>
+      <div class="field full"><label>Preuves manquantes / remarques</label><textarea id="notes" placeholder="Ex. états financiers, attestation fiscale, contrats clients..."></textarea></div>
+    </div>
+    <div class="actions"><button class="primary" onclick="calculate()">Calculer le diagnostic</button><button class="secondary" onclick="exportReport()">Exporter le mémo</button><button class="secondary" onclick="resetForm()">Réinitialiser</button></div>
+  </section>
+  <aside class="card">
+    <h2>Décision exécutive</h2>
+    <div class="score" id="score">0</div>
+    <div class="meter"><span id="meter"></span></div>
+    <div class="status" id="status">Dossier non évalué</div>
+    <div class="badge" id="proof">Preuve : P0</div>
+    <h3>Gates</h3>
+    <div id="gates"></div>
+    <h3>Actions prioritaires</h3>
+    <ul class="list" id="actions"><li>Renseigner les données du candidat.</li></ul>
+  </aside>
+</main>
+<footer>GENOME-STARTUP-ACCELERATOR-001 · Production V1 · Validation humaine obligatoire avant toute soumission.</footer>
+<script>
+const ids=['legal','age','traction','finance','team','innovation','growth','impact','governance','evidence'];
+function value(id){return Number(document.getElementById(id).value||0)}
+function calculate(){
+  const score=ids.reduce((s,id)=>s+value(id),0); document.getElementById('score').textContent=score; document.getElementById('meter').style.width=score+'%';
+  let status='Non éligible ou dossier non démontrable'; if(score>=85)status='Prêt à soumettre'; else if(score>=70)status='Solide avec corrections limitées'; else if(score>=55)status='Risqué — plan correctif requis'; else if(score>=40)status='Insuffisant pour soumission immédiate'; document.getElementById('status').textContent=status;
+  const evidence=document.getElementById('evidence'); document.getElementById('proof').textContent='Preuve : '+evidence.options[evidence.selectedIndex].text;
+  const gateData=[['G1 Identification',document.getElementById('company').value.trim()!=='' ],['G2 Éligibilité minimale',value('legal')>0&&value('age')>0],['G3 Preuves',value('evidence')>=4],['G4 Finance',value('finance')>=8],['G5 Narratif',value('traction')>=8&&value('growth')>=5],['G6 Sécurité',true],['G7 Contrôle final',score>=70],['G8 Autorisation humaine',false]];
+  document.getElementById('gates').innerHTML=gateData.map(([n,ok])=>`<div class="gate"><span>${n}</span><strong class="${ok?'ok':'bad'}">${ok?'VERT':'ROUGE'}</strong></div>`).join('');
+  const a=[]; if(value('legal')===0)a.push('Prouver l’implantation juridique locale.'); if(value('age')===0)a.push('Vérifier l’ancienneté minimale exigée.'); if(value('finance')<8)a.push('Compléter et réconcilier les données financières.'); if(value('evidence')<4)a.push('Remplacer les déclarations par des preuves P2/P3.'); if(value('governance')<3)a.push('Renforcer conformité et gouvernance.'); if(!a.length)a.push('Exécuter M6, S7+, M8 puis obtenir l’autorisation humaine.'); document.getElementById('actions').innerHTML=a.map(x=>`<li>${x}</li>`).join('');
+}
+function exportReport(){calculate();const text=`AFRIAGENESIS® — EXECUTIVE ELIGIBILITY MEMO\nEntreprise: ${document.getElementById('company').value||'Non renseignée'}\nProgramme: ${document.getElementById('program').value}\nScore: ${document.getElementById('score').textContent}/100\nDécision: ${document.getElementById('status').textContent}\nPreuves: ${document.getElementById('proof').textContent}\nRemarques: ${document.getElementById('notes').value||'Aucune'}\n\nValidation humaine obligatoire.`;const blob=new Blob([text],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='executive-eligibility-memo.txt';a.click();URL.revokeObjectURL(a.href)}
+function resetForm(){document.querySelectorAll('input,textarea').forEach(x=>x.value='');document.querySelectorAll('select').forEach(x=>x.selectedIndex=0);document.getElementById('score').textContent='0';document.getElementById('meter').style.width='0';document.getElementById('status').textContent='Dossier non évalué';document.getElementById('gates').innerHTML='';document.getElementById('actions').innerHTML='<li>Renseigner les données du candidat.</li>'}
+</script>
+</body>
+</html>
