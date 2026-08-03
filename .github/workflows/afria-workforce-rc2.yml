@@ -23,8 +23,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: apps/afria-workforce-intelligence/backend/package-lock.json
       - run: npm install
       - run: npm run typecheck
       - run: npm test
