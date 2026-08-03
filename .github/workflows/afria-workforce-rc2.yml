@@ -1,0 +1,28 @@
+name: AfrIA Workforce RC2
+
+on:
+  pull_request:
+    paths:
+      - 'apps/afria-workforce-intelligence/backend/**'
+      - '.github/workflows/afria-workforce-rc2.yml'
+  push:
+    branches:
+      - feature/afria-workforce-intelligence-rc2
+    paths:
+      - 'apps/afria-workforce-intelligence/backend/**'
+      - '.github/workflows/afria-workforce-rc2.yml'
+
+jobs:
+  proof-of-life:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/afria-workforce-intelligence/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test
