@@ -13,11 +13,10 @@ export type VerifiedAccessTokenClaims = Readonly<{
   tokenId: string;
   subject: string;
   tenantId: string;
-  tenantCode: string;
   tenantName: string;
   jurisdiction: string;
   actorKind: IdentityKind;
-  actorName: string;
+  actorDisplayName: string;
   roles: readonly string[];
   issuedAt: string;
   expiresAt: string;
@@ -51,7 +50,7 @@ export class BearerAuthContextResolver implements AuthContextResolver {
     try {
       const tenant = new Tenant(
         claims.tenantId,
-        claims.tenantCode,
+        claims.tenantId,
         claims.tenantName,
         claims.jurisdiction,
       );
@@ -59,7 +58,7 @@ export class BearerAuthContextResolver implements AuthContextResolver {
         claims.subject,
         claims.tenantId,
         claims.actorKind,
-        claims.actorName,
+        claims.actorDisplayName,
         claims.roles,
       );
       return Object.freeze({ tenant, actor });
