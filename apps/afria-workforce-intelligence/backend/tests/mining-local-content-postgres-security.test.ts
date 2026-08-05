@@ -125,7 +125,8 @@ test("reads a tenant emergency stop from PostgreSQL and resumes when the control
 });
 
 test("fails closed when the emergency-control database is unavailable", async () => {
-  const tenant = new Tenant(randomUUID(), randomUUID(), "Mining Authority", "GN");
+  const tenantId = randomUUID();
+  const tenant = new Tenant(tenantId, tenantId, "Mining Authority", "GN");
   const actor = new Identity(randomUUID(), tenant.id, "HUMAN", "Auditor", ["AUDITOR"]);
   const guard = new PostgresEmergencyStopGuard({
     connect: async () => {
