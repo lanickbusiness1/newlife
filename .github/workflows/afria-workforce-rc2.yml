@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - feature/afria-workforce-intelligence-rc2
+      - feature/mining-local-content-module-06
     paths:
       - 'apps/afria-workforce-intelligence/backend/**'
       - '.github/workflows/afria-workforce-rc2.yml'
