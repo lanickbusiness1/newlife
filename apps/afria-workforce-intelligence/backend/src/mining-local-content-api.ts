@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { EmployeeState, EvidenceRef, Identity, Tenant } from "./domain.js";
 import { ControlError } from "./living-core.js";
 import {
@@ -18,7 +18,7 @@ export type AuthContext = Readonly<{
 }>;
 
 export interface AuthContextResolver {
-  resolve(request: Request): AuthContext | undefined;
+  resolve(request: Request): AuthContext | undefined | Promise<AuthContext | undefined>;
 }
 
 export class InMemoryAuthContextResolver implements AuthContextResolver {
@@ -41,18 +41,75 @@ export class InMemoryAuthContextResolver implements AuthContextResolver {
   }
 }
 
+export type GuardDecision =
+  | Readonly<{ allowed: true }>
+  | Readonly<{
+      allowed: false;
+      status: number;
+      code: string;
+      message: string;
+      retryAfterSeconds?: number;
+    }>;
+
+export interface ApiRequestGuard {
+  evaluate(input: Readonly<{
+    context: AuthContext;
+    request: Request;
+    path: string;
+  }>): GuardDecision | Promise<GuardDecision>;
+}
+
+export type PendingIdempotencyRecord = Readonly<{
+  requestHash: string;
+  responseStatus: number;
+  responseHeaders: Readonly<Record<string, string>>;
+  responseBody: string;
+}>;
+
+export type IdempotencyRecord = PendingIdempotencyRecord & Readonly<{
+  createdAt: string;
+  expiresAt: string;
+}>;
+
+export interface IdempotencyStore {
+  get(scopeKey: string): IdempotencyRecord | undefined | Promise<IdempotencyRecord | undefined>;
+  put(
+    scopeKey: string,
+    record: PendingIdempotencyRecord,
+    ttlSeconds: number,
+  ): IdempotencyRecord | Promise<IdempotencyRecord>;
+}
+
 export type MiningLocalContentApiConfig = Readonly<{
   service: MiningLocalContentService;
   auth: AuthContextResolver;
   maxBodyBytes?: number;
+  guards?: readonly ApiRequestGuard[];
+  idempotency?: Readonly<{
+    store: IdempotencyStore;
+    requireForMutations?: boolean;
+    ttlSeconds: number;
+  }>;
 }>;
 
 export type MiningLocalContentApi = (request: Request) => Promise<Response>;
+
+type PreparedIdempotency = Readonly<{
+  scopeKey: string;
+  requestHash: string;
+  store: IdempotencyStore;
+  ttlSeconds: number;
+}>;
 
 export function createMiningLocalContentApi(config: MiningLocalContentApiConfig): MiningLocalContentApi {
   const maxBodyBytes = config.maxBodyBytes ?? 1_048_576;
   if (!Number.isInteger(maxBodyBytes) || maxBodyBytes <= 0) {
     throw new Error("maxBodyBytes must be a positive integer");
+  }
+  if (config.idempotency !== undefined) {
+    if (!Number.isInteger(config.idempotency.ttlSeconds) || config.idempotency.ttlSeconds <= 0) {
+      throw new Error("Idempotency ttlSeconds must be a positive integer");
+    }
   }
 
   return async (request: Request): Promise<Response> => {
@@ -65,19 +122,42 @@ export function createMiningLocalContentApi(config: MiningLocalContentApiConfig)
         return jsonResponse({ status: "healthy", module: "MODULE-06" }, 200, correlationId);
       }
 
-      const context = config.auth.resolve(request);
+      const context = await config.auth.resolve(request);
       if (!context) {
         throw new ApiFault(401, "AUTHENTICATION_REQUIRED", "Trusted tenant and actor context is required");
       }
 
+      for (const guard of config.guards ?? []) {
+        const decision = await guard.evaluate({ context, request, path });
+        if (!decision.allowed) {
+          const headers = decision.retryAfterSeconds === undefined
+            ? undefined
+            : { "retry-after": String(decision.retryAfterSeconds) };
+          throw new ApiFault(decision.status, decision.code, decision.message, headers);
+        }
+      }
+
+      const preparedIdempotency = await prepareIdempotency(
+        request,
+        path,
+        context,
+        config.idempotency,
+        maxBodyBytes,
+      );
+      if (preparedIdempotency.replay !== undefined) {
+        return replayResponse(preparedIdempotency.replay, correlationId);
+      }
+      const respond = async (response: Response): Promise<Response> =>
+        finalizeIdempotency(response, preparedIdempotency.context, correlationId);
+
       if (request.method === "POST" && path === "/v1/rules") {
         const body = await readJsonObject(request, maxBodyBytes);
         const rule = buildRule(body, context.tenant.id);
-        return jsonResponse(
+        return await respond(jsonResponse(
           config.service.registerRuleDraft({ ...context, rule }),
           201,
           correlationId,
-        );
+        ));
       }
 
       const validateRuleMatch = /^\/v1\/rules\/([^/]+)\/validate$/.exec(path);
@@ -89,7 +169,7 @@ export function createMiningLocalContentApi(config: MiningLocalContentApiConfig)
           context.tenant.id,
           "LEGAL_RULE_APPROVAL",
         );
-        return jsonResponse(
+        return await respond(jsonResponse(
           config.service.validateRule({
             ...context,
             ruleId: decodePathId(validateRuleMatch[1]),
@@ -97,7 +177,7 @@ export function createMiningLocalContentApi(config: MiningLocalContentApiConfig)
           }),
           200,
           correlationId,
-        );
+        ));
       }
 
       if (request.method === "POST" && path === "/v1/workforce/batch") {
@@ -107,12 +187,12 @@ export function createMiningLocalContentApi(config: MiningLocalContentApiConfig)
           buildWorkforceRecord(requireObject(record, `records[${index}]`), context.tenant.id),
         );
         const accepted = config.service.ingestWorkforceRecords({ ...context, records });
-        return jsonResponse({ accepted: accepted.length }, 202, correlationId);
+        return await respond(jsonResponse({ accepted: accepted.length }, 202, correlationId));
       }
 
       if (request.method === "POST" && path === "/v1/assessments") {
         const body = await readJsonObject(request, maxBodyBytes);
-        return jsonResponse(
+        return await respond(jsonResponse(
           config.service.runAssessment({
             ...context,
             ruleId: requireString(body.ruleId, "ruleId"),
@@ -120,17 +200,17 @@ export function createMiningLocalContentApi(config: MiningLocalContentApiConfig)
           }),
           200,
           correlationId,
-        );
+        ));
       }
 
       if (request.method === "POST" && path === "/v1/succession-plans") {
         const body = await readJsonObject(request, maxBodyBytes);
         const plan = buildSuccessionPlan(body, context.tenant.id);
-        return jsonResponse(
+        return await respond(jsonResponse(
           config.service.createSuccessionPlan({ ...context, plan }),
           201,
           correlationId,
-        );
+        ));
       }
 
       const approvePlanMatch = /^\/v1\/succession-plans\/([^/]+)\/approve$/.exec(path);
@@ -142,7 +222,7 @@ export function createMiningLocalContentApi(config: MiningLocalContentApiConfig)
           context.tenant.id,
           "SUCCESSION_PLAN_APPROVAL",
         );
-        return jsonResponse(
+        return await respond(jsonResponse(
           config.service.approveSuccessionPlan({
             ...context,
             planId: decodePathId(approvePlanMatch[1]),
@@ -150,7 +230,7 @@ export function createMiningLocalContentApi(config: MiningLocalContentApiConfig)
           }),
           200,
           correlationId,
-        );
+        ));
       }
 
       if (request.method === "GET" && path === "/v1/mission-control") {
@@ -173,10 +253,96 @@ class ApiFault extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly headers?: Readonly<Record<string, string>>,
   ) {
     super(message);
     this.name = "ApiFault";
   }
+}
+
+async function prepareIdempotency(
+  request: Request,
+  path: string,
+  context: AuthContext,
+  config: MiningLocalContentApiConfig["idempotency"],
+  maxBodyBytes: number,
+): Promise<Readonly<{ context?: PreparedIdempotency; replay?: IdempotencyRecord }>> {
+  if (config === undefined || !isMutation(request.method)) return Object.freeze({});
+
+  const key = request.headers.get("idempotency-key")?.trim();
+  if (!key) {
+    if (config.requireForMutations === true) {
+      throw new ApiFault(400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required for mutating requests");
+    }
+    return Object.freeze({});
+  }
+  if (!/^[A-Za-z0-9._:-]{8,200}$/.test(key)) {
+    throw new ApiFault(400, "INVALID_IDEMPOTENCY_KEY", "Idempotency-Key format is invalid");
+  }
+
+  const bodyText = await readBodyText(request.clone(), maxBodyBytes);
+  const requestHash = createHash("sha256")
+    .update([request.method.toUpperCase(), path, bodyText].join("\n"))
+    .digest("hex");
+  const scopeKey = [context.tenant.id, context.actor.id, request.method.toUpperCase(), path, key].join(":");
+
+  let existing: IdempotencyRecord | undefined;
+  try {
+    existing = await config.store.get(scopeKey);
+  } catch {
+    throw new ApiFault(503, "IDEMPOTENCY_STORE_UNAVAILABLE", "Idempotency control is temporarily unavailable");
+  }
+  if (existing !== undefined) {
+    if (existing.requestHash !== requestHash) {
+      throw new ApiFault(409, "IDEMPOTENCY_CONFLICT", "Idempotency-Key was already used with a different request");
+    }
+    return Object.freeze({ replay: existing });
+  }
+
+  return Object.freeze({
+    context: Object.freeze({
+      scopeKey,
+      requestHash,
+      store: config.store,
+      ttlSeconds: config.ttlSeconds,
+    }),
+  });
+}
+
+async function finalizeIdempotency(
+  response: Response,
+  prepared: PreparedIdempotency | undefined,
+  correlationId: string,
+): Promise<Response> {
+  if (prepared === undefined || response.status < 200 || response.status >= 300) return response;
+
+  const responseHeaders: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    if (key !== "x-correlation-id" && key !== "x-idempotent-replay") responseHeaders[key] = value;
+  });
+  const record: PendingIdempotencyRecord = Object.freeze({
+    requestHash: prepared.requestHash,
+    responseStatus: response.status,
+    responseHeaders: Object.freeze(responseHeaders),
+    responseBody: await response.clone().text(),
+  });
+  try {
+    await prepared.store.put(prepared.scopeKey, record, prepared.ttlSeconds);
+  } catch {
+    throw new ApiFault(503, "IDEMPOTENCY_STORE_UNAVAILABLE", "Idempotency control is temporarily unavailable");
+  }
+  return withCorrelationId(response, correlationId);
+}
+
+function replayResponse(record: IdempotencyRecord, correlationId: string): Response {
+  return new Response(record.responseBody, {
+    status: record.responseStatus,
+    headers: {
+      ...record.responseHeaders,
+      "x-correlation-id": correlationId,
+      "x-idempotent-replay": "true",
+    },
+  });
 }
 
 async function readJsonObject(request: Request, maxBodyBytes: number): Promise<Record<string, unknown>> {
@@ -184,6 +350,17 @@ async function readJsonObject(request: Request, maxBodyBytes: number): Promise<R
   if (contentType !== "application/json") {
     throw new ApiFault(415, "UNSUPPORTED_MEDIA_TYPE", "Content-Type application/json is required");
   }
+  const text = await readBodyText(request, maxBodyBytes);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new ApiFault(400, "INVALID_REQUEST", "Request body must contain valid JSON");
+  }
+  return requireObject(parsed, "body");
+}
+
+async function readBodyText(request: Request, maxBodyBytes: number): Promise<string> {
   const declaredLength = request.headers.get("content-length");
   if (declaredLength !== null) {
     const length = Number(declaredLength);
@@ -199,13 +376,7 @@ async function readJsonObject(request: Request, maxBodyBytes: number): Promise<R
   if (new TextEncoder().encode(text).byteLength > maxBodyBytes) {
     throw new ApiFault(413, "PAYLOAD_TOO_LARGE", "Request body exceeds the configured limit");
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new ApiFault(400, "INVALID_REQUEST", "Request body must contain valid JSON");
-  }
-  return requireObject(parsed, "body");
+  return text;
 }
 
 function buildRule(body: Record<string, unknown>, tenantId: string): LocalContentRule {
@@ -360,9 +531,13 @@ function decodePathId(value: string | undefined): string {
   }
 }
 
+function isMutation(method: string): boolean {
+  return ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
+}
+
 function errorResponse(error: unknown, correlationId: string): Response {
   if (error instanceof ApiFault) {
-    return jsonResponse({ error: error.code, message: error.message }, error.status, correlationId);
+    return jsonResponse({ error: error.code, message: error.message }, error.status, correlationId, error.headers);
   }
   if (error instanceof ControlError) {
     const message = error.message;
@@ -383,7 +558,12 @@ function errorResponse(error: unknown, correlationId: string): Response {
   return jsonResponse({ error: "INTERNAL_ERROR", message: "An unexpected error occurred" }, 500, correlationId);
 }
 
-function jsonResponse(payload: unknown, status: number, correlationId: string): Response {
+function jsonResponse(
+  payload: unknown,
+  status: number,
+  correlationId: string,
+  extraHeaders?: Readonly<Record<string, string>>,
+): Response {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
@@ -391,8 +571,15 @@ function jsonResponse(payload: unknown, status: number, correlationId: string): 
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
       "x-correlation-id": correlationId,
+      ...extraHeaders,
     },
   });
+}
+
+function withCorrelationId(response: Response, correlationId: string): Response {
+  const headers = new Headers(response.headers);
+  headers.set("x-correlation-id", correlationId);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 function contextKey(tenantId: string, actorId: string): string {
