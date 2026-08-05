@@ -9,6 +9,10 @@ on:
     paths:
       - 'docs/afria-recruit-investor/**'
 
+concurrency:
+  group: afria-recruit-investor-page
+  cancel-in-progress: true
+
 jobs:
   investor-page-e2e:
     runs-on: ubuntu-latest
@@ -21,8 +25,5 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
-      - run: npx playwright install --with-deps chromium
-      - name: Start static site
-        run: python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/afria-investor-page.log 2>&1 &
       - name: Run privacy and interaction tests
         run: npm run test:e2e
