@@ -27,7 +27,7 @@ function jsonRequest(
   body?: unknown,
   method = body === undefined ? "GET" : "POST",
 ): Request {
-  return new Request(`https://module-06.test${path}`, {
+  const init: RequestInit = {
     method,
     headers: {
       "content-type": "application/json",
@@ -35,8 +35,9 @@ function jsonRequest(
       "x-actor-id": actorId,
       "x-correlation-id": `corr-${actorId}-${path}`,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  return new Request(`https://module-06.test${path}`, init);
 }
 
 function createApi() {
