@@ -1,10 +1,10 @@
 # MODULE 06 — Mining Local Content, Workforce & Value Retention Intelligence
 
 **Canonical parent:** BP-MINING-GN-001 — AfrIAgenesis® Sovereign Mining OS™ Guinée  
-**Version:** BP-MINING-GN-001 / MODULE-06 / v1.2-G2-G3-TEST_PROVEN  
+**Version:** BP-MINING-GN-001 / MODULE-06 / v1.4-G4B-M8-PREVIEW-TEST_PROVEN  
 **Build branch:** `feature/mining-local-content-module-06`  
 **Draft PR:** `#9`  
-**Technical status:** kernel, governed application service, HTTP contract and PostgreSQL migrations are TEST_PROVEN; not deployed; not production-certified.
+**Technical status:** TEST_PROVEN for synthetic sandbox engineering; not deployed; not production-certified.
 
 ## Implemented scope
 
@@ -15,13 +15,11 @@
 - effective and expiry date controls;
 - mandatory human `LEGAL_APPROVER` gate;
 - mining workforce records by project, category and nationality status;
-- national/expatriate headcount ratio;
-- target gap and evidence-coverage calculation;
-- explicit `NO_DATA` result instead of false compliance;
+- national/expatriate ratio, target gap and evidence coverage;
+- explicit `NO_DATA` instead of false compliance;
 - advisory-only assessments;
 - tenant and mining-project isolation;
-- succession readiness calculation;
-- mandatory human `HR_APPROVER` gate for succession-plan approval.
+- succession readiness and mandatory human `HR_APPROVER` gate.
 
 ### Governed application service
 
@@ -35,11 +33,11 @@
 - succession approval by human `HR_APPROVER`;
 - Mission Control and audit access by `AUDITOR`.
 
-Every mutation creates an audit event. Duplicate identities are rejected instead of silently overwriting evidence. Succession plans require an expatriate source record and a national candidate in the same tenant and mining project.
+Every mutation creates an audit event. Duplicate identities are rejected. Succession plans require an expatriate source record and a national candidate in the same tenant and project.
 
 ### HTTP contract
 
-The Web-standard API adapter exposes:
+The API adapter exposes:
 
 - `GET /health`;
 - `POST /v1/rules`;
@@ -51,84 +49,118 @@ The Web-standard API adapter exposes:
 - `GET /v1/mission-control`;
 - `GET /v1/audit-trail`.
 
-Implemented controls include JSON-only input, configurable body-size limits, correlation identifiers, `no-store`, `nosniff`, controlled status/error mapping and no stack leakage.
+Implemented controls include JSON-only input, body-size limits, correlation identifiers, controlled status/error mapping, `no-store`, `nosniff` and no stack leakage.
 
-`InMemoryAuthContextResolver` is a test adapter only. Production deployment must replace it with a cryptographically verified OIDC/JWT or equivalent institutional identity adapter. Caller-provided identity headers must never be trusted directly at a public ingress.
+### G4b operational security controls
+
+- native RS256 JWT signature verification;
+- issuer, audience, `kid`, issue-time, expiry, actor-kind and role validation;
+- abstract signing-key provider suitable for institutional JWKS integration;
+- Bearer auth resolver that does not trust caller identity headers;
+- tenant emergency-stop guard;
+- fixed-window tenant/actor/path rate limiter;
+- idempotency requirement, replay and conflict protection for mutations;
+- append-only persistent audit schema with hash-chain fields;
+- persistent emergency-control and idempotency schemas;
+- tested security migration rollback and re-application.
+
+`InMemoryAuthContextResolver`, the in-memory guards and the in-memory business repository are deterministic test adapters. They must not be used as production persistence or public-ingress trust components.
 
 ## Security and governance invariants
 
 1. A draft legal rule cannot be evaluated.
 2. An AI agent cannot validate a legal rule.
 3. An AI agent cannot approve a succession plan.
-4. A rule source must have identity, title, HTTPS URL, jurisdiction, version, effective date and SHA-256 fingerprint.
-5. Approval evidence must belong to the same tenant and have a SHA-256 fingerprint.
-6. A rule can only be applied to the same tenant jurisdiction and during its effective period.
-7. Workforce records cannot cross tenant or mining-project boundaries.
-8. Assessments are labelled `ADVISORY`; the engine never certifies legal compliance.
+4. Legal sources require identity, HTTPS URL, jurisdiction, version, effectivity and SHA-256.
+5. Approval evidence must belong to the same tenant and have SHA-256 integrity.
+6. A rule can only be applied in the same jurisdiction and effective period.
+7. Workforce records cannot cross tenant or project boundaries.
+8. Assessments are `ADVISORY`; the engine never certifies legal compliance.
 9. Empty datasets return `NO_DATA`.
 10. PostgreSQL references are tenant-bound through composite foreign keys.
 11. Tenant tables use RLS `FOR ALL`, `WITH CHECK` and `FORCE ROW LEVEL SECURITY`.
-12. No real employee data, secrets, biometrics or production credentials are present in the repository.
+12. Audit rows are append-only at database level.
+13. Mutating requests can be configured to require idempotency keys.
+14. Emergency stop is checked before protected route execution.
+15. No real employee data, secrets, biometrics or production credentials are committed.
 
-## Verification evidence
+## Authoritative verification evidence
 
-Authoritative GitHub Actions proof:
-
-- **Head SHA:** `9c049d7efab3b7d8aa1308d7dd203e0fdcae384a`
-- **Workflow run:** `31012188433`
+- **Code evidence SHA:** `d8fdcd01f068a06b4fe0fcc69e16263c12b8a709`
+- **GitHub Actions run:** `31014286308` — SUCCESS
 - **Node:** 22
 - **Strict TypeScript type-check:** SUCCESS
-- **Automated tests:** 18 passed, 0 failed
-- **HTTP synthetic flow:** SUCCESS
+- **Automated tests:** **35 passed / 0 failed**
+- **Dependency audit:** 0 vulnerabilities reported
+- **Native RS256 JWT controls:** SUCCESS
+- **Synthetic HTTP/service flow:** SUCCESS
 - **PostgreSQL 16 service:** healthy
-- **Migration `001_living_core.sql`:** SUCCESS
-- **Migration `002_mining_local_content.sql`:** SUCCESS
-- **npm audit:** 0 vulnerabilities reported for the current dependency set
+- **Migrations `001`, `002`, `003`:** SUCCESS
+- **SQL control tests:** SUCCESS
+- **Migration 003 rollback, table-removal assertions and re-apply:** SUCCESS
 
-The proven synthetic flow is:
+The proven flow is:
 
 ```plain text
-legal source
+signed identity claims
+→ legal source
 → draft rule
 → human legal validation
 → workforce ingestion
 → advisory assessment
 → succession proposal
 → human HR approval
-→ Mission Control snapshot
-→ audit trail
+→ Mission Control
+→ append-only audit controls
+→ rollback proof
 ```
 
 ## Database assets
 
-Migration `database/002_mining_local_content.sql` adds:
+### `002_mining_local_content.sql`
 
-- `mining_projects`;
-- `local_content_legal_sources`;
-- `local_content_rules`;
-- `mining_workforce_records`;
-- `local_content_assessments`;
-- `succession_plans`;
+- mining projects;
+- legal sources and rules;
+- workforce records;
+- assessments;
+- succession plans;
 - composite tenant-safe foreign keys;
-- tenant-isolation RLS policies and operational indexes.
+- RLS policies and indexes.
+
+### `003_security_operations.sql`
+
+- tenant emergency controls;
+- append-only local-content audit events;
+- persistent idempotency records;
+- hash, uniqueness and integrity constraints;
+- RLS hardening for security and base workforce tables.
+
+### Verification and rollback
+
+- `003_security_operations_test.sql` proves database controls;
+- `003_security_operations_down.sql` reverses migration 003;
+- CI verifies removal and successful re-application.
 
 ## Gate status
 
-- **G0 Legal Source Gate — OPEN:** replace synthetic legal metadata with verified Guinean primary sources, hashes and legal validation evidence.
-- **G1 Data Gate — OPEN:** define official HR/ERP import contracts, quality rules, retention and minimisation.
-- **G2 API Gate — TEST_PROVEN:** governed application service and HTTP contract implemented and tested; production identity adapter remains open.
-- **G3 E2E Gate — TEST_PROVEN:** full synthetic HTTP and service flows reproduced with audit trail.
-- **G4 M6/S7+ Gate — M6 PASSED WITH CAPA; S7+ OPEN:** threat model, idempotency, rate limiting, persistent audit, privacy and rollback controls remain to close.
-- **G5 M8 Gate — OPEN:** internal governance decision not executed.
-- **G6 External Gate — OPEN:** legal and Big4-type review required before institutional production use.
+- **G0 Legal Source Gate — OPEN:** replace synthetic source metadata with verified Guinean primary sources, hashes and human legal approval.
+- **G1 Data Gate — OPEN:** define official HR/ERP imports, quality, privacy, retention and minimisation.
+- **G2 API Gate — TEST_PROVEN:** governed service and HTTP contract implemented.
+- **G3 E2E Gate — TEST_PROVEN:** full synthetic service and HTTP flow reproduced.
+- **G4a M6/S7+ — TEST_PROVEN FOR SANDBOX:** code, threat model, abuse tests, RLS and CI hardening are green.
+- **G4b Operational controls — PARTIALLY TEST_PROVEN:** native JWT verification, guards, persistence schema and rollback are proven; actual institutional JWKS provider, distributed rate limiter, wired PostgreSQL business repository and persistent runtime adapters remain open.
+- **G5 M8 — PRE-REVIEW COMPLETED:** score 6.5/10; GO conditionnel for Build Factory and synthetic demo; NO-GO merge/release/production.
+- **G6 External Gate — OPEN:** legal and Big4-type review required.
 
-## Next build increment
+## M8 blockers before draft PR promotion
 
-1. Produce and test the S7+ threat model and security controls.
-2. Add idempotency protection to mutating API operations.
-3. Define the production identity-verification contract without embedding a fake verifier.
-4. Define persistent repository and audit-event ports for PostgreSQL/Supabase.
-5. Create the official synthetic demo dataset and Mission Control evidence export.
-6. Keep PR #9 in draft until S7+ and M8 readiness review.
+1. Wire the business `LocalContentRepository` to PostgreSQL/Supabase with transactions and concurrency controls.
+2. Wire persistent audit, idempotency and emergency-stop adapters to runtime.
+3. Configure a real institutional issuer/JWKS provider and rotation/revocation procedure.
+4. Register and approve verified Guinean primary legal sources.
+5. Approve privacy, retention, field-level access and data-residency controls.
+6. Build and browser-test the Mission Control cockpit and evidence-room UI.
+7. Obtain pilot sponsor, data-sharing framework, RACI, SLA and acceptance criteria.
+8. Execute human M8 and external legal/Big4 review.
 
-No production, commercial-performance or legal-certification claim is authorized until all gates close with evidence.
+No production, deployment, legal-compliance, certification or commercial-performance claim is authorised until all gates close with evidence.
