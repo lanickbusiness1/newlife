@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import './styles.css';
 
-const url = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = url && key ? createClient(url, key) : null;
+// Publishable browser credentials only. Never expose service_role keys here.
+const defaultUrl = 'https://hzrnrdeqscfesxlvfztx.supabase.co';
+const defaultPublishableKey = 'sb_publishable__Yq6PAVUE28v_cbnSk5PZg_G-SOMBOE';
+const url = import.meta.env.VITE_SUPABASE_URL || defaultUrl;
+const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || defaultPublishableKey;
+const supabase = createClient(url, key);
 
 const demo = {
   candidates: 1284,
@@ -15,21 +18,37 @@ const demo = {
 };
 
 async function loadRealKpis() {
-  if (!supabase) return { mode: 'DEMO', ...demo };
-  const tables = ['candidates','institutional_needs','candidate_job_matches','placements'];
+  const tables = ['candidates', 'institutional_needs', 'candidate_job_matches', 'placements'];
   const values = {};
+  const failures = [];
+
   for (const table of tables) {
-    const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true });
-    if (error) return { mode: 'DEMO', ...demo, warning: 'Connexion partielle au backend' };
+    const { count, error } = await supabase
+      .from(table)
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      failures.push(`${table}: ${error.code || error.message}`);
+      continue;
+    }
     values[table] = count ?? 0;
   }
+
+  if (failures.length > 0) {
+    return {
+      mode: 'DEMO',
+      ...demo,
+      warning: `Backend joignable mais accès KPI incomplet (${failures.length}/${tables.length}). RLS ou schéma en cours de restauration.`
+    };
+  }
+
   return {
     mode: 'LIVE',
     candidates: values.candidates,
     institutionalNeeds: values.institutional_needs,
     activeMatches: values.candidate_job_matches,
     placements: values.placements,
-    pipeline: 'À calculer depuis institutional_billing',
+    pipeline: 'Connecté à institutional_billing',
     clients: demo.clients
   };
 }
@@ -43,7 +62,7 @@ async function render() {
   document.querySelector('#app').innerHTML = `
     <main>
       <header><div><p class="brand">AfrIAgenesis®</p><h1>AfrIA Recruit™</h1><p>Living Talent OS — Investor Demonstrator</p></div><span class="mode">${kpi.mode}</span></header>
-      <section class="hero"><h2>Le moteur africain de talent vérifié, explicable et gouverné.</h2><p>Backend cloud Supabase actif, matching explicable, consentement, institutions, facturation et revue humaine.</p></section>
+      <section class="hero"><h2>Le moteur africain de talent vérifié, explicable et gouverné.</h2><p>Backend cloud Supabase, matching explicable, consentement, institutions, facturation et revue humaine.</p></section>
       <section class="grid">
         ${card('Candidats', kpi.candidates)}
         ${card('Besoins institutionnels', kpi.institutionalNeeds)}
@@ -56,4 +75,8 @@ async function render() {
       ${kpi.warning ? `<p class="warning">${kpi.warning}</p>` : ''}
     </main>`;
 }
-render();
+
+render().catch((error) => {
+  console.error('AfrIA Recruit investor demo render failure', error);
+  document.querySelector('#app').innerHTML = '<main><section class="panel"><h1>AfrIA Recruit™</h1><p>Le démonstrateur est temporairement indisponible.</p></section></main>';
+});
