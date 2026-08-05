@@ -3,68 +3,145 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="AfrIA Recruit™ — démonstrateur investisseur sécurisé par AfrIAgenesis®." />
-  <title>AfrIA Recruit™ — Investor Staging</title>
+  <meta name="description" content="AfrIA Recruit™ — démonstration investisseur interactive par AfrIAgenesis®." />
+  <title>AfrIA Recruit™ — Démonstration investisseur</title>
   <style>
-    :root{--bg:#170f0b;--panel:#261812;--panel2:#321f16;--gold:#f2bd5b;--terracotta:#c8663d;--text:#f7ebdc;--muted:#bfa997;--live:#79d49c;--border:rgba(242,189,91,.22)}
-    *{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);background:radial-gradient(circle at 15% 0%,#4a2b1a 0,transparent 34%),linear-gradient(145deg,#1a110c,#120b08);min-height:100vh}
-    main{width:min(1180px,calc(100% - 32px));margin:auto;padding:34px 0 54px}.top{display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{font-size:12px;text-transform:uppercase;letter-spacing:.23em;color:var(--muted);font-weight:800}.status{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(121,212,156,.35);background:rgba(121,212,156,.08);color:var(--live);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:800}.dot{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 16px currentColor}.hero{padding:65px 0 30px}.hero h1{font-size:clamp(48px,8vw,88px);line-height:.98;margin:0;font-weight:900;letter-spacing:-.045em}.gradient{background:linear-gradient(100deg,var(--gold),var(--terracotta));-webkit-background-clip:text;background-clip:text;color:transparent}.hero p{max-width:790px;font-size:clamp(18px,2.2vw,25px);line-height:1.5;color:var(--muted);margin:24px 0 0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{background:linear-gradient(145deg,rgba(50,31,22,.92),rgba(34,22,16,.92));border:1px solid var(--border);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.22)}.label{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:800}.value{font-size:40px;font-weight:900;margin-top:13px}.hint{font-size:12px;color:var(--muted);margin-top:6px}.section{margin-top:46px}.section h2{font-size:13px;text-transform:uppercase;letter-spacing:.2em;color:var(--muted);margin:0 0 16px}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.step-no{color:var(--gold);font-weight:900}.step h3{margin:10px 0 7px;font-size:17px}.step p{margin:0;color:var(--muted);line-height:1.5;font-size:14px}.proofs{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.proof strong{display:block;margin-bottom:7px}.proof span{font-size:13px;color:var(--muted)}.notice{display:none;margin:22px 0 0;border:1px solid rgba(200,102,61,.45);background:rgba(200,102,61,.1);padding:14px;border-radius:12px;color:#f4c7b5}.footer{margin-top:48px;padding-top:22px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.7}
-    @media(max-width:820px){.grid,.steps{grid-template-columns:repeat(2,1fr)}.proofs{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:540px){main{width:min(100% - 22px,1180px)}.hero{padding-top:48px}.grid,.steps,.proofs{grid-template-columns:1fr}.value{font-size:34px}.top{align-items:flex-start}.brand{max-width:180px}}
+    :root{--bg:#160e0a;--panel:#261711;--panel2:#321e15;--gold:#f2bd5b;--terra:#c8673d;--text:#f8ecdc;--muted:#bea895;--green:#7bd29d;--border:rgba(242,189,91,.22);--shadow:0 24px 60px rgba(0,0,0,.28)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);background:radial-gradient(circle at 15% 0%,#4b2b1a 0,transparent 35%),linear-gradient(145deg,#1a110c,#110a07);min-height:100vh}button{font:inherit}
+    main{width:min(1180px,calc(100% - 32px));margin:auto;padding:30px 0 56px}.top{display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{font-size:12px;text-transform:uppercase;letter-spacing:.23em;color:var(--muted);font-weight:900}.tag{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(123,210,157,.34);background:rgba(123,210,157,.08);color:var(--green);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:800}.dot{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 14px currentColor}
+    .hero{padding:72px 0 46px}.eyebrow{color:var(--gold);font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.22em;margin-bottom:18px}.hero h1{font-size:clamp(48px,8vw,88px);line-height:.98;margin:0;font-weight:950;letter-spacing:-.045em}.gradient{background:linear-gradient(100deg,var(--gold),var(--terra));-webkit-background-clip:text;background-clip:text;color:transparent}.hero p{max-width:820px;font-size:clamp(18px,2.2vw,25px);line-height:1.5;color:var(--muted);margin:24px 0 0}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}.btn{border:0;border-radius:12px;padding:13px 18px;font-weight:900;cursor:pointer;transition:.2s transform,.2s filter,.2s border-color;display:inline-flex;align-items:center;justify-content:center;gap:9px}.btn:hover{transform:translateY(-2px);filter:brightness(1.06)}.btn:focus-visible{outline:3px solid rgba(242,189,91,.42);outline-offset:3px}.btn-primary{background:linear-gradient(110deg,var(--gold),var(--terra));color:#24130c}.btn-secondary{background:rgba(255,255,255,.035);color:var(--text);border:1px solid var(--border)}
+    .section{margin-top:52px}.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.2em;color:var(--muted);margin:0 0 17px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{background:linear-gradient(145deg,rgba(50,30,21,.94),rgba(34,21,15,.94));border:1px solid var(--border);border-radius:18px;padding:22px;box-shadow:var(--shadow)}.label{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:850}.value{font-size:40px;font-weight:950;margin-top:13px}.hint{font-size:12px;color:var(--muted);margin-top:7px}.feature h3,.step h3{margin:10px 0 8px;font-size:18px}.feature p,.step p{margin:0;color:var(--muted);line-height:1.55;font-size:14px}.icon{font-size:23px}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.step-no{color:var(--gold);font-weight:950}.assurances{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.assurance strong{display:block;margin-bottom:8px}.assurance span{font-size:14px;color:var(--muted);line-height:1.5}
+    .demo-shell{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:stretch}.demo-copy{display:flex;flex-direction:column;justify-content:center}.demo-copy h2{font-size:clamp(28px,4vw,46px);line-height:1.06;margin:0}.demo-copy p{color:var(--muted);line-height:1.6;font-size:16px}.demo-stage{min-height:310px;display:flex;flex-direction:column;justify-content:space-between}.progress{display:flex;gap:8px}.bar{height:5px;flex:1;border-radius:999px;background:rgba(255,255,255,.08)}.bar.active{background:linear-gradient(90deg,var(--gold),var(--terra))}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.choice{background:rgba(255,255,255,.035);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;text-align:left;cursor:pointer}.choice:hover,.choice.selected{border-color:var(--gold);background:rgba(242,189,91,.09)}.demo-result{display:none}.result-list{display:grid;gap:10px;margin:18px 0}.result{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--border);background:rgba(255,255,255,.025);padding:12px 14px;border-radius:12px}.score{font-weight:950;color:var(--gold)}
+    .footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.7}.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,25px);opacity:0;pointer-events:none;background:#2b1b13;border:1px solid var(--border);box-shadow:var(--shadow);padding:12px 16px;border-radius:12px;color:var(--text);transition:.25s}.toast.show{opacity:1;transform:translate(-50%,0)}
+    @media(max-width:860px){.grid,.steps,.assurances{grid-template-columns:repeat(2,1fr)}.demo-shell{grid-template-columns:1fr}}
+    @media(max-width:560px){main{width:min(100% - 22px,1180px)}.hero{padding-top:50px}.grid,.steps,.assurances,.choice-grid{grid-template-columns:1fr}.value{font-size:34px}.top{align-items:flex-start}.brand{max-width:180px}.actions .btn{width:100%}}
   </style>
 </head>
 <body>
 <main>
-  <div class="top"><div><div class="brand">AfrIAgenesis®</div><div style="margin-top:6px;color:var(--muted);font-size:13px">Investor Staging</div></div><div id="status" class="status"><span class="dot"></span><span>CONNEXION</span></div></div>
-  <section class="hero"><h1>AfrIA <span class="gradient">Recruit™</span></h1><p>Le moteur africain de talent vérifié, explicable et gouverné.</p><div id="notice" class="notice"></div></section>
-  <section class="grid">
-    <article class="card"><div class="label">Candidats</div><div id="candidates" class="value">—</div><div class="hint">KPI agrégé sécurisé</div></article>
-    <article class="card"><div class="label">Besoins institutionnels</div><div id="needs" class="value">—</div><div class="hint">KPI agrégé sécurisé</div></article>
-    <article class="card"><div class="label">Matchs</div><div id="matches" class="value">—</div><div class="hint">KPI agrégé sécurisé</div></article>
-    <article class="card"><div class="label">Placements</div><div id="placements" class="value">—</div><div class="hint">KPI agrégé sécurisé</div></article>
-    <article class="card"><div class="label">Pipeline</div><div id="pipeline" class="value">—</div><div class="hint">Besoins + matchs</div></article>
-    <article class="card"><div class="label">Architecture</div><div class="value gradient" style="font-size:29px">GENESIS V4</div><div class="hint">Consentement · explicabilité · audit</div></article>
+  <div class="top">
+    <div><div class="brand">AfrIAgenesis®</div><div style="margin-top:6px;color:var(--muted);font-size:13px">Présentation investisseur</div></div>
+    <div id="data-status" class="tag"><span class="dot"></span><span>Démonstration prête</span></div>
+  </div>
+
+  <section class="hero">
+    <div class="eyebrow">Talent Intelligence for Africa</div>
+    <h1>AfrIA <span class="gradient">Recruit™</span></h1>
+    <p>Une plateforme de recrutement intelligente qui aide les institutions et les entreprises à identifier, comparer et mobiliser les meilleurs talents africains avec transparence et contrôle humain.</p>
+    <div class="actions">
+      <button class="btn btn-primary" id="launch-demo">Lancer la démonstration</button>
+      <button class="btn btn-secondary" data-scroll="indicators">Voir les indicateurs</button>
+      <button class="btn btn-secondary" data-scroll="journey">Découvrir le parcours</button>
+    </div>
   </section>
-  <section class="section"><h2>Parcours investisseur</h2><div class="steps">
-    <article class="card step"><span class="step-no">01</span><h3>Besoin institutionnel</h3><p>Cadrage du poste, des volumes et des exigences.</p></article>
-    <article class="card step"><span class="step-no">02</span><h3>Matching explicable</h3><p>Score justifié, critère par critère, traçable.</p></article>
-    <article class="card step"><span class="step-no">03</span><h3>Consentement candidat</h3><p>Partage opt-in, révocable et journalisé.</p></article>
-    <article class="card step"><span class="step-no">04</span><h3>Revue humaine</h3><p>Validation avant toute présentation institutionnelle.</p></article>
-    <article class="card step"><span class="step-no">05</span><h3>Placement</h3><p>Contractualisation, onboarding et suivi.</p></article>
-    <article class="card step"><span class="step-no">06</span><h3>Facturation & apprentissage</h3><p>Facturation au résultat et boucle d’amélioration.</p></article>
-  </div></section>
-  <section class="section"><h2>Preuves techniques</h2><div class="proofs">
-    <article class="card proof"><strong>Supabase actif</strong><span>Backend cloud restauré et opérationnel.</span></article>
-    <article class="card proof"><strong>RLS activé</strong><span>Accès aux tables métier protégé.</span></article>
-    <article class="card proof"><strong>RPC agrégé sécurisé</strong><span>Aucune donnée personnelle exposée.</span></article>
-    <article class="card proof"><strong>CI GitHub verte</strong><span>Tests et build contrôlés.</span></article>
-  </div></section>
-  <footer class="footer">Staging technique — aucune donnée personnelle n’est exposée.<br/>Lecture exclusive du RPC <code>investor_demo_kpis()</code> avec une clé browser publishable.</footer>
+
+  <section class="section">
+    <h2 class="section-title">Pourquoi AfrIA Recruit™</h2>
+    <div class="grid">
+      <article class="card feature"><div class="icon">⚡</div><h3>Décider plus vite</h3><p>Transformer un besoin de recrutement en présélection exploitable, sans perdre la maîtrise de la décision.</p></article>
+      <article class="card feature"><div class="icon">◎</div><h3>Comprendre chaque match</h3><p>Présenter les raisons du classement et les critères déterminants plutôt qu’un score opaque.</p></article>
+      <article class="card feature"><div class="icon">✓</div><h3>Garder l’humain au centre</h3><p>La technologie prépare et documente la décision ; la validation finale reste humaine.</p></article>
+    </div>
+  </section>
+
+  <section id="indicators" class="section">
+    <h2 class="section-title">Indicateurs de la plateforme</h2>
+    <div class="grid">
+      <article class="card"><div class="label">Talents enregistrés</div><div id="candidates" class="value">—</div><div class="hint">Profils disponibles dans l’environnement actuel</div></article>
+      <article class="card"><div class="label">Besoins actifs</div><div id="needs" class="value">—</div><div class="hint">Demandes institutionnelles actuellement suivies</div></article>
+      <article class="card"><div class="label">Correspondances</div><div id="matches" class="value">—</div><div class="hint">Mises en relation générées par la plateforme</div></article>
+      <article class="card"><div class="label">Placements</div><div id="placements" class="value">—</div><div class="hint">Recrutements finalisés dans l’environnement actuel</div></article>
+      <article class="card"><div class="label">Opportunités suivies</div><div id="pipeline" class="value">—</div><div class="hint">Besoins et correspondances en cours</div></article>
+      <article class="card"><div class="label">Couverture</div><div class="value gradient" style="font-size:29px">Panafricaine</div><div class="hint">Une architecture conçue pour plusieurs pays et institutions</div></article>
+    </div>
+  </section>
+
+  <section id="interactive-demo" class="section">
+    <div class="demo-shell">
+      <article class="card demo-copy">
+        <div class="eyebrow">Scénario interactif</div>
+        <h2>De la demande institutionnelle à la shortlist.</h2>
+        <p>Choisissez un besoin, lancez la présélection, puis observez comment AfrIA Recruit™ structure une décision compréhensible et contrôlable.</p>
+        <p style="font-size:13px">Ce scénario est illustratif et ne présente aucune donnée personnelle réelle.</p>
+      </article>
+      <article class="card demo-stage">
+        <div class="progress"><span class="bar active"></span><span class="bar"></span><span class="bar"></span></div>
+        <div id="demo-select">
+          <div class="label" style="margin-top:20px">1. Sélectionnez un besoin</div>
+          <div class="choice-grid">
+            <button class="choice" data-role="Responsable transformation numérique">Transformation numérique</button>
+            <button class="choice" data-role="Responsable finance et conformité">Finance & conformité</button>
+            <button class="choice" data-role="Coordinateur programmes régionaux">Programmes régionaux</button>
+            <button class="choice" data-role="Responsable opérations et logistique">Opérations & logistique</button>
+          </div>
+          <button class="btn btn-primary" id="run-match" disabled>Lancer la présélection</button>
+        </div>
+        <div id="demo-result" class="demo-result">
+          <div class="label" style="margin-top:20px">2. Shortlist illustrative</div>
+          <h3 id="selected-role" style="margin:9px 0 0"></h3>
+          <div class="result-list">
+            <div class="result"><span>Profil A — expérience sectorielle forte</span><span class="score">92%</span></div>
+            <div class="result"><span>Profil B — excellente couverture régionale</span><span class="score">87%</span></div>
+            <div class="result"><span>Profil C — conformité et leadership</span><span class="score">82%</span></div>
+          </div>
+          <button class="btn btn-primary" id="human-review">Valider la revue humaine</button>
+          <button class="btn btn-secondary" id="reset-demo" style="margin-left:8px">Recommencer</button>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section id="journey" class="section">
+    <h2 class="section-title">Parcours de recrutement</h2>
+    <div class="steps">
+      <article class="card step"><span class="step-no">01</span><h3>Définir le besoin</h3><p>Poste, compétences, localisation, disponibilité et critères institutionnels.</p></article>
+      <article class="card step"><span class="step-no">02</span><h3>Présélectionner</h3><p>Comparer les profils selon des critères documentés et compréhensibles.</p></article>
+      <article class="card step"><span class="step-no">03</span><h3>Obtenir le consentement</h3><p>Présenter uniquement les profils ayant autorisé le partage de leurs informations.</p></article>
+      <article class="card step"><span class="step-no">04</span><h3>Examiner humainement</h3><p>Permettre au recruteur de confirmer, corriger ou rejeter la proposition.</p></article>
+      <article class="card step"><span class="step-no">05</span><h3>Finaliser le placement</h3><p>Accompagner la contractualisation, l’intégration et le suivi.</p></article>
+      <article class="card step"><span class="step-no">06</span><h3>Améliorer en continu</h3><p>Utiliser les retours de mission pour renforcer les futures recommandations.</p></article>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">Confiance intégrée</h2>
+    <div class="assurances">
+      <article class="card assurance"><strong>Confidentialité</strong><span>Les informations individuelles ne sont jamais affichées dans cette présentation publique.</span></article>
+      <article class="card assurance"><strong>Décision humaine</strong><span>Chaque recommandation reste soumise à une validation explicite du recruteur.</span></article>
+      <article class="card assurance"><strong>Explicabilité</strong><span>Les raisons d’une recommandation peuvent être présentées et discutées.</span></article>
+    </div>
+  </section>
+
+  <footer class="footer">AfrIAgenesis® · AfrIA Recruit™<br/>Démonstration investisseur — aucune donnée personnelle n’est exposée.</footer>
 </main>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script>
-const SUPABASE_URL='https://hzrnrdeqscfesxlvfztx.supabase.co';
-const PUBLISHABLE_KEY='sb_publishable__Yq6PAVUE28v_cbnSk5PZg_G-SOMBOE';
+const DATA_ENDPOINT='https://hzrnrdeqscfesxlvfztx.supabase.co/rest/v1/rpc/investor_demo_kpis';
+const PUBLIC_ACCESS='sb_publishable__Yq6PAVUE28v_cbnSk5PZg_G-SOMBOE';
 const fmt=n=>Number(n||0).toLocaleString('fr-FR');
-async function boot(){
-  const status=document.getElementById('status');
+const status=document.getElementById('data-status');
+function toast(message){const t=document.getElementById('toast');t.textContent=message;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
+async function loadIndicators(){
   try{
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/rpc/investor_demo_kpis`,{method:'POST',headers:{apikey:PUBLISHABLE_KEY,'Content-Type':'application/json',Accept:'application/json'},body:'{}'});
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    const raw=await r.json(); const k=Array.isArray(raw)?raw[0]:raw;
+    const r=await fetch(DATA_ENDPOINT,{method:'POST',headers:{apikey:PUBLIC_ACCESS,'Content-Type':'application/json',Accept:'application/json'},body:'{}'});
+    if(!r.ok) throw new Error('indisponible');
+    const raw=await r.json();const k=Array.isArray(raw)?raw[0]:raw;
     const candidates=Number(k?.candidates||0),needs=Number(k?.institutional_needs||0),matches=Number(k?.candidate_job_matches||0),placements=Number(k?.placements||0);
-    document.getElementById('candidates').textContent=fmt(candidates);
-    document.getElementById('needs').textContent=fmt(needs);
-    document.getElementById('matches').textContent=fmt(matches);
-    document.getElementById('placements').textContent=fmt(placements);
-    document.getElementById('pipeline').textContent=fmt(needs+matches);
-    status.querySelector('span:last-child').textContent='LIVE';
-  }catch(e){
-    status.style.color='#f0a17c';status.style.borderColor='rgba(200,102,61,.45)';status.style.background='rgba(200,102,61,.1)';status.querySelector('span:last-child').textContent='DEMO';
-    ['candidates','needs','matches','placements','pipeline'].forEach(id=>document.getElementById(id).textContent='0');
-    const n=document.getElementById('notice');n.style.display='block';n.textContent='Mode DEMO : le RPC sécurisé est temporairement indisponible. Les compteurs sont neutralisés à zéro.';
+    document.getElementById('candidates').textContent=fmt(candidates);document.getElementById('needs').textContent=fmt(needs);document.getElementById('matches').textContent=fmt(matches);document.getElementById('placements').textContent=fmt(placements);document.getElementById('pipeline').textContent=fmt(needs+matches);
+    status.querySelector('span:last-child').textContent='Données actualisées';
+  }catch(_){
+    ['candidates','needs','matches','placements','pipeline'].forEach(id=>document.getElementById(id).textContent='—');
+    status.style.color='#f0b18e';status.style.borderColor='rgba(200,103,61,.4)';status.style.background='rgba(200,103,61,.08)';status.querySelector('span:last-child').textContent='Présentation disponible';
   }
 }
-boot();
+document.querySelectorAll('[data-scroll]').forEach(btn=>btn.addEventListener('click',()=>document.getElementById(btn.dataset.scroll).scrollIntoView({behavior:'smooth'})));
+document.getElementById('launch-demo').addEventListener('click',()=>document.getElementById('interactive-demo').scrollIntoView({behavior:'smooth'}));
+let chosen='';const choices=[...document.querySelectorAll('.choice')];const run=document.getElementById('run-match');
+choices.forEach(btn=>btn.addEventListener('click',()=>{choices.forEach(x=>x.classList.remove('selected'));btn.classList.add('selected');chosen=btn.dataset.role;run.disabled=false}));
+run.addEventListener('click',()=>{document.getElementById('demo-select').style.display='none';document.getElementById('demo-result').style.display='block';document.getElementById('selected-role').textContent=chosen;document.querySelectorAll('.bar')[1].classList.add('active');toast('Présélection illustrative générée')});
+document.getElementById('human-review').addEventListener('click',()=>{document.querySelectorAll('.bar')[2].classList.add('active');toast('Revue humaine validée — dossier prêt pour entretien')});
+document.getElementById('reset-demo').addEventListener('click',()=>{chosen='';choices.forEach(x=>x.classList.remove('selected'));run.disabled=true;document.getElementById('demo-select').style.display='block';document.getElementById('demo-result').style.display='none';document.querySelectorAll('.bar').forEach((b,i)=>b.classList.toggle('active',i===0))});
+loadIndicators();
 </script>
 </body>
 </html>
