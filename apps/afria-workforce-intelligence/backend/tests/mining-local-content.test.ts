@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Identity, Tenant } from "../src/domain.js";
-import { ControlError, InMemoryEvidenceVault } from "../src/living-core.js";
+import { ControlError } from "../src/living-core.js";
 import {
   LocalContentComplianceEngine,
   LocalContentRule,
   MiningWorkforceRecord,
   SuccessionPlan,
+  type ApprovalEvidenceRef,
   type LegalSourceRef,
 } from "../src/mining-local-content.js";
 
@@ -32,7 +33,20 @@ const source: LegalSourceRef = {
   jurisdiction: "GN",
   version: "2022-01",
   effectiveFrom: "2022-01-01",
+  sha256: "a".repeat(64),
 };
+
+function approvalEvidence(
+  kind: "LEGAL_RULE_APPROVAL" | "SUCCESSION_PLAN_APPROVAL",
+): ApprovalEvidenceRef {
+  return {
+    id: `proof-${kind.toLowerCase()}`,
+    tenantId: tenant.id,
+    kind,
+    createdAt: "2026-08-05T00:00:00.000Z",
+    sha256: kind === "LEGAL_RULE_APPROVAL" ? "b".repeat(64) : "c".repeat(64),
+  };
+}
 
 function workforceRecord(input: {
   id: string;
@@ -75,7 +89,7 @@ test("blocks compliance evaluation until a sourced rule receives human legal app
   );
 
   const agent = new Identity("legal-agent", tenant.id, "AGENT", "Legal Agent", ["LEGAL_APPROVER"]);
-  const proof = new InMemoryEvidenceVault().append({ kind: "LEGAL_RULE_APPROVAL" });
+  const proof = approvalEvidence("LEGAL_RULE_APPROVAL");
   assert.throws(
     () => rule.validate(agent, proof),
     (error: unknown) => error instanceof ControlError && /human legal approver/.test(error.message),
@@ -88,7 +102,7 @@ test("blocks compliance evaluation until a sourced rule receives human legal app
 });
 
 test("calculates the national workforce ratio, compliance gap and evidence coverage", () => {
-  const proof = new InMemoryEvidenceVault().append({ kind: "LEGAL_RULE_APPROVAL" });
+  const proof = approvalEvidence("LEGAL_RULE_APPROVAL");
   const rule = new LocalContentRule(
     "rule-2",
     tenant.id,
@@ -102,6 +116,7 @@ test("calculates the national workforce ratio, compliance gap and evidence cover
   const assessment = engine.evaluate({
     tenant,
     rule,
+    asOf: "2026-08-05",
     records: [
       workforceRecord({ id: "1", nationality: "NATIONAL", evidence: true }),
       workforceRecord({ id: "2", nationality: "NATIONAL", evidence: true }),
@@ -118,10 +133,11 @@ test("calculates the national workforce ratio, compliance gap and evidence cover
   assert.equal(assessment.gapPercent, 5);
   assert.equal(assessment.evidenceCoveragePercent, 75);
   assert.equal(assessment.assessmentType, "ADVISORY");
+  assert.equal(assessment.assessedAsOf, "2026-08-05");
 });
 
 test("returns NO_DATA without falsely declaring compliance", () => {
-  const proof = new InMemoryEvidenceVault().append({ kind: "LEGAL_RULE_APPROVAL" });
+  const proof = approvalEvidence("LEGAL_RULE_APPROVAL");
   const rule = new LocalContentRule(
     "rule-3",
     tenant.id,
@@ -131,7 +147,12 @@ test("returns NO_DATA without falsely declaring compliance", () => {
     source,
   ).validate(legalApprover, proof);
 
-  const assessment = new LocalContentComplianceEngine().evaluate({ tenant, rule, records: [] });
+  const assessment = new LocalContentComplianceEngine().evaluate({
+    tenant,
+    rule,
+    records: [],
+    asOf: "2026-08-05",
+  });
 
   assert.equal(assessment.status, "NO_DATA");
   assert.equal(assessment.ratioPercent, null);
@@ -139,7 +160,7 @@ test("returns NO_DATA without falsely declaring compliance", () => {
 });
 
 test("blocks workforce records from another tenant or mining project", () => {
-  const proof = new InMemoryEvidenceVault().append({ kind: "LEGAL_RULE_APPROVAL" });
+  const proof = approvalEvidence("LEGAL_RULE_APPROVAL");
   const rule = new LocalContentRule(
     "rule-4",
     tenant.id,
@@ -154,6 +175,7 @@ test("blocks workforce records from another tenant or mining project", () => {
     () => engine.evaluate({
       tenant,
       rule,
+      asOf: "2026-08-05",
       records: [workforceRecord({ id: "x", nationality: "NATIONAL", tenantId: "tenant-other" })],
     }),
     (error: unknown) => error instanceof ControlError && /Tenant isolation/.test(error.message),
@@ -163,6 +185,7 @@ test("blocks workforce records from another tenant or mining project", () => {
     () => engine.evaluate({
       tenant,
       rule,
+      asOf: "2026-08-05",
       records: [workforceRecord({ id: "y", nationality: "NATIONAL", projectId: "project-other" })],
     }),
     (error: unknown) => error instanceof ControlError && /Project isolation/.test(error.message),
@@ -170,8 +193,7 @@ test("blocks workforce records from another tenant or mining project", () => {
 });
 
 test("requires human HR approval before activating an expatriate succession plan", () => {
-  const vault = new InMemoryEvidenceVault();
-  const proof = vault.append({ kind: "SUCCESSION_PLAN_APPROVAL" });
+  const proof = approvalEvidence("SUCCESSION_PLAN_APPROVAL");
   const plan = new SuccessionPlan(
     "succession-1",
     tenant.id,
