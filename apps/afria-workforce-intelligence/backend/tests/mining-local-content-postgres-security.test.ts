@@ -82,6 +82,47 @@ test("deletes an expired idempotency record instead of replaying it", { skip: !i
   }
 });
 
+test("hides another tenant idempotency row from the non-owner application role", { skip: !integrationEnabled }, async () => {
+  const admin = new Pool({ connectionString: adminDatabaseUrl });
+  const app = new Pool({ connectionString: appDatabaseUrl });
+  try {
+    const tenantA = await seedTenant(admin);
+    const tenantB = await seedTenant(admin);
+    await new PostgresIdempotencyStore(app, () => "2026-08-05T14:30:00.000Z").put(
+      `${tenantB.tenant.id}:${tenantB.auditor.id}:POST:/v1/rules:idem-tenant-b`,
+      {
+        requestHash: "c".repeat(64),
+        responseStatus: 201,
+        responseHeaders: {},
+        responseBody: "{}",
+      },
+      3600,
+    );
+
+    const client = await app.connect();
+    try {
+      await client.query("begin");
+      await client.query("select set_config('app.tenant_id', $1, true)", [tenantA.tenant.id]);
+      const result = await client.query(
+        `select tenant_id
+         from local_content_idempotency_keys
+         where tenant_id = $1`,
+        [tenantB.tenant.id],
+      );
+      assert.equal(result.rowCount, 0);
+      await client.query("commit");
+    } catch (error: unknown) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } finally {
+    await app.end();
+    await admin.end();
+  }
+});
+
 test("reads a tenant emergency stop from PostgreSQL and resumes when the control is cleared", { skip: !integrationEnabled }, async () => {
   const admin = new Pool({ connectionString: adminDatabaseUrl });
   const app = new Pool({ connectionString: appDatabaseUrl });
