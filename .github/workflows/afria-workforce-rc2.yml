@@ -13,12 +13,16 @@ on:
       - 'apps/afria-workforce-intelligence/backend/**'
       - '.github/workflows/afria-workforce-rc2.yml'
 
+permissions:
+  contents: read
+
 jobs:
   proof-of-life:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
         env:
           POSTGRES_DB: workforce_test
           POSTGRES_USER: postgres
@@ -36,11 +40,12 @@ jobs:
       run:
         working-directory: apps/afria-workforce-intelligence/backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
       - run: npm install
+      - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm test
       - name: Install PostgreSQL client
