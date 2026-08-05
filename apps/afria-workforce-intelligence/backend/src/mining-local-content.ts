@@ -43,6 +43,12 @@ export type LegalSourceRef = Readonly<{
   version: string;
   effectiveFrom: string;
   effectiveTo?: string;
+  sha256: string;
+}>;
+
+export type ApprovalEvidenceRef = EvidenceRef & Readonly<{
+  tenantId: string;
+  sha256: string;
 }>;
 
 export type LocalContentRuleState = "DRAFT" | "VALIDATED" | "RETIRED";
@@ -74,15 +80,13 @@ export class LocalContentRule implements EnterpriseObject {
     this.version = version;
   }
 
-  validate(actor: Identity, proof: EvidenceRef): LocalContentRule {
+  validate(actor: Identity, proof: ApprovalEvidenceRef): LocalContentRule {
     if (actor.tenantId !== this.tenantId) throw new ControlError("Tenant isolation violation");
     if (actor.kind !== "HUMAN" || !actor.roles.includes("LEGAL_APPROVER")) {
       throw new ControlError("A human legal approver is required");
     }
     if (this.state !== "DRAFT") throw new ControlError("Only draft legal rules can be validated");
-    if (proof.kind !== "LEGAL_RULE_APPROVAL") {
-      throw new ControlError("Legal rule approval evidence is required");
-    }
+    assertApprovalEvidence(proof, this.tenantId, "LEGAL_RULE_APPROVAL");
 
     return new LocalContentRule(
       this.id,
@@ -103,8 +107,16 @@ function assertLegalSource(source: LegalSourceRef): void {
   if (!source.id.trim() || !source.title.trim() || !source.version.trim()) {
     throw new Error("Legal source identity, title and version are required");
   }
-  if (!source.jurisdiction.trim() || !source.effectiveFrom.trim()) {
-    throw new Error("Legal source jurisdiction and effective date are required");
+  if (!source.jurisdiction.trim()) throw new Error("Legal source jurisdiction is required");
+  assertIsoDate(source.effectiveFrom, "Legal source effective date");
+  if (source.effectiveTo !== undefined) {
+    assertIsoDate(source.effectiveTo, "Legal source expiry date");
+    if (source.effectiveTo < source.effectiveFrom) {
+      throw new Error("Legal source expiry date cannot precede its effective date");
+    }
+  }
+  if (!isSha256(source.sha256)) {
+    throw new Error("Legal source requires a valid SHA-256 fingerprint");
   }
   let url: URL;
   try {
@@ -113,6 +125,23 @@ function assertLegalSource(source: LegalSourceRef): void {
     throw new Error("Legal source URL must be valid");
   }
   if (url.protocol !== "https:") throw new Error("Legal source URL must use HTTPS");
+}
+
+function assertApprovalEvidence(
+  proof: ApprovalEvidenceRef,
+  tenantId: string,
+  expectedKind: "LEGAL_RULE_APPROVAL" | "SUCCESSION_PLAN_APPROVAL",
+): void {
+  if (proof.tenantId !== tenantId) throw new ControlError("Evidence tenant isolation violation");
+  if (proof.kind !== expectedKind) {
+    throw new ControlError(
+      expectedKind === "LEGAL_RULE_APPROVAL"
+        ? "Legal rule approval evidence is required"
+        : "Succession plan approval evidence is required",
+    );
+  }
+  if (!isSha256(proof.sha256)) throw new ControlError("Approval evidence requires a valid SHA-256 fingerprint");
+  if (Number.isNaN(Date.parse(proof.createdAt))) throw new ControlError("Approval evidence timestamp is invalid");
 }
 
 export type ComplianceAssessmentStatus = "COMPLIANT" | "NON_COMPLIANT" | "NO_DATA";
@@ -131,6 +160,7 @@ export type ComplianceAssessment = Readonly<{
   thresholdPercent: number;
   gapPercent: number | null;
   evidenceCoveragePercent: number;
+  assessedAsOf: string;
 }>;
 
 export class LocalContentComplianceEngine {
@@ -138,14 +168,24 @@ export class LocalContentComplianceEngine {
     tenant: Tenant;
     rule: LocalContentRule;
     records: readonly MiningWorkforceRecord[];
+    asOf?: string;
   }): ComplianceAssessment {
     const { tenant, rule, records } = input;
+    const asOf = input.asOf ?? new Date().toISOString().slice(0, 10);
+    assertIsoDate(asOf, "Assessment date");
+
     if (rule.state !== "VALIDATED") {
       throw new ControlError("Compliance evaluation requires a validated legal rule");
     }
     if (rule.tenantId !== tenant.id) throw new ControlError("Tenant isolation violation");
     if (rule.source.jurisdiction !== tenant.jurisdiction) {
       throw new ControlError("Legal source jurisdiction does not match tenant jurisdiction");
+    }
+    if (asOf < rule.source.effectiveFrom) {
+      throw new ControlError("Legal rule is not yet effective for the assessment date");
+    }
+    if (rule.source.effectiveTo !== undefined && asOf > rule.source.effectiveTo) {
+      throw new ControlError("Legal rule is no longer effective for the assessment date");
     }
 
     for (const record of records) {
@@ -177,6 +217,7 @@ export class LocalContentComplianceEngine {
         thresholdPercent: rule.thresholdPercent,
         gapPercent: null,
         evidenceCoveragePercent,
+        assessedAsOf: asOf,
       });
     }
 
@@ -196,6 +237,7 @@ export class LocalContentComplianceEngine {
       thresholdPercent: rule.thresholdPercent,
       gapPercent,
       evidenceCoveragePercent,
+      assessedAsOf: asOf,
     });
   }
 }
@@ -226,7 +268,7 @@ export class SuccessionPlan implements EnterpriseObject {
     if (!expatriateWorkforceRecordId.trim()) throw new Error("Expatriate workforce record id is required");
     if (!nationalCandidateEmployeeId.trim()) throw new Error("National candidate employee id is required");
     if (requiredSkills.length === 0) throw new Error("At least one required skill is required");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) throw new Error("Target date must use YYYY-MM-DD");
+    assertIsoDate(targetDate, "Succession target date");
     this.evidence = evidence;
     this.version = version;
   }
@@ -238,15 +280,13 @@ export class SuccessionPlan implements EnterpriseObject {
     return Math.round((matched / requiredSkills.size) * 100);
   }
 
-  approve(actor: Identity, proof: EvidenceRef): SuccessionPlan {
+  approve(actor: Identity, proof: ApprovalEvidenceRef): SuccessionPlan {
     if (actor.tenantId !== this.tenantId) throw new ControlError("Tenant isolation violation");
     if (actor.kind !== "HUMAN" || !actor.roles.includes("HR_APPROVER")) {
       throw new ControlError("A human HR approver is required");
     }
     if (this.state !== "DRAFT") throw new ControlError("Only draft succession plans can be approved");
-    if (proof.kind !== "SUCCESSION_PLAN_APPROVAL") {
-      throw new ControlError("Succession plan approval evidence is required");
-    }
+    assertApprovalEvidence(proof, this.tenantId, "SUCCESSION_PLAN_APPROVAL");
 
     return new SuccessionPlan(
       this.id,
@@ -263,6 +303,18 @@ export class SuccessionPlan implements EnterpriseObject {
       actor.id,
     );
   }
+}
+
+function assertIsoDate(value: string, label: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`${label} must use YYYY-MM-DD`);
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new Error(`${label} must be a valid calendar date`);
+  }
+}
+
+function isSha256(value: string): boolean {
+  return /^[a-f0-9]{64}$/i.test(value);
 }
 
 function roundPercent(value: number): number {
