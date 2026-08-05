@@ -8,21 +8,76 @@ on:
   push:
     branches:
       - feature/afria-workforce-intelligence-rc2
+      - feature/mining-local-content-module-06
     paths:
       - 'apps/afria-workforce-intelligence/backend/**'
       - '.github/workflows/afria-workforce-rc2.yml'
 
+permissions:
+  contents: read
+
 jobs:
   proof-of-life:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
+        env:
+          POSTGRES_DB: workforce_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d workforce_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workforce_test
+      APP_DATABASE_URL: postgresql://workforce_app:workforce_app@localhost:5432/workforce_test
     defaults:
       run:
         working-directory: apps/afria-workforce-intelligence/backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
       - run: npm install
+      - run: npm audit --audit-level=high
       - run: npm run typecheck
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply sovereign database migrations
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/001_living_core.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/002_mining_local_content.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations.sql
+      - name: Configure non-owner application role
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          begin
+            if not exists (select 1 from pg_roles where rolname = 'workforce_app') then
+              create role workforce_app login password 'workforce_app'
+                nosuperuser nocreatedb nocreaterole noinherit;
+            end if;
+          end
+          $$;
+          grant connect on database workforce_test to workforce_app;
+          grant usage on schema public to workforce_app;
+          grant select, insert, update, delete on all tables in schema public to workforce_app;
+          grant usage, select on all sequences in schema public to workforce_app;
+          SQL
       - run: npm test
+      - name: Test sovereign database controls
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations_test.sql
+      - name: Prove security migration rollback and re-apply
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations_down.sql
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.local_content_audit_events') is null")" = "t"
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.local_content_idempotency_keys') is null")" = "t"
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.local_content_module_controls') is null")" = "t"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations.sql
