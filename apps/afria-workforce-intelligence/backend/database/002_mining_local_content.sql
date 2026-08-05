@@ -1,3 +1,10 @@
+create unique index if not exists workforce_identities_id_tenant_uidx
+  on workforce_identities (id, tenant_id);
+create unique index if not exists workforce_employees_id_tenant_uidx
+  on workforce_employees (id, tenant_id);
+create unique index if not exists workforce_evidence_id_tenant_uidx
+  on workforce_evidence (id, tenant_id);
+
 create table if not exists mining_projects (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references workforce_tenants(id),
@@ -7,6 +14,8 @@ create table if not exists mining_projects (
   created_at timestamptz not null default now(),
   unique (tenant_id, project_code)
 );
+create unique index if not exists mining_projects_id_tenant_uidx
+  on mining_projects (id, tenant_id);
 
 create table if not exists local_content_legal_sources (
   id uuid primary key default gen_random_uuid(),
@@ -18,63 +27,85 @@ create table if not exists local_content_legal_sources (
   source_version text not null,
   effective_from date not null,
   effective_to date,
-  sha256 text not null,
+  sha256 text not null check (sha256 ~ '^[0-9A-Fa-f]{64}$'),
   verification_state text not null default 'DRAFT'
     check (verification_state in ('DRAFT','VERIFIED','REVOKED')),
-  verified_by_identity_id uuid references workforce_identities(id),
+  verified_by_identity_id uuid,
   verified_at timestamptz,
   created_at timestamptz not null default now(),
   unique (tenant_id, source_key, source_version),
+  foreign key (verified_by_identity_id, tenant_id)
+    references workforce_identities (id, tenant_id),
   check (effective_to is null or effective_to >= effective_from),
   check (
     (verification_state = 'VERIFIED' and verified_by_identity_id is not null and verified_at is not null)
     or verification_state <> 'VERIFIED'
   )
 );
+create unique index if not exists local_content_legal_sources_id_tenant_uidx
+  on local_content_legal_sources (id, tenant_id);
 
 create table if not exists local_content_rules (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references workforce_tenants(id),
-  project_id uuid not null references mining_projects(id),
-  legal_source_id uuid not null references local_content_legal_sources(id),
+  project_id uuid not null,
+  legal_source_id uuid not null,
   workforce_category text not null
     check (workforce_category in ('ALL','UNSKILLED','SKILLED','MIDDLE_MANAGEMENT','SENIOR_MANAGEMENT')),
   threshold_percent numeric(5,2) not null check (threshold_percent between 0 and 100),
   state text not null default 'DRAFT' check (state in ('DRAFT','VALIDATED','RETIRED')),
   version integer not null default 1 check (version > 0),
-  validated_by_identity_id uuid references workforce_identities(id),
-  validation_evidence_id uuid references workforce_evidence(id),
+  validated_by_identity_id uuid,
+  validation_evidence_id uuid,
   validated_at timestamptz,
   created_at timestamptz not null default now(),
+  foreign key (project_id, tenant_id)
+    references mining_projects (id, tenant_id),
+  foreign key (legal_source_id, tenant_id)
+    references local_content_legal_sources (id, tenant_id),
+  foreign key (validated_by_identity_id, tenant_id)
+    references workforce_identities (id, tenant_id),
+  foreign key (validation_evidence_id, tenant_id)
+    references workforce_evidence (id, tenant_id),
   check (
     (state = 'VALIDATED' and validated_by_identity_id is not null and validation_evidence_id is not null and validated_at is not null)
     or state <> 'VALIDATED'
   )
 );
+create unique index if not exists local_content_rules_id_tenant_uidx
+  on local_content_rules (id, tenant_id);
 
 create table if not exists mining_workforce_records (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references workforce_tenants(id),
-  project_id uuid not null references mining_projects(id),
-  employee_id uuid not null references workforce_employees(id),
+  project_id uuid not null,
+  employee_id uuid not null,
   role_code text not null,
   workforce_category text not null
     check (workforce_category in ('UNSKILLED','SKILLED','MIDDLE_MANAGEMENT','SENIOR_MANAGEMENT')),
   nationality_status text not null check (nationality_status in ('NATIONAL','EXPATRIATE')),
   monthly_cost_usd numeric(14,2) not null default 0 check (monthly_cost_usd >= 0),
   state text not null default 'ACTIVE' check (state in ('DRAFT','ACTIVE','SUSPENDED','EXITED')),
-  source_evidence_id uuid references workforce_evidence(id),
+  source_evidence_id uuid,
   valid_from date not null default current_date,
   valid_to date,
   created_at timestamptz not null default now(),
+  foreign key (project_id, tenant_id)
+    references mining_projects (id, tenant_id),
+  foreign key (employee_id, tenant_id)
+    references workforce_employees (id, tenant_id),
+  foreign key (source_evidence_id, tenant_id)
+    references workforce_evidence (id, tenant_id),
   check (valid_to is null or valid_to >= valid_from)
 );
+create unique index if not exists mining_workforce_records_id_tenant_uidx
+  on mining_workforce_records (id, tenant_id);
 
 create table if not exists local_content_assessments (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references workforce_tenants(id),
-  project_id uuid not null references mining_projects(id),
-  rule_id uuid not null references local_content_rules(id),
+  project_id uuid not null,
+  rule_id uuid not null,
   status text not null check (status in ('COMPLIANT','NON_COMPLIANT','NO_DATA')),
   assessment_type text not null default 'ADVISORY' check (assessment_type = 'ADVISORY'),
   national_count integer not null check (national_count >= 0),
@@ -84,8 +115,15 @@ create table if not exists local_content_assessments (
   threshold_percent numeric(5,2) not null check (threshold_percent between 0 and 100),
   gap_percent numeric(5,2),
   evidence_coverage_percent numeric(5,2) not null check (evidence_coverage_percent between 0 and 100),
-  evaluated_by_identity_id uuid references workforce_identities(id),
+  assessed_as_of date not null,
+  evaluated_by_identity_id uuid not null,
   evaluated_at timestamptz not null default now(),
+  foreign key (project_id, tenant_id)
+    references mining_projects (id, tenant_id),
+  foreign key (rule_id, tenant_id)
+    references local_content_rules (id, tenant_id),
+  foreign key (evaluated_by_identity_id, tenant_id)
+    references workforce_identities (id, tenant_id),
   check (total_count = national_count + expatriate_count),
   check (
     (status = 'NO_DATA' and ratio_percent is null and gap_percent is null)
@@ -96,9 +134,9 @@ create table if not exists local_content_assessments (
 create table if not exists succession_plans (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references workforce_tenants(id),
-  project_id uuid not null references mining_projects(id),
-  expatriate_workforce_record_id uuid not null references mining_workforce_records(id),
-  national_candidate_employee_id uuid not null references workforce_employees(id),
+  project_id uuid not null,
+  expatriate_workforce_record_id uuid not null,
+  national_candidate_employee_id uuid not null,
   required_skills jsonb not null default '[]'::jsonb,
   candidate_skills jsonb not null default '[]'::jsonb,
   readiness_percent numeric(5,2) not null default 0 check (readiness_percent between 0 and 100),
@@ -106,10 +144,20 @@ create table if not exists succession_plans (
   state text not null default 'DRAFT'
     check (state in ('DRAFT','APPROVED','IN_PROGRESS','COMPLETED','CANCELLED')),
   version integer not null default 1 check (version > 0),
-  approved_by_identity_id uuid references workforce_identities(id),
-  approval_evidence_id uuid references workforce_evidence(id),
+  approved_by_identity_id uuid,
+  approval_evidence_id uuid,
   approved_at timestamptz,
   created_at timestamptz not null default now(),
+  foreign key (project_id, tenant_id)
+    references mining_projects (id, tenant_id),
+  foreign key (expatriate_workforce_record_id, tenant_id)
+    references mining_workforce_records (id, tenant_id),
+  foreign key (national_candidate_employee_id, tenant_id)
+    references workforce_employees (id, tenant_id),
+  foreign key (approved_by_identity_id, tenant_id)
+    references workforce_identities (id, tenant_id),
+  foreign key (approval_evidence_id, tenant_id)
+    references workforce_evidence (id, tenant_id),
   check (jsonb_typeof(required_skills) = 'array'),
   check (jsonb_array_length(required_skills) > 0),
   check (jsonb_typeof(candidate_skills) = 'array'),
@@ -139,15 +187,45 @@ alter table mining_workforce_records enable row level security;
 alter table local_content_assessments enable row level security;
 alter table succession_plans enable row level security;
 
+alter table mining_projects force row level security;
+alter table local_content_legal_sources force row level security;
+alter table local_content_rules force row level security;
+alter table mining_workforce_records force row level security;
+alter table local_content_assessments force row level security;
+alter table succession_plans force row level security;
+
+drop policy if exists tenant_isolation_mining_projects on mining_projects;
 create policy tenant_isolation_mining_projects on mining_projects
-using (tenant_id::text = current_setting('app.tenant_id', true));
+for all
+using (tenant_id::text = current_setting('app.tenant_id', true))
+with check (tenant_id::text = current_setting('app.tenant_id', true));
+
+drop policy if exists tenant_isolation_local_content_sources on local_content_legal_sources;
 create policy tenant_isolation_local_content_sources on local_content_legal_sources
-using (tenant_id::text = current_setting('app.tenant_id', true));
+for all
+using (tenant_id::text = current_setting('app.tenant_id', true))
+with check (tenant_id::text = current_setting('app.tenant_id', true));
+
+drop policy if exists tenant_isolation_local_content_rules on local_content_rules;
 create policy tenant_isolation_local_content_rules on local_content_rules
-using (tenant_id::text = current_setting('app.tenant_id', true));
+for all
+using (tenant_id::text = current_setting('app.tenant_id', true))
+with check (tenant_id::text = current_setting('app.tenant_id', true));
+
+drop policy if exists tenant_isolation_mining_workforce_records on mining_workforce_records;
 create policy tenant_isolation_mining_workforce_records on mining_workforce_records
-using (tenant_id::text = current_setting('app.tenant_id', true));
+for all
+using (tenant_id::text = current_setting('app.tenant_id', true))
+with check (tenant_id::text = current_setting('app.tenant_id', true));
+
+drop policy if exists tenant_isolation_local_content_assessments on local_content_assessments;
 create policy tenant_isolation_local_content_assessments on local_content_assessments
-using (tenant_id::text = current_setting('app.tenant_id', true));
+for all
+using (tenant_id::text = current_setting('app.tenant_id', true))
+with check (tenant_id::text = current_setting('app.tenant_id', true));
+
+drop policy if exists tenant_isolation_succession_plans on succession_plans;
 create policy tenant_isolation_succession_plans on succession_plans
-using (tenant_id::text = current_setting('app.tenant_id', true));
+for all
+using (tenant_id::text = current_setting('app.tenant_id', true))
+with check (tenant_id::text = current_setting('app.tenant_id', true));
