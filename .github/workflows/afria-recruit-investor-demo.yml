@@ -21,6 +21,7 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
+      - run: npm test
       - run: npm run build
       - name: Verify build artifact
         run: test -f dist/index.html
