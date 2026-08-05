@@ -50,7 +50,16 @@ jobs:
       - run: npm test
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - name: Apply sovereign database migrations
+      - name: Apply and test sovereign database migrations
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/001_living_core.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/002_mining_local_content.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations_test.sql
+      - name: Prove security migration rollback and re-apply
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations_down.sql
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.local_content_audit_events') is null")" = "t"
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.local_content_idempotency_keys') is null")" = "t"
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.local_content_module_controls') is null")" = "t"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations.sql
