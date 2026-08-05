@@ -3,213 +3,161 @@
 **Asset:** Mining Local Content, Workforce & Value Retention Intelligence™  
 **Canonical parent:** `BP-MINING-GN-001 — AfrIAgenesis® Sovereign Mining OS™ Guinée`  
 **Review date:** 2026-08-05  
-**Scope:** domain, service, HTTP API, identity, operational guards, PostgreSQL controls, CI and rollback  
+**Version:** `v1.5-G4B-PERSISTENT-SECURITY-TEST_PROVEN`  
 **Verdict:** **S7+ CONDITIONAL GO FOR SYNTHETIC SANDBOX / NO-GO FOR PRODUCTION**
 
-## 1. Protected assets
+## Protected assets
 
-- legal-source artifacts, metadata, versions and fingerprints;
-- human approval evidence;
-- employee and expatriate assignment references;
-- nationality and workforce-category records;
-- compensation-cost fields;
-- compliance assessments and gaps;
-- succession candidates, skills and target dates;
-- tenant controls, audit events and Mission Control indicators;
-- authentication claims, roles, idempotency records and emergency-stop state.
+- legal-source artifacts, versions and fingerprints;
+- human legal and HR approval evidence;
+- workforce nationality, category and succession records;
+- compensation and skills-gap fields;
+- assessments and Mission Control indicators;
+- signed identity claims and privileged roles;
+- durable idempotency responses;
+- tenant emergency-stop state;
+- append-only audit records.
 
-No biometric data is required or authorised by the current model.
+No biometric data is required or authorised.
 
-## 2. Trust boundaries
+## Trust boundaries
 
-1. Client or cockpit → API ingress.
-2. API ingress → Bearer token verification.
-3. JWT verifier → signing-key/JWKS provider.
-4. Authenticated API → request guards.
-5. API adapter → governed application service.
-6. Application service → business repository and audit sink.
-7. Persistence layer → PostgreSQL with RLS.
-8. CI runner → source repository and ephemeral PostgreSQL.
-9. Legal officer → source validation and approval evidence.
-10. HR officer → succession approval evidence.
+1. Client/cockpit → API ingress.
+2. API ingress → Bearer/JWT verification.
+3. JWT verifier → institutional signing-key provider.
+4. Authenticated API → request guards and idempotency store.
+5. API → governed application service.
+6. Service → business repository and audit sink.
+7. Runtime adapters → PostgreSQL under non-owner application role.
+8. PostgreSQL → tenant-isolated RLS tables.
+9. Human legal/HR officers → approval evidence.
 
-`InMemoryAuthContextResolver`, in-memory guards and the in-memory repository are test adapters only. They must never constitute public-ingress identity or institutional production persistence.
+In-memory adapters remain test-only components.
 
-## 3. Threat model
+## STRIDE review
 
-| STRIDE class | Primary threat | Implemented control | Residual risk / CAPA |
-|---|---|---|---|
-| Spoofing | Actor or tenant impersonation | Native RS256 signature verification; issuer/audience/`kid`/expiry checks; Bearer resolver; tenant-bound actor context | Configure institutional issuer, JWKS retrieval/cache, key rotation and revocation |
-| Tampering | Altered law, approval or command replay | SHA-256 source/evidence fingerprints; legal effectivity; idempotency request hashes; database constraints | Store source files and signed approval artifacts in immutable evidence storage |
-| Repudiation | Denial of legal, assessment or succession action | Governed audit events; append-only database trigger; event/previous-hash fields | Wire runtime audit sink, chain verification and external timestamping |
-| Information disclosure | Cross-tenant HR or audit access | Tenant-scoped service; composite tenant FKs; RLS `FOR ALL`/`WITH CHECK`/`FORCE RLS`; controlled errors | Test non-owner application roles; add field masking and approved privacy model |
-| Denial of service | Oversized, malformed or repeated requests | Byte limits; JSON-only; fixed-window rate limiter; workflow timeout; emergency stop | Use distributed gateway limiter, concurrency/batch ceilings and infrastructure autoscaling controls |
-| Elevation of privilege | Role injection or agent self-approval | Roles derived from verified claims; payload identity ignored; human-only legal/HR approvals; separation of role endpoints | Add institutional policy engine, SoD administration and privileged-access reviews |
+| Threat | Implemented control | Residual production gate |
+|---|---|---|
+| Spoofing | Native RS256 verification; issuer/audience/`kid`/time validation; tenant-bound actor context | Institutional issuer/JWKS, rotation, revocation, MFA |
+| Tampering | SHA-256 evidence; legal effectivity; request hashes; parameterized SQL; integrity constraints | Immutable source-artifact store and signed approvals |
+| Repudiation | Governed audit events; append-only trigger and hash fields | Runtime business audit sink and external timestamping |
+| Information disclosure | Composite tenant FKs; `FORCE RLS`; non-owner role; explicit tenant-A/tenant-B test | Field masking and approved privacy model |
+| Denial of service | Byte limits; rate limiter; workflow timeout; emergency stop; database fail-closed | Distributed gateway limiter and infrastructure controls |
+| Elevation of privilege | Verified roles; ignored payload identity; human-only approvals | Institutional policy engine and privileged-access reviews |
 
-## 4. Tested abuse and failure cases
+## Persistent adapter controls — TEST_PROVEN
 
-- valid identity replayed under another tenant is rejected;
-- identity headers are ignored by the Bearer resolver;
-- expired tokens are rejected;
-- tampered JWT payloads fail signature verification;
-- wrong issuer, audience, key ID and unsupported algorithm are rejected;
-- future, expired and structurally invalid claims are rejected;
-- a viewer cannot access audit endpoints;
-- tenant, actor and roles injected into payloads are ignored;
-- agents cannot validate law or approve succession;
-- future or expired legal rules cannot be evaluated;
-- cross-tenant evidence and workforce records are rejected;
-- unsupported media types and malformed JSON are controlled;
-- oversized payloads return 413;
-- repeated requests are rate-limited with `Retry-After`;
-- emergency-stop state blocks protected routes with 503;
-- successful mutations can be replayed without duplicate execution;
-- idempotency-key reuse with a different payload returns conflict;
-- unknown routes return controlled 404 responses;
-- stacks are not leaked; caching and MIME sniffing are disabled; CORS is not enabled implicitly;
-- audit UPDATE/DELETE is blocked by PostgreSQL;
-- duplicate idempotency records and invalid stop records are blocked;
+### PostgreSQL idempotency
+
+`PostgresIdempotencyStore`:
+
+- creates durable response records;
+- reloads records from a new adapter instance;
+- deletes expired records before replay;
+- uses parameterized SQL;
+- scopes transactions with `app.tenant_id`;
+- rolls back on query or mapping failure;
+- prevents a tenant-A session from reading tenant-B records through RLS.
+
+### PostgreSQL emergency stop
+
+`PostgresEmergencyStopGuard`:
+
+- reads tenant-specific enable/stop state;
+- blocks protected access with controlled 503 when stopped;
+- permits access after an authorised resume update;
+- fails closed with `EMERGENCY_CONTROL_UNAVAILABLE` when PostgreSQL cannot be reached;
+- performs every read inside a tenant-scoped transaction.
+
+### Application database role
+
+CI creates `workforce_app` as:
+
+- `LOGIN`;
+- `NOSUPERUSER`;
+- `NOCREATEDB`;
+- `NOCREATEROLE`;
+- `NOINHERIT`;
+- no `BYPASSRLS` privilege.
+
+The integration suite connects through this role, not the table owner.
+
+## Tested abuse and failure cases
+
+- forged tenant or actor context is rejected;
+- tampered, expired, future or wrongly issued JWTs are rejected;
+- role injection and AI self-approval are blocked;
+- cross-tenant evidence and workforce records are blocked;
+- oversized, malformed and unsupported payloads are controlled;
+- repeated requests are rate-limited;
+- idempotency replay avoids duplicate command execution;
+- idempotency-key payload conflict is rejected;
+- expired persistent records are not replayed;
+- tenant-A cannot read tenant-B persistent idempotency data;
+- emergency stop blocks and resume restores tenant access;
+- emergency-control database outage fails closed;
+- audit update/delete is blocked by PostgreSQL;
 - security migration rollback and re-application succeed.
 
-## 5. Identity security
-
-### TEST_PROVEN
-
-- `Rs256JwtAccessTokenVerifier` validates native RSA SHA-256 signatures without accepting `none` or alternative algorithms;
-- issuer and audience are mandatory;
-- signing key ID is mandatory and resolved through a key-provider interface;
-- `iat`, optional `nbf`, `exp`, token ID, tenant, jurisdiction, actor type, display name and roles are validated;
-- configurable clock skew is bounded to 0–300 seconds;
-- Bearer context is reconstructed only after verification.
-
-### OPEN before production
-
-- actual institutional OIDC issuer configuration;
-- HTTPS JWKS retrieval, cache, rotation and outage policy;
-- token revocation/introspection decision;
-- MFA and privileged-access policy;
-- service-account lifecycle and workload identity;
-- security monitoring for repeated auth failure and anomalous claims.
-
-## 6. Data protection controls
-
-### Implemented
-
-- data minimisation in the kernel;
-- no biometric fields;
-- no production secrets or credentials committed;
-- tenant and project isolation;
-- advisory-only outputs;
-- source and approval integrity fingerprints;
-- controlled errors and audit metadata;
-- emergency-stop schema and tenant isolation.
-
-### Required before real data
-
-- lawful-basis and purpose register;
-- privacy impact assessment;
-- field classification and retention schedule;
-- encrypted transport/storage and key rotation;
-- field-level controls for compensation and succession data;
-- access/correction/deletion processes where applicable;
-- approved data residency and cross-border transfer model;
-- backup, restore and verified deletion evidence.
-
-## 7. Persistent operational controls
-
-Migration `003_security_operations.sql` implements:
-
-- tenant module enable/stop state;
-- append-only audit table with integrity hashes;
-- durable idempotency table;
-- uniqueness, effective integrity and tenant-bound foreign keys;
-- RLS hardening of security and base workforce tables.
-
-Verification proves:
-
-- valid control/audit/idempotency inserts;
-- append-only mutation rejection;
-- duplicate-key rejection;
-- invalid emergency-stop rejection;
-- migration DOWN removes security tables;
-- table-removal assertions pass;
-- migration 003 can be re-applied successfully.
-
-The schemas are proven, but production runtime adapters are not yet wired to the API/service. This remains a release blocker.
-
-## 8. Supply-chain and CI controls
+## Supply-chain and CI controls
 
 - Node.js 22 explicitly selected;
-- runner fixed to Ubuntu 24.04;
-- workflow permissions restricted to `contents: read`;
-- workflow timeout fixed at 15 minutes;
-- GitHub Actions pinned to commit SHAs;
+- Ubuntu 24.04 runner;
+- workflow permission limited to `contents: read`;
+- 15-minute timeout;
+- actions pinned to reviewed SHAs;
 - PostgreSQL 16 image pinned by digest;
-- dependency audit runs on every relevant push/PR;
-- strict type-check and all tests run before database verification;
+- dependency audit on every relevant push/PR;
+- strict type-check before integration tests;
 - migrations execute with `ON_ERROR_STOP=1`;
-- no deployment credential is used.
+- non-owner application role configured before tests;
+- no deployment credential used.
 
-## 9. Rollback and emergency controls
+## Verification evidence
 
-### TEST_PROVEN
+- **Code SHA:** `442c202fb6bd2777ebc3f0e7c3558388aba2ce78`
+- **Workflow run:** `31016382802` — SUCCESS
+- **Tests:** `40/40` passed, `0` failed
+- **Dependency audit:** `0` vulnerabilities reported
+- **TypeScript strict:** SUCCESS
+- **Migrations 001/002/003:** SUCCESS
+- **Persistent idempotency:** SUCCESS
+- **Persistent emergency stop:** SUCCESS
+- **Explicit non-owner cross-tenant RLS:** SUCCESS
+- **SQL control tests:** SUCCESS
+- **Migration 003 rollback and re-apply:** SUCCESS
 
-- tenant-level emergency-stop guard;
-- persistent emergency-control schema;
-- reversible migration 003;
-- removal assertions and re-application in CI.
-
-### OPEN before production
-
-- infrastructure routing kill switch;
-- named authority and dual-control procedure for stop/resume;
-- incident freeze preserving evidence;
-- full business migration restore test;
-- application deployment rollback;
-- post-rollback health and data-integrity verification;
-- operational incident simulation.
-
-## 10. S7+ decision matrix
+## S7+ decision matrix
 
 | Control family | Status |
 |---|---|
 | Native signed-token verification | TEST_PROVEN |
-| Institutional issuer/JWKS integration | OPEN |
+| Institutional issuer/JWKS | OPEN |
 | RBAC and human approvals | TEST_PROVEN |
-| Tenant/project isolation | TEST_PROVEN at domain/service/schema level |
+| Domain/service tenant isolation | TEST_PROVEN |
+| PostgreSQL non-owner RLS | TEST_PROVEN |
 | Legal-source integrity | TEST_PROVEN with synthetic data |
-| Input validation and error safety | TEST_PROVEN |
-| Rate limiting | TEST_PROVEN in-memory; distributed control OPEN |
-| Idempotency | TEST_PROVEN in-memory and schema; wired persistent adapter OPEN |
-| Audit generation | TEST_PROVEN in-memory |
-| Persistent append-only audit schema | TEST_PROVEN; runtime sink OPEN |
-| Emergency stop | TEST_PROVEN in-memory and schema; operational wiring OPEN |
+| Input/error safety | TEST_PROVEN |
+| In-memory rate limiting | TEST_PROVEN; distributed limiter OPEN |
+| Persistent idempotency adapter | TEST_PROVEN |
+| Persistent emergency-stop adapter | TEST_PROVEN |
+| Append-only audit schema | TEST_PROVEN; business runtime sink OPEN |
+| PostgreSQL business repository | OPEN |
 | Privacy governance for real HR data | OPEN |
-| Migration application | TEST_PROVEN |
 | Security migration rollback | TEST_PROVEN |
-| Full application rollback and incident response | OPEN |
+| Full deployment rollback/incident simulation | OPEN |
 
-## 11. Evidence
+## Verdict
 
-- Code evidence SHA: `d8fdcd01f068a06b4fe0fcc69e16263c12b8a709`
-- GitHub Actions run: `31014286308` — SUCCESS
-- Strict type-check: SUCCESS
-- Automated tests: **35/35 passed**
-- Dependency audit: 0 vulnerabilities reported
-- PostgreSQL migrations and SQL controls: SUCCESS
-- Rollback and re-apply: SUCCESS
+**GO** for continued Build Factory, synthetic demonstrations and transaction-safe business persistence engineering.
 
-## 12. Verdict
+**NO-GO** for merge, release, real employee ingestion, public exposure, official legal assessment or institutional production until closure of:
 
-**GO** for continued Build Factory, synthetic demonstrations, security integration and M8 remediation.
-
-**NO-GO** for production, real employee ingestion, public exposure, official legal assessment or institutional decisioning until all of the following are closed:
-
+- transaction-safe PostgreSQL business repository and atomic audit writes;
 - institutional issuer/JWKS integration;
-- PostgreSQL business repository and persistent security adapters wired to runtime;
-- distributed rate limiting and operational stop controls;
-- privacy/data-retention and field-access approval;
-- full deployment rollback and incident simulation;
+- distributed rate limiting and operational stop procedures;
+- privacy, retention, encryption and field-level access;
 - verified Guinean primary legal sources;
+- deployment rollback and incident simulation;
 - Mission Control browser QA;
 - human M8 and external legal/Big4-type review.
