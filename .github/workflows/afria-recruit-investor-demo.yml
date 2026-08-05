@@ -1,0 +1,28 @@
+name: AfrIA Recruit Investor Demo
+
+on:
+  push:
+    paths:
+      - 'apps/afria-recruit-investor-demo/**'
+      - '.github/workflows/afria-recruit-investor-demo.yml'
+  pull_request:
+    paths:
+      - 'apps/afria-recruit-investor-demo/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/afria-recruit-investor-demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: apps/afria-recruit-investor-demo/package-lock.json
+      - run: npm install
+      - run: npm run build
+      - name: Verify build artifact
+        run: test -f dist/index.html
