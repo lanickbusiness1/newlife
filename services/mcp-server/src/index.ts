@@ -4,6 +4,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import { compileRevenueEngine } from "./revenueEngine.js";
+
+const SERVICE_VERSION = "0.2.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -43,19 +46,19 @@ function governed(ctx: Context, tool: string, data: unknown) {
   return {
     data,
     provenance: [],
-    confidence: 0.5,
-    freshness: { status: "unknown", checkedAt: new Date().toISOString() },
+    confidence: 0.72,
+    freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.1", reason: "Scope validated; mock adapter active." },
+    eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 revenue engine active." },
     auditId,
-    limitations: ["MCP v0.1.1: moteurs métier non encore connectés."]
+    limitations: ["MCP v0.2.0: revenue engine deterministic; CRM/payment providers not yet connected to live external systems."]
   };
 }
 
 function buildServer() {
   const server = new McpServer({
     name: "afriagenesis-intelligence-mcp",
-    version: "0.1.1"
+    version: SERVICE_VERSION
   });
 
   function register(
@@ -123,6 +126,14 @@ function buildServer() {
     tenantId: context.tenantId, topic, priorities: [], risks: [], evidence: []
   }));
 
+  register("genome.revenue_engine.compile", "Compile un produit AfrIAgenesis® en moteur Release-to-Revenue GENESIS V4.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "revenue:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    ...compileRevenueEngine(payload)
+  }));
+
   return server;
 }
 
@@ -141,7 +152,9 @@ if (mode === "stdio") {
     res.json({
       status: "ok",
       service: "afriagenesis-intelligence-mcp",
-      version: "0.1.1"
+      version: SERVICE_VERSION,
+      genome: "GENESIS_V4",
+      revenueEngine: "GEN-V4-REV-ENGINE-001"
     });
   });
 
