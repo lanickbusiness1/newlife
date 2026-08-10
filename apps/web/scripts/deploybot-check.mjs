@@ -23,23 +23,22 @@ const envExamplePath = path.join(root, ".env.example");
 const envExample = fs.existsSync(envExamplePath) ? fs.readFileSync(envExamplePath, "utf8") : "";
 const missingEnv = requiredEnv.filter((key) => !envExample.includes(key));
 
-const status = missingFiles.length === 0 && missingEnv.length === 0 ? "PRET_AU_DEPLOIEMENT" : "NON_PRET";
+const codeVerified = missingFiles.length === 0 && missingEnv.length === 0;
+const status = codeVerified ? "CODE_VERIFIE" : "CONTRAT_INCOMPLET";
 
 const report = {
   project: "GDIZ Smart Service Node",
   root_directory: "apps/web",
   target_platform: "Vercel",
   status,
+  deployment_confirmed: false,
+  deployment_gate: codeVerified ? "CONFIGURATION_EXTERNE_REQUISE" : "CODE_INCOMPLET",
   missing_files: missingFiles,
   missing_env_keys: missingEnv,
-  next_action:
-    status === "PRET_AU_DEPLOIEMENT"
-      ? "Créer/brancher le projet Vercel avec Root Directory = apps/web puis renseigner les variables d'environnement."
-      : "Corriger les fichiers ou variables manquants avant déploiement.",
 };
 
 console.log(JSON.stringify(report, null, 2));
 
-if (status !== "PRET_AU_DEPLOIEMENT") {
+if (!codeVerified) {
   process.exit(1);
 }

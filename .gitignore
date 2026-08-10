@@ -3,4 +3,6 @@
 **/dist-e2e/
 **/test-results/
 **/playwright-report/
+**/.next/
+**/*.tsbuildinfo
 .DS_Store

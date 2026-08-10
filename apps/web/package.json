@@ -6,14 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --test scripts/*.test.mjs",
     "deploybot:check": "node scripts/deploybot-check.mjs"
   },
   "dependencies": {
     "framer-motion": "^11.11.17",
-    "next": "15.0.3",
-    "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "next": "16.3.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
@@ -23,5 +24,8 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
