@@ -1,28 +1,37 @@
-const demoFallback = {
-  mode: 'DEMO',
-  candidates: 1284,
-  institutionalNeeds: 17,
-  activeMatches: 146,
-  placements: 23,
-  pipeline: '184.5 M GNF',
+const unavailableKpis = {
+  mode: 'DEGRADED',
+  candidates: null,
+  institutionalNeeds: null,
+  activeMatches: null,
+  placements: null,
+  pipeline: null,
+  status: 'Indicateurs temporairement indisponibles',
+  warning: 'Aucune valeur de remplacement n’est affichée.',
 };
 
+function toMetric(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const metric = Number(value);
+  return Number.isFinite(metric) && metric >= 0 ? metric : null;
+}
+
 export async function loadInvestorKpis(supabase) {
-  const { data, error } = await supabase.rpc('investor_demo_kpis');
+  try {
+    const { data, error } = await supabase.rpc('investor_demo_kpis');
+    const row = Array.isArray(data) ? data[0] : data;
 
-  if (error || !data) {
+    if (error || !row) return { ...unavailableKpis };
+
     return {
-      ...demoFallback,
-      warning: `RPC KPI indisponible${error?.message ? ` : ${error.message}` : ''}`,
+      mode: 'LIVE',
+      candidates: toMetric(row.candidates),
+      institutionalNeeds: toMetric(row.institutional_needs),
+      activeMatches: toMetric(row.candidate_job_matches),
+      placements: toMetric(row.placements),
+      pipeline: toMetric(row.pipeline_opportunities),
+      status: 'Données agrégées vérifiées',
     };
+  } catch {
+    return { ...unavailableKpis };
   }
-
-  return {
-    mode: 'LIVE',
-    candidates: Number(data.candidates ?? 0),
-    institutionalNeeds: Number(data.institutional_needs ?? 0),
-    activeMatches: Number(data.candidate_job_matches ?? 0),
-    placements: Number(data.placements ?? 0),
-    pipeline: 'Connecté à institutional_billing',
-  };
 }

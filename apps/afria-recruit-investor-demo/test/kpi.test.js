@@ -13,6 +13,7 @@ test('loads investor KPIs through the secured aggregate RPC', async () => {
           institutional_needs: 3,
           candidate_job_matches: 0,
           placements: 0,
+          pipeline_opportunities: 10,
         },
         error: null,
       };
@@ -28,11 +29,40 @@ test('loads investor KPIs through the secured aggregate RPC', async () => {
     institutionalNeeds: 3,
     activeMatches: 0,
     placements: 0,
-    pipeline: 'Connecté à institutional_billing',
+    pipeline: 10,
+    status: 'Données agrégées vérifiées',
   });
 });
 
-test('returns a transparent fallback when the RPC is unavailable', async () => {
+test('normalizes a one-row RPC response without inventing missing values', async () => {
+  const supabase = {
+    async rpc() {
+      return {
+        data: [{
+          candidates: '12',
+          institutional_needs: '3',
+          candidate_job_matches: '7',
+          placements: '2',
+        }],
+        error: null,
+      };
+    },
+  };
+
+  const result = await loadInvestorKpis(supabase);
+
+  assert.deepEqual(result, {
+    mode: 'LIVE',
+    candidates: 12,
+    institutionalNeeds: 3,
+    activeMatches: 7,
+    placements: 2,
+    pipeline: null,
+    status: 'Données agrégées vérifiées',
+  });
+});
+
+test('returns an empty transparent state when the RPC is unavailable', async () => {
   const supabase = {
     async rpc() {
       return { data: null, error: { message: 'temporary failure' } };
@@ -41,6 +71,29 @@ test('returns a transparent fallback when the RPC is unavailable', async () => {
 
   const result = await loadInvestorKpis(supabase);
 
-  assert.equal(result.mode, 'DEMO');
-  assert.match(result.warning, /RPC KPI indisponible/);
+  assert.deepEqual(result, {
+    mode: 'DEGRADED',
+    candidates: null,
+    institutionalNeeds: null,
+    activeMatches: null,
+    placements: null,
+    pipeline: null,
+    status: 'Indicateurs temporairement indisponibles',
+    warning: 'Aucune valeur de remplacement n’est affichée.',
+  });
+});
+
+test('returns the same transparent state when the RPC throws', async () => {
+  const supabase = {
+    async rpc() {
+      throw new Error('network unavailable');
+    },
+  };
+
+  const result = await loadInvestorKpis(supabase);
+
+  assert.equal(result.mode, 'DEGRADED');
+  assert.equal(result.candidates, null);
+  assert.equal(result.pipeline, null);
+  assert.equal(result.warning, 'Aucune valeur de remplacement n’est affichée.');
 });
