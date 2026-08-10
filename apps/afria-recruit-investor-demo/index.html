@@ -1,1 +1,332 @@
-<!doctype html><html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>AfrIA Recruit™ — Investor Demo</title></head><body><div id="app"></div><script type="module" src="/src/main.js"></script></body></html>
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#160e0a" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co https://supabase.test.invalid; form-action 'self'"
+    />
+    <meta
+      name="description"
+      content="AfrIA Recruit™ — staging investisseur contrôlé, indicateurs agrégés vérifiés et parcours de gouvernance illustratif."
+    />
+    <title>AfrIA Recruit™ — Staging investisseur contrôlé</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Aller au contenu</a>
+
+    <header class="site-header wrap">
+      <a
+        class="brand-lockup"
+        href="#top"
+        data-testid="brand-logo-header"
+        aria-label="AfrIAgenesis, retour en haut"
+      >
+        <span class="brand-mark" aria-hidden="true">AG</span>
+        <span>
+          <span class="brand-name"><b>AfrIA</b>genesis®</span>
+          <span class="brand-subtitle">Institution Intelligence OS™</span>
+        </span>
+      </a>
+      <span class="release-badge">STAGING — CONCEPT — NON DÉPLOYÉ</span>
+    </header>
+
+    <main id="main-content">
+      <section id="top" class="hero wrap">
+        <p class="eyebrow">Talent intelligence for Africa</p>
+        <h1>AfrIA <span class="gradient-text">Recruit™</span></h1>
+        <p class="hero-lead">Le moteur africain de talent vérifié, explicable et gouverné.</p>
+        <p class="hero-copy">
+          Cette présentation contrôlée illustre comment un besoin peut être structuré,
+          vérifié puis revu par une personne. Elle ne constitue ni un produit déployé,
+          ni une promesse commerciale.
+        </p>
+        <div class="hero-actions">
+          <button class="button button-primary" id="launch-demo" type="button">
+            Lancer la démonstration
+          </button>
+          <button class="button button-secondary" type="button" data-scroll="indicators">
+            Voir les indicateurs
+          </button>
+          <button class="button button-secondary" type="button" data-scroll="journey">
+            Découvrir le parcours
+          </button>
+        </div>
+        <div class="scope-note" role="note">
+          <strong>Périmètre public minimal.</strong>
+          Seuls des agrégats autorisés sont affichés. La disponibilité de données ne vaut
+          pas validation du produit complet.
+        </div>
+      </section>
+
+      <section class="section section-muted" aria-labelledby="value-title">
+        <div class="wrap">
+          <p class="section-kicker">Pourquoi ce concept</p>
+          <h2 id="value-title" class="section-heading">Décider avec des preuves, jamais à l’aveugle.</h2>
+          <div class="feature-grid">
+            <article class="surface feature-card">
+              <span class="feature-icon" aria-hidden="true">01</span>
+              <h3>Structurer le besoin</h3>
+              <p>Transformer une demande en critères documentés avant toute recherche de profils.</p>
+            </article>
+            <article class="surface feature-card">
+              <span class="feature-icon" aria-hidden="true">02</span>
+              <h3>Expliquer la correspondance</h3>
+              <p>Présenter les critères et leur niveau de preuve, sans réduire une personne à un score.</p>
+            </article>
+            <article class="surface feature-card">
+              <span class="feature-icon" aria-hidden="true">03</span>
+              <h3>Conserver la décision humaine</h3>
+              <p>Bloquer le partage sans consentement et documenter chaque validation importante.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="indicators" class="section" aria-labelledby="indicator-title">
+        <div class="wrap">
+          <p class="section-kicker">Indicateurs autorisés</p>
+          <div class="section-title-row">
+            <div>
+              <h2 id="indicator-title" class="section-heading">Des agrégats vérifiés ou aucun chiffre.</h2>
+              <p class="section-copy">
+                Les valeurs non disponibles restent volontairement masquées. Aucun chiffre de
+                remplacement n’est généré.
+              </p>
+            </div>
+            <p id="data-status" class="data-status" role="status" aria-live="polite">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span>Configuration des données en cours…</span>
+            </p>
+          </div>
+          <div class="metric-grid" aria-label="Indicateurs agrégés AfrIA Recruit">
+            <article class="surface metric-card">
+              <span>Talents vérifiés</span>
+              <strong id="candidates">—</strong>
+              <small>Profils répondant aux gates de vérification</small>
+            </article>
+            <article class="surface metric-card">
+              <span>Besoins vérifiés</span>
+              <strong id="needs">—</strong>
+              <small>Besoins approuvés, en sourcing ou pourvus</small>
+            </article>
+            <article class="surface metric-card">
+              <span>Correspondances éligibles</span>
+              <strong id="matches">—</strong>
+              <small>Matching vérifié et rendu éligible</small>
+            </article>
+            <article class="surface metric-card">
+              <span>Placements gouvernés</span>
+              <strong id="placements">—</strong>
+              <small>Placements actifs ou terminés</small>
+            </article>
+            <article class="surface metric-card metric-card-wide">
+              <span>Opportunités actives vérifiées</span>
+              <strong id="pipeline">—</strong>
+              <small>Besoins vérifiés encore approuvés ou en sourcing</small>
+            </article>
+          </div>
+          <p id="data-warning" class="data-warning" hidden></p>
+        </div>
+      </section>
+
+      <section id="interactive-demo" class="section section-muted" aria-labelledby="demo-title">
+        <div class="wrap demo-layout">
+          <article class="demo-copy">
+            <p class="section-kicker">Scénario pédagogique</p>
+            <h2 id="demo-title" class="section-heading">Voir les gates avant la recommandation.</h2>
+            <p class="section-copy">
+              Le scénario n’utilise aucun profil réel. Il montre pourquoi le consentement et la
+              vérification doivent être établis avant toute présélection exploitable.
+            </p>
+            <ul class="proof-list">
+              <li>Aucune identité ni donnée personnelle</li>
+              <li>Aucun score numérique isolé</li>
+              <li>Revue humaine obligatoire</li>
+            </ul>
+          </article>
+
+          <article class="surface demo-stage">
+            <div class="progress" aria-label="Progression du scénario">
+              <span class="progress-step active"></span>
+              <span class="progress-step"></span>
+              <span class="progress-step"></span>
+            </div>
+
+            <div id="demo-select">
+              <p class="stage-label">1. Choisissez un besoin fictif</p>
+              <div class="choice-grid">
+                <button class="choice" type="button" data-role="Responsable transformation numérique" aria-pressed="false">
+                  Transformation numérique
+                </button>
+                <button class="choice" type="button" data-role="Responsable finance et conformité" aria-pressed="false">
+                  Finance &amp; conformité
+                </button>
+                <button class="choice" type="button" data-role="Coordinateur programmes régionaux" aria-pressed="false">
+                  Programmes régionaux
+                </button>
+                <button class="choice" type="button" data-role="Responsable opérations et logistique" aria-pressed="false">
+                  Opérations &amp; logistique
+                </button>
+              </div>
+
+              <fieldset class="gate-fieldset">
+                <legend>2. Reconnaissez les prérequis de production</legend>
+                <label class="gate-check">
+                  <input id="consent-gate" type="checkbox" />
+                  <span>Consentement requis avant tout partage</span>
+                </label>
+                <label class="gate-check">
+                  <input id="verification-gate" type="checkbox" />
+                  <span>Vérification requise avant toute recommandation</span>
+                </label>
+              </fieldset>
+
+              <button class="button button-primary" id="run-match" type="button" disabled>
+                Lancer la présélection
+              </button>
+            </div>
+
+            <div id="demo-result" hidden>
+              <p class="stage-label">3. Lecture explicable</p>
+              <h3 id="selected-role"></h3>
+              <p class="result-note">
+                Exemple de dimensions à instruire. Elles ne décrivent aucune personne et ne
+                constituent pas une recommandation.
+              </p>
+              <div class="result-list">
+                <div class="result-row">
+                  <span>Expérience sectorielle</span>
+                  <strong>DÉCLARÉ — À VÉRIFIER</strong>
+                </div>
+                <div class="result-row">
+                  <span>Disponibilité et mobilité</span>
+                  <strong>DÉCLARÉ — À VÉRIFIER</strong>
+                </div>
+                <div class="result-row">
+                  <span>Conformité documentaire</span>
+                  <strong>DÉCLARÉ — À VÉRIFIER</strong>
+                </div>
+              </div>
+              <div class="result-actions">
+                <button class="button button-primary" id="human-review" type="button">
+                  Confirmer la revue humaine
+                </button>
+                <button class="button button-secondary" id="reset-demo" type="button">
+                  Recommencer
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="journey" class="section" aria-labelledby="journey-title">
+        <div class="wrap">
+          <p class="section-kicker">Parcours gouverné</p>
+          <h2 id="journey-title" class="section-heading">Six étapes, quatre gates explicites.</h2>
+          <div class="journey-grid">
+            <article class="surface journey-card"><span>01</span><h3>Définir</h3><p>Formaliser besoin, contexte et critères.</p></article>
+            <article class="surface journey-card"><span>02</span><h3>Vérifier</h3><p>Qualifier les preuves et leur fraîcheur.</p></article>
+            <article class="surface journey-card"><span>03</span><h3>Consentir</h3><p>Obtenir un accord traçable avant partage.</p></article>
+            <article class="surface journey-card"><span>04</span><h3>Comparer</h3><p>Expliquer chaque correspondance utile.</p></article>
+            <article class="surface journey-card"><span>05</span><h3>Revoir</h3><p>Confirmer, corriger ou rejeter humainement.</p></article>
+            <article class="surface journey-card"><span>06</span><h3>Documenter</h3><p>Conserver la preuve de la décision.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section trust-section" aria-labelledby="trust-title">
+        <div class="wrap">
+          <p class="section-kicker">Confiance intégrée</p>
+          <h2 id="trust-title" class="section-heading">Ce staging ne franchit pas les limites qu’il explique.</h2>
+          <div class="trust-grid">
+            <article><strong>Confidentialité</strong><span>Aucune donnée personnelle réelle n’est exposée dans cette présentation publique.</span></article>
+            <article><strong>Décision humaine</strong><span>Aucune recommandation n’est présentée comme une décision automatisée.</span></article>
+            <article><strong>Vérité des claims</strong><span>Une valeur absente reste un tiret ; un concept reste nommé comme tel.</span></article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <div class="brand-lockup" data-testid="brand-logo-footer" aria-label="AfrIA Recruit par AfrIAgenesis">
+          <span class="brand-mark brand-mark-small" aria-hidden="true">AG</span>
+          <span>
+            <span class="brand-name"><b>AfrIA</b>genesis®</span>
+            <span class="brand-subtitle">Powered by AfrIAgenesis®</span>
+          </span>
+        </div>
+        <p>AfrIA Recruit™ — présentation contrôlée<br />Concept non déployé · aucune donnée personnelle réelle</p>
+      </div>
+    </footer>
+
+    <div class="floating-actions">
+      <a
+        class="floating-button whatsapp-button"
+        aria-label="Échanger sur WhatsApp"
+        title="Échanger sur WhatsApp"
+        target="_blank"
+        rel="noopener noreferrer"
+        href="https://wa.me/2290161107373?text=Bonjour%2C%20je%20d%C3%A9couvre%20le%20concept%20AfrIA%20Recruit%E2%84%A2%20et%20je%20souhaite%20%C3%A9changer%20avec%20l%E2%80%99%C3%A9quipe%20AfrIAgenesis%C2%AE."
+      >
+        <span aria-hidden="true">WA</span>
+      </a>
+      <button
+        class="floating-button assistant-launcher"
+        id="assistant-launcher"
+        type="button"
+        aria-label="Ouvrir l’assistant guidé AfrIA Recruit"
+        aria-controls="assistant-panel"
+        aria-expanded="false"
+      >
+        <span aria-hidden="true">AI</span>
+      </button>
+    </div>
+
+    <section
+      id="assistant-panel"
+      class="assistant-panel"
+      role="dialog"
+      aria-label="Assistant guidé AfrIA Recruit"
+      hidden
+    >
+      <header class="assistant-header">
+        <div>
+          <strong>Assistant guidé AfrIA Recruit™</strong>
+          <span>Réponses documentaires · aucune décision automatisée</span>
+        </div>
+        <div class="assistant-tools">
+          <button id="assistant-clear" type="button" aria-label="Effacer la conversation">↺</button>
+          <button id="assistant-close" type="button" aria-label="Fermer l’assistant guidé">×</button>
+        </div>
+      </header>
+      <div id="assistant-messages" class="assistant-messages" aria-live="polite"></div>
+      <div class="quick-replies" aria-label="Questions rapides">
+        <button type="button" data-question="Comment fonctionne le matching ?">Comprendre le matching</button>
+        <button type="button" data-question="Comment protégez-vous les données privées ?">Confidentialité</button>
+        <button type="button" data-question="Je veux un pilote">Cadrer un pilote</button>
+      </div>
+      <form id="assistant-form" class="assistant-form">
+        <label class="visually-hidden" for="assistant-input">Votre question à l’assistant AfrIA Recruit</label>
+        <input
+          id="assistant-input"
+          name="question"
+          maxlength="240"
+          autocomplete="off"
+          placeholder="Posez une question sur le concept…"
+        />
+        <button type="submit" aria-label="Envoyer la question">Envoyer</button>
+      </form>
+    </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

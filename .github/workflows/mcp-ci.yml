@@ -1,6 +1,7 @@
 name: MCP CI
 on:
   push:
+    branches: [main]
     paths:
       - 'services/mcp-server/**'
       - 'render.yaml'
@@ -11,6 +12,13 @@ on:
       - 'render.yaml'
       - '.github/workflows/mcp-ci.yml'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -18,11 +26,14 @@ jobs:
       run:
         working-directory: services/mcp-server
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 20
-      - run: npm install
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/mcp-server/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
