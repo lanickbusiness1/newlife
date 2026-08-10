@@ -18,15 +18,19 @@ Le job `verify` exécute, dans cet ordre :
 
 1. installation déterministe par `npm ci` avec Node.js 24 ;
 2. audit npm au seuil `high` ;
-3. tests unitaires et contrats du packager/scanner ;
-4. E2E Playwright sur le vrai bundle Vite ;
-5. build de production ;
+3. tests unitaires, contrats du packager/scanner et migration sur PostgreSQL embarqué ;
+4. build de production et empreintes de chaque fichier ;
+5. E2E Playwright sur ce même bundle, puis preuve que ses empreintes sont inchangées ;
 6. scan du bundle et de l’artefact complet ;
 7. paquet Pages unique et manifeste de release.
 
 Le job `deploy` ne consomme que l’artefact produit par `verify`. Le job `smoke`
 contrôle ensuite la racine Recruit, le SHA de `release.json` et le sous-chemin
 Startup Accelerator.
+
+La concurrence est définie pour l’ensemble du workflow par ref avec
+`cancel-in-progress: true`. Une release plus récente annule donc sa devancière avant
+que cette dernière puisse publier un artefact obsolète.
 
 ## Activation et comportement sûr
 
@@ -45,6 +49,9 @@ RPC agrégé versionné par
 `supabase/migrations/20260810094242_secure_investor_demo_kpis.sql`. Le scanner
 interdit les marqueurs `service_role`, clés serveur, anciens chiffres inventés et
 source maps.
+
+Les Actions, l’image Node du conteneur et les dépendances npm sont immuables dans
+chaque release. Dependabot contrôle leurs mises à jour chaque semaine par PR.
 
 ## Rollback
 

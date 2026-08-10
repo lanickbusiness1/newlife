@@ -9,18 +9,18 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "build:e2e": "VITE_SUPABASE_URL=https://supabase.test.invalid VITE_SUPABASE_PUBLISHABLE_KEY=test-publishable-key vite build --outDir dist-e2e",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test",
     "test:e2e": "playwright test",
     "scan:bundle": "node scripts/scan-public-bundle.mjs dist",
     "package:pages": "node scripts/package-pages.mjs dist ../startup-accelerator-genome/index.html ../../public-site local",
-    "check": "npm test && npm run test:e2e && npm run build && npm run scan:bundle"
+    "check": "npm test && npm run build && npm run test:e2e && npm run scan:bundle"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.4",
     "@playwright/test": "^1.62.1",
     "vite": "^7.3.6"
   }

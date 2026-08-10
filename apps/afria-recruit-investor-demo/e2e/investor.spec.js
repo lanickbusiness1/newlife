@@ -59,7 +59,7 @@ test('states the governed staging scope and excludes unsupported claims', async 
   await page.goto('/');
 
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
-  await expect(page.getByText('STAGING — CONCEPT — NON DÉPLOYÉ', { exact: true })).toBeVisible();
+  await expect(page.getByText('STAGING — CONCEPT — HORS PRODUCTION', { exact: true })).toBeVisible();
   await expect(page.getByText(/aucune donnée personnelle réelle/i).first()).toBeVisible();
   await expect(page.locator('[data-testid="brand-logo-header"]')).toBeVisible();
   await expect(page.locator('[data-testid="brand-logo-footer"]')).toBeVisible();
@@ -100,8 +100,13 @@ test('assistant safely handles matching and pilot intents', async ({ page }) => 
   page.on('pageerror', (error) => runtimeErrors.push(error));
   await page.goto('/');
 
+  const panel = page.locator('#assistant-panel');
+  await expect(panel).toBeHidden();
   await page.getByRole('button', { name: 'Ouvrir l’assistant guidé AfrIA Recruit' }).click();
-  await expect(page.locator('#assistant-panel')).toBeVisible();
+  await expect(panel).toBeVisible();
+  await page.getByRole('button', { name: 'Fermer l’assistant guidé' }).click();
+  await expect(panel).toBeHidden();
+  await page.getByRole('button', { name: 'Ouvrir l’assistant guidé AfrIA Recruit' }).click();
   await page.getByRole('button', { name: 'Comprendre le matching' }).click();
   await expect(page.locator('#assistant-messages')).toContainText('critères lisibles');
 

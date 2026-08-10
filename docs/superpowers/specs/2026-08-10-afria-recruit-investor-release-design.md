@@ -18,10 +18,11 @@ Le dépôt contient trois surfaces concurrentes : une application Vite connecté
 2. Les fonctions utiles de la page premium — identité AfrIAgenesis®, scénario interactif, assistant explicatif, CTA WhatsApp, responsive — sont intégrées dans cette application Vite.
 3. Les KPI restent chargés par `loadInvestorKpis()` depuis le RPC Supabase `investor_demo_kpis`. Une indisponibilité produit un mode dégradé explicitement libellé, jamais de faux claim live.
 4. La clé navigateur Supabase est traitée comme publique. Aucun `service_role`, secret serveur ou donnée personnelle ne doit être présent dans la source ou le bundle.
-5. Un seul workflow `AfrIA Recruit Canonical Release` exécute dans l’ordre : installation déterministe, tests unitaires, tests E2E du bundle, build de production, audit de secrets, création de l’artefact Pages, déploiement si Pages existe, puis smoke test HTTP.
+5. Un seul workflow `AfrIA Recruit Canonical Release` exécute dans l’ordre : installation déterministe, tests unitaires et SQL, build de production, tests E2E de ce même répertoire immuable, audit de secrets, création de l’artefact Pages, déploiement si Pages existe, puis smoke test HTTP.
 6. Les trois workflows historiques AfrIA Recruit et le workflow Pages concurrent Startup Accelerator sont retirés afin d’éliminer les doubles exécutions et les écrasements de site. L’Accelerator est préservé dans l’artefact unique sous `/startup-accelerator/`; les anciennes pages Recruit restent des archives non publiées.
 7. Le staging ne prétend pas être le produit Next.js/PWA production verrouillé dans Notion. Il constitue une preuve investisseur connectée et contrôlée.
 8. Le RPC `investor_demo_kpis` est versionné dans le dépôt et n’agrège que les enregistrements ayant franchi les gates métier. Sa fonction `SECURITY DEFINER` fixe un `search_path` vide et limite explicitement l’exécution à `anon` et `authenticated`.
+9. La concurrence est gérée au niveau du workflow et annule tout run plus ancien sur la même ref ; un artefact obsolète ne peut donc pas passer après une release plus récente.
 
 ## Composants
 
@@ -35,10 +36,12 @@ Le dépôt contient trois surfaces concurrentes : une application Vite connecté
 - `scripts/scan-public-bundle.mjs` : refus des secrets serveur, anciens claims inventés et source maps.
 - `scripts/package-pages.mjs` : paquet Pages unique et manifeste lié au SHA.
 - `supabase/migrations/20260810094242_secure_investor_demo_kpis.sql` : contrat SQL auditable des agrégats publics.
+- `test/migration.test.js` : exécution du SQL sur PostgreSQL embarqué, privilèges et métriques vérifiées.
 
 ## Critères d’acceptation
 
 - `npm ci`, `npm test`, `npm run build` et `npm run test:e2e` réussissent.
+- Les empreintes du répertoire `dist/` sont identiques avant et après les E2E.
 - Le test E2E intercepte le RPC et prouve l’affichage `12 / 3 / 7 / 2`, plus le pipeline calculé.
 - Le mode dégradé est visible et ne se présente jamais comme donnée actualisée.
 - Logo, assistant, WhatsApp, scénario et validation humaine sont fonctionnels.

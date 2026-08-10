@@ -29,11 +29,11 @@
 - Consumes: `loadInvestorKpis(supabase)`
 - Produces: `answerInvestorQuestion(question)` et `createWelcomeMessage()`
 
-- [ ] Écrire les tests de normalisation, pipeline, mode dégradé et réponses de l’assistant.
-- [ ] Exécuter `npm test` et vérifier l’échec attendu pour le module assistant absent.
-- [ ] Implémenter le minimum dans `src/assistant.js`.
-- [ ] Exécuter `npm test` et obtenir zéro échec.
-- [ ] Commit : `test(afria-recruit): restore governed data and assistant contracts`.
+- [x] Écrire les tests de normalisation, pipeline, mode dégradé et réponses de l’assistant.
+- [x] Exécuter `npm test` et vérifier l’échec attendu pour le module assistant absent.
+- [x] Implémenter le minimum dans `src/assistant.js`.
+- [x] Exécuter `npm test` et obtenir zéro échec.
+- [x] Commit : `test(afria-recruit): restore governed data and assistant contracts`.
 
 ### Task 2: Preuve E2E restaurée — phase rouge
 
@@ -47,12 +47,12 @@
 - Consumes: bundle Vite servi par `npm run preview`
 - Produces: commande `npm run test:e2e` et contrat DOM attendu
 
-- [ ] Ajouter Playwright et les scripts `check` et `test:e2e`.
-- [ ] Tester le RPC mocké et exiger `12`, `3`, `7`, `2` et pipeline `10`.
-- [ ] Tester mode dégradé, assistant, scénario, WhatsApp, confidentialité visible et viewport mobile.
-- [ ] Exécuter la suite sur la page historique et conserver la preuve de l’échec fonctionnel attendu.
-- [ ] Générer et committer le lockfile npm avec les tests rouges.
-- [ ] Commit : `test(afria-recruit): restore connected investor e2e contract`.
+- [x] Ajouter Playwright et les scripts `check` et `test:e2e`.
+- [x] Tester le RPC mocké et exiger `12`, `3`, `7`, `2` et pipeline `10`.
+- [x] Tester mode dégradé, assistant, scénario, WhatsApp, confidentialité visible et viewport mobile.
+- [x] Exécuter la suite sur la page historique et conserver la preuve de l’échec fonctionnel attendu.
+- [x] Générer et committer le lockfile npm avec les tests rouges.
+- [x] Commit : `test(afria-recruit): restore connected investor e2e contract`.
 
 ### Task 3: Interface premium connectée — phase verte
 
@@ -65,12 +65,12 @@
 - Consumes: `loadInvestorKpis`, `answerInvestorQuestion`, `createWelcomeMessage`
 - Produces: DOM stable `#candidates`, `#needs`, `#matches`, `#placements`, `#pipeline`, `#data-status`, `#assistant-panel`, `#interactive-demo`
 
-- [ ] Remplacer la structure minimale par la page premium AfrIAgenesis®.
-- [ ] Brancher les KPI réels ou le mode dégradé transparent.
-- [ ] Brancher scénario, revue humaine, assistant, navigation et WhatsApp.
-- [ ] Exécuter `npm test`, `npm run build` et `npm run test:e2e` jusqu’à zéro échec.
-- [ ] Vérifier manuellement les vues desktop et mobile avec le bundle produit.
-- [ ] Commit : `feat(afria-recruit): unify connected investor experience`.
+- [x] Remplacer la structure minimale par la page premium AfrIAgenesis®.
+- [x] Brancher les KPI réels ou le mode dégradé transparent.
+- [x] Brancher scénario, revue humaine, assistant, navigation et WhatsApp.
+- [x] Exécuter `npm test`, `npm run build` et `npm run test:e2e` jusqu’à zéro échec.
+- [x] Vérifier manuellement les vues desktop et mobile avec le bundle produit.
+- [x] Commit : `feat(afria-recruit): unify connected investor experience`.
 
 ### Task 4: Pipeline release unique et durci
 
@@ -88,14 +88,14 @@
 - Consumes: `npm ci`, `npm run check`, `dist/`
 - Produces: artefact Pages, `release.json`, URL et smoke test
 
-- [ ] Écrire le scanner et son test avant le workflow.
-- [ ] Créer un job `verify` Node 24 : install, unit, build, E2E, scan.
-- [ ] Créer un job `package-pages` dépendant de `verify`.
-- [ ] Créer un job `deploy` dépendant de l’artefact vérifié et de l’activation Pages détectée par API.
-- [ ] Ajouter le smoke test post-déploiement et le runbook de rollback.
-- [ ] Retirer les quatre workflows concurrents et préserver Accelerator sous un sous-chemin.
-- [ ] Valider la syntaxe YAML et les chemins.
-- [ ] Commit : `ci(afria-recruit): gate one canonical release pipeline`.
+- [x] Écrire le scanner et son test avant le workflow.
+- [x] Créer un job `verify` Node 24 : install, unit/SQL, build, E2E du même artefact, scan.
+- [x] Créer l’étape `package-pages` dans `verify` pour empaqueter exactement le répertoire contrôlé.
+- [x] Créer un job `deploy` dépendant de l’artefact vérifié et de l’activation Pages détectée par API.
+- [x] Ajouter le smoke test post-déploiement et le runbook de rollback.
+- [x] Retirer les quatre workflows concurrents et préserver Accelerator sous un sous-chemin.
+- [x] Valider la syntaxe YAML et les chemins.
+- [x] Commit : `ci(afria-recruit): gate one canonical release pipeline`.
 
 ### Task 5: Livraison GitHub et contrôle public
 
@@ -106,9 +106,9 @@
 - Consumes: branche `fix/afria-recruit-release`
 - Produces: PR, checks verts, Pages actif, URL HTTP 200
 
-- [ ] Exécuter fraîchement `npm ci`, `npm test`, `npm run build`, `npm run test:e2e` et le scan.
-- [ ] Pousser la branche et ouvrir une PR avec preuves.
-- [ ] Inspecter chaque job GitHub Actions et corriger uniquement la cause observée.
+- [x] Exécuter fraîchement `npm ci`, `npm test`, `npm run build`, `npm run test:e2e` et le scan.
+- [x] Pousser la branche et ouvrir une PR avec preuves.
+- [x] Inspecter chaque job GitHub Actions et corriger uniquement la cause observée.
 - [ ] Activer Pages avec Source=`GitHub Actions` si l’outil authentifié le permet.
 - [ ] Fusionner après contrôles verts, surveiller le run `main` et vérifier l’URL.
 - [ ] Exécuter M8, contre-revue Big4, puis mettre à jour la page Notion canonique avec SHA, URL et verdict.

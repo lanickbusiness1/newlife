@@ -8,9 +8,14 @@ import { scanPublicBundle } from '../scripts/scan-public-bundle.mjs';
 
 test('public bundle scanner permits a browser publishable key', async () => {
   const bundle = await mkdtemp(join(tmpdir(), 'afria-clean-bundle-'));
+  const anonJwt = [
+    Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url'),
+    Buffer.from('{"role":"anon"}').toString('base64url'),
+    'public-signature-placeholder',
+  ].join('.');
   await writeFile(
     join(bundle, 'index.js'),
-    "const key = 'sb_publishable_example'; const documentedSecretPrefix = 'sb_secret_';",
+    `const key = 'sb_publishable_example'; const documentedSecretPrefix = 'sb_secret_'; const legacyAnon = '${anonJwt}';`,
   );
 
   assert.deepEqual(await scanPublicBundle(bundle), []);
@@ -28,6 +33,27 @@ test('public bundle scanner catches secrets, fabricated claims, and source maps'
     'server-secret-marker',
     'source-map',
   ]);
+});
+
+test('public bundle scanner rejects a legacy Supabase service-role JWT', async () => {
+  const bundle = await mkdtemp(join(tmpdir(), 'afria-legacy-secret-bundle-'));
+  const serviceRoleJwt = [
+    Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url'),
+    Buffer.from('{"role":"service_role","iss":"supabase"}').toString('base64url'),
+    'secret-signature-placeholder',
+  ].join('.');
+  await writeFile(join(bundle, 'index.js'), `const credential = '${serviceRoleJwt}';`);
+
+  assert.deepEqual(await scanPublicBundle(bundle), [
+    { rule: 'server-secret-marker', file: 'index.js' },
+  ]);
+});
+
+test('robots excludes Recruit staging while allowing the preserved Accelerator path', async () => {
+  const robots = await readFile(new URL('../public/robots.txt', import.meta.url), 'utf8');
+
+  assert.match(robots, /^Allow: \/startup-accelerator\/$/m);
+  assert.match(robots, /^Disallow: \/$/m);
 });
 
 test('Pages packager publishes the verified Recruit bundle and preserves Accelerator under a subpath', async () => {

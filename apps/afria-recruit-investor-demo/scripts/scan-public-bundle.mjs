@@ -17,7 +17,7 @@ const CONTENT_RULES = [
   {
     rule: 'server-secret-marker',
     pattern:
-      /\bservice_role\b|SUPABASE_SERVICE_ROLE_KEY|sb_secret_[A-Za-z0-9_-]{16,}|sk-proj-[A-Za-z0-9_-]{16,}|sk_live_[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY/i,
+      /\bservice_role\b|SUPABASE_(?:SERVICE_ROLE|SERVICE|SECRET)_KEY|sb_secret_[A-Za-z0-9_-]{16,}|sk-proj-[A-Za-z0-9_-]{16,}|sk_live_[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY/i,
   },
   {
     rule: 'fabricated-investor-claim',
@@ -25,6 +25,23 @@ const CONTENT_RULES = [
       /184(?:[.,]5)\s*M\s*GNF|1[\s\u00a0.,]?284\s+candidat|146\s+match|23\s+placement|CIAUD|Orange\s+Guin[ée]e?/i,
   },
 ];
+
+function containsServiceRoleJwt(content) {
+  const jwtPattern = /\beyJ[A-Za-z0-9_-]+\.(eyJ[A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+\b/g;
+
+  for (const match of content.matchAll(jwtPattern)) {
+    try {
+      const payload = JSON.parse(Buffer.from(match[1], 'base64url').toString('utf8'));
+      if (payload?.role === 'service_role') {
+        return true;
+      }
+    } catch {
+      // A malformed JWT-looking string is not treated as a credential.
+    }
+  }
+
+  return false;
+}
 
 async function listFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -58,10 +75,17 @@ export async function scanPublicBundle(rootDirectory) {
     }
 
     const content = await readFile(filePath, 'utf8');
+    const matchedRules = new Set();
     for (const { rule, pattern } of CONTENT_RULES) {
       if (pattern.test(content)) {
-        findings.push({ rule, file });
+        matchedRules.add(rule);
       }
+    }
+    if (containsServiceRoleJwt(content)) {
+      matchedRules.add('server-secret-marker');
+    }
+    for (const rule of matchedRules) {
+      findings.push({ rule, file });
     }
   }
 

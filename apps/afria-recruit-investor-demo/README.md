@@ -34,13 +34,14 @@ de cette clé peut être faite sans modifier le contrat du RPC.
 npm ci
 npm test
 npx playwright install chromium
-npm run test:e2e
 npm run build
+npm run test:e2e
 npm run scan:bundle
 ```
 
-Les E2E reconstruisent le bundle avec un endpoint fictif intercepté par Playwright. Le bundle de release doit ensuite être reconstruit avec les variables publiques de l’environnement ciblé.
+Les E2E servent le bundle de production déjà construit et interceptent son appel RPC
+Supabase. Le même répertoire `dist/`, inchangé, est ensuite scanné et empaqueté.
 
 `npm run check` exécute l’ensemble des contrôles dans l’ordre et laisse dans `dist/`
-le build de production, après les E2E. Le scanner refuse les marqueurs de secrets
+le build de production testé par les E2E. Le scanner refuse les marqueurs de secrets
 serveur, les anciens chiffres non prouvés et toute source map publique.
