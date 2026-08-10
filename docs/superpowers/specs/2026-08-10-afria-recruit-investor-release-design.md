@@ -22,7 +22,7 @@ Le dépôt contient trois surfaces concurrentes : une application Vite connecté
 6. Les trois workflows historiques AfrIA Recruit et le workflow Pages concurrent Startup Accelerator sont retirés afin d’éliminer les doubles exécutions et les écrasements de site. L’Accelerator est préservé dans l’artefact unique sous `/startup-accelerator/`; les anciennes pages Recruit restent des archives non publiées.
 7. Le staging ne prétend pas être le produit Next.js/PWA production verrouillé dans Notion. Il constitue une preuve investisseur connectée et contrôlée.
 8. Le RPC `investor_demo_kpis` est versionné dans le dépôt et n’agrège que les enregistrements ayant franchi les gates métier. Sa fonction `SECURITY DEFINER` fixe un `search_path` vide et limite explicitement l’exécution à `anon` et `authenticated`.
-9. La concurrence est gérée au niveau du workflow et annule tout run plus ancien sur la même ref ; un artefact obsolète ne peut donc pas passer après une release plus récente.
+9. Les PR obsolètes sont annulées, les releases `main` sont sérialisées, et le job Pages revérifie le HEAD courant sous verrou avant tout déploiement. Une branche non fusionnée ou un SHA devenu ancien ne peut pas publier.
 
 ## Composants
 

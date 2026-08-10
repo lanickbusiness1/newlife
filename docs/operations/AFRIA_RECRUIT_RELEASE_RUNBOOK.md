@@ -28,9 +28,10 @@ Le job `deploy` ne consomme que l’artefact produit par `verify`. Le job `smoke
 contrôle ensuite la racine Recruit, le SHA de `release.json` et le sous-chemin
 Startup Accelerator.
 
-La concurrence est définie pour l’ensemble du workflow par ref avec
-`cancel-in-progress: true`. Une release plus récente annule donc sa devancière avant
-que cette dernière puisse publier un artefact obsolète.
+Les runs PR plus anciens sont annulés. Les runs `main` sont sérialisés sans être
+annulés afin qu’un déploiement déjà effectué conserve son smoke test. Dans le verrou
+Pages, le SHA de l’artefact est comparé au HEAD `main` courant ; un run devenu
+obsolète termine sans déployer et sans lancer de smoke.
 
 ## Activation et comportement sûr
 
@@ -38,8 +39,9 @@ GitHub Pages doit exister une fois au niveau du dépôt avec la source **GitHub
 Actions**. Le workflow interroge l’API Pages : tant que le site renvoie `404`, la
 vérification reste verte et le déploiement est volontairement ignoré, ce qui évite
 les emails d’échec répétitifs. Après activation, tout prochain run `main` détecte le
-site et déploie automatiquement. Un dispatch manuel avec `deploy=true` permet de
-forcer un déploiement après activation.
+site et déploie automatiquement. Un dispatch manuel lancé sur `main` permet de
+relancer cette même chaîne après activation ; toute autre ref est refusée au niveau
+du job de déploiement.
 
 ## Données et secrets
 
@@ -55,7 +57,9 @@ chaque release. Dependabot contrôle leurs mises à jour chaque semaine par PR.
 
 ## Rollback
 
-Chaque artefact est lié à un SHA Git. Le rollback opérationnel consiste à relancer
-le workflow sur le dernier SHA dont les jobs `verify`, `deploy` et `smoke` sont
-verts. Le smoke test doit confirmer que le SHA public correspond exactement au SHA
-attendu. Une release sans smoke vert reste `NO-GO production`.
+Chaque artefact est lié à un SHA Git. Le rollback opérationnel consiste à créer sur
+`main` un commit de réversion vers le dernier état dont les jobs `verify`, `deploy`
+et `smoke` sont verts. Le pipeline reconstruit alors un nouvel artefact auditable ;
+aucune branche non fusionnée et aucun ancien run ne peuvent forcer la publication.
+Le smoke test doit confirmer que le SHA public correspond exactement au SHA attendu.
+Une release sans smoke vert reste `NO-GO production`.

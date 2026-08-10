@@ -56,6 +56,22 @@ test('robots excludes Recruit staging while allowing the preserved Accelerator p
   assert.match(robots, /^Disallow: \/$/m);
 });
 
+test('release workflow serializes main and rejects stale or non-main deployments', async () => {
+  const workflow = await readFile(
+    new URL('../../../.github/workflows/afria-recruit-release.yml', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(
+    workflow,
+    /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/,
+  );
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /repos\/\$GITHUB_REPOSITORY\/git\/ref\/heads\/main/);
+  assert.match(workflow, /steps\.current\.outputs\.deploy == 'true'/);
+  assert.doesNotMatch(workflow, /inputs\.deploy/);
+});
+
 test('Pages packager publishes the verified Recruit bundle and preserves Accelerator under a subpath', async () => {
   const fixture = await mkdtemp(join(tmpdir(), 'afria-pages-fixture-'));
   const recruitDist = join(fixture, 'recruit-dist');
