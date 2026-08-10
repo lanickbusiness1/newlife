@@ -254,11 +254,14 @@ function assessStage(input: ProductRevenueEngineInput, stage: RevenueStage): Sta
   }
 }
 
+function readyThrough(stages: StageAssessment[], stage: RevenueStage) {
+  return stages.slice(0, REVENUE_STAGES.indexOf(stage) + 1).every(item => item.status === "ready");
+}
+
 function deriveReleaseStatus(stages: StageAssessment[]): RevenueEngineOutput["releaseStatus"] {
-  const readyThrough = (stage: RevenueStage) => stages.slice(0, REVENUE_STAGES.indexOf(stage) + 1).every(item => item.status === "ready");
   if (stages.every(item => item.status === "ready") && stages.at(-1)?.evidence.includes("scale")) return "scale_ready";
-  if (readyThrough("first_revenue")) return "revenue_proven";
-  if (readyThrough("payment")) return "sellable";
+  if (readyThrough(stages, "first_revenue")) return "revenue_proven";
+  if (readyThrough(stages, "payment")) return "sellable";
   return "blocked";
 }
 
@@ -279,7 +282,7 @@ export function compileRevenueEngine(input: ProductRevenueEngineInput): RevenueE
     completionRate,
     stages,
     gates: {
-      m6: completionRate >= 70 ? "pass" : "fail",
+      m6: readyThrough(stages, "payment") ? "pass" : "fail",
       s7plus: input.payment?.methods?.length && input.crm?.owner ? "pass" : "fail",
       m8: releaseStatus === "scale_ready" ? "pass" : releaseStatus === "revenue_proven" ? "conditional" : "fail"
     },
