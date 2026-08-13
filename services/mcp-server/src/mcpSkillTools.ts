@@ -135,7 +135,7 @@ export function registerSkillMcpTools(
 
   register(
     "genome.skill_factory.match",
-    "Recherche Registry-first et décide reuse_or_compose à partir du seuil canonique de 80%.",
+    "Recherche Registry-first et décide reuse_or_compose à partir du seuil canonique de 80%, après filtrage ABAC des candidats.",
     { context: contextSchema, request: SkillRequestSchema },
     "genome:skill:read",
     async ({ context, request }) => {
@@ -144,7 +144,7 @@ export function registerSkillMcpTools(
         countries: parsed.countries,
         organizations: parsed.institutions
       });
-      return registry.match(parsed);
+      return registry.match(parsed, entry => registryEntryVisible(context, entry));
     }
   );
 
