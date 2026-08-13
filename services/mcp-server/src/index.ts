@@ -4,9 +4,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import { registerSkillMcpTools, SKILL_MCP_HEALTH } from "./mcpSkillTools.js";
 import { compileRevenueEngine } from "./revenueEngine.js";
 
-const SERVICE_VERSION = "0.2.0";
+const SERVICE_VERSION = "0.3.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -49,9 +50,11 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.72,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 revenue engine active." },
+    eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 governed MCP active." },
     auditId,
-    limitations: ["MCP v0.2.0: revenue engine deterministic; CRM/payment providers not yet connected to live external systems."]
+    limitations: [
+      "MCP v0.3.0: Skill Factory/Registry/Country Compiler are deterministic and CI-verifiable; production still requires deployed runtime, durable registry storage, monitoring, backup/restore and rollback proof."
+    ]
   };
 }
 
@@ -134,6 +137,8 @@ function buildServer() {
     ...compileRevenueEngine(payload)
   }));
 
+  registerSkillMcpTools(register, RequestContext);
+
   return server;
 }
 
@@ -154,7 +159,8 @@ if (mode === "stdio") {
       service: "afriagenesis-intelligence-mcp",
       version: SERVICE_VERSION,
       genome: "GENESIS_V4",
-      revenueEngine: "GEN-V4-REV-ENGINE-001"
+      revenueEngine: "GEN-V4-REV-ENGINE-001",
+      ...SKILL_MCP_HEALTH
     });
   });
 
