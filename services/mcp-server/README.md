@@ -154,12 +154,9 @@ docker run --rm afriagenesis-mcp:ci npm run smoke:http-auth
 
 GitHub Actions exécute les deux smokes sur le runner **et dans l'image Docker**. La CI démarre aussi un conteneur configuré OIDC et vérifie `/health` puis le refus HTTP 401 sans bearer.
 
-### Dernière preuve fraîche
+### Preuve fraîche
 
-- branche : `genesis-v4-continental-skill-factory` ;
-- commit vérifié : `d67a30d28b65b3f7def96c334378279fe088af27` ;
-- GitHub Actions : **MCP CI run #98 — SUCCESS** ;
-- install dépendances, audit high, typecheck, tests, build, `smoke:mcp`, `smoke:http-auth`, build Docker, les deux smokes Docker, `/health` et refus 401 sans bearer : succès.
+La preuve de référence est **le dernier run GitHub Actions réussi attaché au HEAD courant de la PR #31**. Ne jamais utiliser un numéro de run historique pour déclarer un HEAD ultérieur comme vérifié.
 
 ## Déploiement Render
 
