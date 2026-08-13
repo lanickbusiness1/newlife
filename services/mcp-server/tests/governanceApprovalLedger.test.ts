@@ -217,15 +217,19 @@ describe("GENESIS Governance Approval Ledger", () => {
 
     await expect(l.read(review.approvalId)).rejects.toThrow(/APPROVAL_INTEGRITY_FAILURE/);
 
+    const reviewOnlySkill = compileSkill(input({
+      riskDomains: [],
+      warnings: ["non-sensitive benchmark requires review"]
+    }));
     const expiringRoot = await mkdtemp(path.join(tmpdir(), "genesis-approval-expiry-"));
     roots.push(expiringRoot);
     const expiring = new GovernanceApprovalLedger(expiringRoot, 0);
-    const short = await expiring.attest(skill, "double_review", ctx(
+    const short = await expiring.attest(reviewOnlySkill, "double_review", ctx(
       "reviewer-2",
       ["genome:skill:review"],
       ["Reviewer"]
     ));
-    await expect(expiring.verifyInstall(skill, { reviewApprovalId: short.approvalId }, ctx(
+    await expect(expiring.verifyInstall(reviewOnlySkill, { reviewApprovalId: short.approvalId }, ctx(
       "installer-2",
       ["genome:skill:install"],
       ["Workflow Orchestrator"]
