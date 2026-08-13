@@ -48,6 +48,7 @@ interface IntegrityPayload {
 }
 
 function canonicalJson(value: unknown): string {
+  if (value === undefined) return "null";
   if (value === null || typeof value !== "object") {
     return JSON.stringify(value);
   }
@@ -56,6 +57,7 @@ function canonicalJson(value: unknown): string {
   }
   const object = value as Record<string, unknown>;
   return `{${Object.keys(object)
+    .filter(key => object[key] !== undefined)
     .sort()
     .map(key => `${JSON.stringify(key)}:${canonicalJson(object[key])}`)
     .join(",")}}`;
