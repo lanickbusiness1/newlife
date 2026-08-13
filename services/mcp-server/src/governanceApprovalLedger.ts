@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { link, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { link, mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { BoundRequestContext } from "./auth.js";
 import type { CompiledSkill } from "./skillFactory.js";
@@ -266,6 +266,36 @@ export class GovernanceApprovalLedger {
     return record;
   }
 
+  private approvalLockPath(approvalId: string): string {
+    const safe = safeApprovalId(approvalId);
+    return path.resolve(this.rootDir, "locks", `${safe}.lock`);
+  }
+
+  private async withApprovalLocks<T>(approvalIds: string[], operation: () => Promise<T>): Promise<T> {
+    const ids = [...new Set(approvalIds.filter(Boolean).map(safeApprovalId))].sort();
+    if (ids.length === 0) return operation();
+
+    const acquired: string[] = [];
+    await mkdir(path.resolve(this.rootDir, "locks"), { recursive: true });
+    try {
+      for (const approvalId of ids) {
+        const lock = this.approvalLockPath(approvalId);
+        try {
+          await mkdir(lock);
+          acquired.push(lock);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+            throw new Error(`APPROVAL_OPERATION_BUSY:${approvalId}`);
+          }
+          throw error;
+        }
+      }
+      return await operation();
+    } finally {
+      await Promise.all(acquired.reverse().map(lock => rm(lock, { recursive: true, force: true })));
+    }
+  }
+
   private async writeImmutable(
     record: string,
     entry: GovernanceApprovalEntry | GovernanceApprovalRevocationEntry,
@@ -372,39 +402,41 @@ export class GovernanceApprovalLedger {
     ctx: BoundRequestContext,
     reason: string
   ): Promise<GovernanceApprovalRevocationEntry> {
-    const approval = await this.read(approvalId);
-    if (approval.kind !== expectedKind) {
-      throw new Error(`APPROVAL_KIND_MISMATCH:${approval.kind}`);
-    }
-    if (approval.tenantId !== ctx.tenantId) throw new Error("APPROVAL_TENANT_MISMATCH");
-    assertAuthority(expectedKind, ctx);
+    return this.withApprovalLocks([approvalId], async () => {
+      const approval = await this.read(approvalId);
+      if (approval.kind !== expectedKind) {
+        throw new Error(`APPROVAL_KIND_MISMATCH:${approval.kind}`);
+      }
+      if (approval.tenantId !== ctx.tenantId) throw new Error("APPROVAL_TENANT_MISMATCH");
+      assertAuthority(expectedKind, ctx);
 
-    const normalizedReason = reason.trim();
-    if (normalizedReason.length < 3) throw new Error("APPROVAL_REVOCATION_REASON_REQUIRED");
+      const normalizedReason = reason.trim();
+      if (normalizedReason.length < 3) throw new Error("APPROVAL_REVOCATION_REASON_REQUIRED");
 
-    const payload: RevocationPayload = {
-      revocationVersion: GENESIS_GOVERNANCE_APPROVAL_REVOCATION_VERSION,
-      revocationId: randomUUID(),
-      approvalId: approval.approvalId,
-      kind: approval.kind,
-      tenantId: ctx.tenantId,
-      actorId: ctx.actorId,
-      agentId: ctx.agentId,
-      issuer: ctx.issuer,
-      roles: [...ctx.roles],
-      amr: [...ctx.amr],
-      correlationId: ctx.correlationId,
-      purpose: ctx.purpose,
-      reason: normalizedReason,
-      revokedAt: new Date().toISOString()
-    };
-    const entry = revocationWithIntegrity(payload);
-    await this.writeImmutable(
-      this.revocationPath(approval.approvalId),
-      entry,
-      "APPROVAL_ALREADY_REVOKED"
-    );
-    return entry;
+      const payload: RevocationPayload = {
+        revocationVersion: GENESIS_GOVERNANCE_APPROVAL_REVOCATION_VERSION,
+        revocationId: randomUUID(),
+        approvalId: approval.approvalId,
+        kind: approval.kind,
+        tenantId: ctx.tenantId,
+        actorId: ctx.actorId,
+        agentId: ctx.agentId,
+        issuer: ctx.issuer,
+        roles: [...ctx.roles],
+        amr: [...ctx.amr],
+        correlationId: ctx.correlationId,
+        purpose: ctx.purpose,
+        reason: normalizedReason,
+        revokedAt: new Date().toISOString()
+      };
+      const entry = revocationWithIntegrity(payload);
+      await this.writeImmutable(
+        this.revocationPath(approval.approvalId),
+        entry,
+        "APPROVAL_ALREADY_REVOKED"
+      );
+      return entry;
+    });
   }
 
   private async assertNotRevoked(approvalId: string): Promise<void> {
@@ -448,5 +480,20 @@ export class GovernanceApprovalLedger {
       doubleReview: Boolean(review),
       m8Approval: Boolean(m8)
     };
+  }
+
+  async withVerifiedInstall<T>(
+    skill: CompiledSkill,
+    refs: InstallApprovalRefs,
+    installer: BoundRequestContext,
+    operation: (approvals: InstallApprovals) => Promise<T>
+  ): Promise<T> {
+    const approvalIds = [refs.reviewApprovalId, refs.m8ApprovalId].filter(
+      (value): value is string => Boolean(value)
+    );
+    return this.withApprovalLocks(approvalIds, async () => {
+      const approvals = await this.verifyInstall(skill, refs, installer);
+      return operation(approvals);
+    });
   }
 }
