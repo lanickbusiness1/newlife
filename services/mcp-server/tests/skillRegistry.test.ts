@@ -146,4 +146,25 @@ describe("GENESIS Skill Registry", () => {
       version: "1.1.0"
     });
   });
+
+  test("allows exactly one winner when the same id/version is installed concurrently", async () => {
+    const r = await registry();
+    const skill = compileSkill(input());
+    const results = await Promise.allSettled([
+      r.install(skill),
+      r.install(skill),
+      r.install(skill),
+      r.install(skill)
+    ]);
+
+    const fulfilled = results.filter(result => result.status === "fulfilled");
+    const rejected = results.filter(result => result.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(3);
+    for (const result of rejected) {
+      if (result.status === "rejected") {
+        expect(String(result.reason)).toMatch(/SKILL_VERSION_IMMUTABLE/);
+      }
+    }
+  });
 });
