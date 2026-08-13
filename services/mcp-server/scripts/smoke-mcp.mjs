@@ -2,11 +2,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { compileCountrySkill } from "../dist/countryCompiler.js";
+import { GovernanceApprovalLedger } from "../dist/governanceApprovalLedger.js";
 import { compileSkill } from "../dist/skillFactory.js";
 import { SkillRegistry } from "../dist/skillRegistry.js";
 import { SKILL_MCP_HEALTH, SKILL_MCP_TOOL_NAMES } from "../dist/mcpSkillTools.js";
 
 const root = await mkdtemp(path.join(tmpdir(), "genesis-skill-smoke-"));
+const approvalRoot = await mkdtemp(path.join(tmpdir(), "genesis-approval-smoke-"));
 
 const contextPack = {
   languageSemantic: { status: "covered", evidenceRefs: ["SMOKE-LANG"] },
@@ -22,6 +24,7 @@ const contextPack = {
 
 try {
   const registry = new SkillRegistry(root);
+  const approvalLedger = new GovernanceApprovalLedger(approvalRoot, 3600);
   const skill = compileSkill({
     id: "procurement.supplier.verify.smoke",
     version: "1.0.0",
@@ -69,6 +72,33 @@ try {
   });
   if (match.decision !== "reuse_or_compose") throw new Error(`SMOKE_MATCH:${match.score}`);
 
+  const reviewSkill = compileSkill({
+    ...skill,
+    id: "procurement.supplier.review.smoke",
+    version: "1.0.0",
+    warnings: ["smoke review required"]
+  });
+  if (!reviewSkill.doubleReviewRequired) throw new Error("SMOKE_REVIEW_NOT_REQUIRED");
+  const reviewer = {
+    issuer: "urn:afriagenesis:smoke",
+    tenantId: "smoke-tenant",
+    actorId: "smoke-reviewer",
+    agentId: "smoke-review-agent",
+    permissionScope: ["genome:skill:review"],
+    roles: ["Reviewer"],
+    amr: ["pwd", "mfa"],
+    allowedCountries: ["GN"],
+    allowedOrganizations: [],
+    allowedMissions: [],
+    correlationId: "06d8d70b-f038-4272-858c-f60a78263e13",
+    purpose: "smoke approval ledger",
+    dataClassification: "internal"
+  };
+  const approval = await approvalLedger.attest(reviewSkill, "double_review", reviewer);
+  const approvalRead = await approvalLedger.read(approval.approvalId);
+  if (approvalRead.actorId !== "smoke-reviewer") throw new Error("SMOKE_APPROVAL_ACTOR");
+  if (!/^[a-f0-9]{64}$/.test(approvalRead.integrity.sha256)) throw new Error("SMOKE_APPROVAL_INTEGRITY");
+
   const country = await compileCountrySkill(registry, {
     countryCode: "GN",
     contextPack,
@@ -77,17 +107,28 @@ try {
   });
   if (country.configuration.currency !== "GNF") throw new Error("SMOKE_COUNTRY_CURRENCY");
   if (!country.universalInvariants.auditRequired) throw new Error("SMOKE_GENOME_INVARIANT");
-  if (SKILL_MCP_TOOL_NAMES.length !== 7) throw new Error("SMOKE_MCP_TOOL_COUNT");
+  if (SKILL_MCP_TOOL_NAMES.length !== 9) throw new Error("SMOKE_MCP_TOOL_COUNT");
+  if (SKILL_MCP_HEALTH.approvalLedger !== "GENESIS_GOVERNANCE_APPROVAL_LEDGER_0.1.0") {
+    throw new Error("SMOKE_APPROVAL_LEDGER_HEALTH");
+  }
 
   console.log(JSON.stringify({
     status: "ok",
     health: SKILL_MCP_HEALTH,
     skill: `${read.skill.id}@${read.skill.version}`,
     integrity: read.integrity.sha256,
+    approval: {
+      approvalId: approvalRead.approvalId,
+      kind: approvalRead.kind,
+      integrity: approvalRead.integrity.sha256
+    },
     match: { decision: match.decision, score: match.score },
     country: country.countryCode,
     tools: SKILL_MCP_TOOL_NAMES.length
   }));
 } finally {
-  await rm(root, { recursive: true, force: true });
+  await Promise.all([
+    rm(root, { recursive: true, force: true }),
+    rm(approvalRoot, { recursive: true, force: true })
+  ]);
 }
