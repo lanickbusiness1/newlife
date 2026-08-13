@@ -374,6 +374,20 @@ function hasAnyRole(roles: string[], allowed: Set<string>): boolean {
   return roles.some(role => allowed.has(role));
 }
 
+function validateAuthorityBindings(permissionScope: string[], roles: string[], amr: string[]): void {
+  if (permissionScope.includes("genome:skill:m8") && !hasAnyRole(roles, M8_AUTHORITY_ROLES)) {
+    throw new Error("AUTH_ROLE_REQUIRED:M8");
+  }
+  if (permissionScope.includes("genome:skill:review") && !hasAnyRole(roles, REVIEW_AUTHORITY_ROLES)) {
+    throw new Error("AUTH_ROLE_REQUIRED:REVIEW");
+  }
+
+  const requiresMfa = permissionScope.some(scope => MFA_AUTHORITY_SCOPES.has(scope));
+  if (requiresMfa && !amr.some(method => MFA_AMR_VALUES.has(method.toLowerCase()))) {
+    throw new Error("AUTH_MFA_REQUIRED");
+  }
+}
+
 function identityFromClaims(claims: JwtClaims, config: OidcVerifierConfig): AuthenticatedIdentity {
   const issuer = nonEmptyString(claims.iss, "AUTH_ISSUER_REQUIRED");
   if (issuer !== config.issuer) throw new Error("AUTH_ISSUER_MISMATCH");
@@ -392,17 +406,7 @@ function identityFromClaims(claims: JwtClaims, config: OidcVerifierConfig): Auth
   const roles = unique(stringList(claims.roles));
   const amr = unique(stringList(claims.amr));
 
-  if (permissionScope.includes("genome:skill:m8") && !hasAnyRole(roles, M8_AUTHORITY_ROLES)) {
-    throw new Error("AUTH_ROLE_REQUIRED:M8");
-  }
-  if (permissionScope.includes("genome:skill:review") && !hasAnyRole(roles, REVIEW_AUTHORITY_ROLES)) {
-    throw new Error("AUTH_ROLE_REQUIRED:REVIEW");
-  }
-
-  const requiresMfa = permissionScope.some(scope => MFA_AUTHORITY_SCOPES.has(scope));
-  if (requiresMfa && !amr.some(method => MFA_AMR_VALUES.has(method.toLowerCase()))) {
-    throw new Error("AUTH_MFA_REQUIRED");
-  }
+  validateAuthorityBindings(permissionScope, roles, amr);
 
   return {
     issuer,
@@ -442,5 +446,35 @@ export function bindAuthenticatedContext(
     permissionScope: [...identity.permissionScope],
     roles: [...identity.roles],
     amr: [...identity.amr]
+  };
+}
+
+export function loadTrustedStdioIdentity(
+  env: NodeJS.ProcessEnv = process.env
+): AuthenticatedIdentity {
+  if (env.MCP_TRUSTED_STDIO !== "true") {
+    throw new Error("AUTH_STDIO_TRUST_REQUIRED");
+  }
+  if (env.NODE_ENV === "production") {
+    throw new Error("AUTH_STDIO_FORBIDDEN_IN_PRODUCTION");
+  }
+
+  const tenantId = requiredEnv(env, "MCP_STDIO_TENANT_ID");
+  const actorId = requiredEnv(env, "MCP_STDIO_ACTOR_ID");
+  const agentId = requiredEnv(env, "MCP_STDIO_AGENT_ID");
+  const permissionScope = unique(stringList(env.MCP_STDIO_SCOPES));
+  const roles = unique(stringList(env.MCP_STDIO_ROLES));
+  const amr = unique(stringList(env.MCP_STDIO_AMR));
+
+  validateAuthorityBindings(permissionScope, roles, amr);
+
+  return {
+    issuer: "urn:afriagenesis:trusted-stdio",
+    tenantId,
+    actorId,
+    agentId,
+    permissionScope,
+    roles,
+    amr
   };
 }
