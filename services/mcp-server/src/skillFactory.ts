@@ -197,13 +197,13 @@ export function compileSkill(input: unknown): CompiledSkill {
     if (!skill.context) {
       blockers.push("STRATEX99_CONTEXT_REQUIRED");
     } else {
-      for (const layer of CRITICAL_CONTEXT_LAYERS) {
-        if (skill.context[layer].status === "partial") {
-          blockers.push(`STRATEX99_CRITICAL_CONTEXT_INCOMPLETE:${layer}`);
-        }
-      }
       for (const [layer, value] of Object.entries(skill.context)) {
-        if (value.status === "partial" && !CRITICAL_CONTEXT_LAYERS.includes(layer as keyof Stratex99Context)) {
+        if (value.evidenceRefs.length === 0) {
+          blockers.push(`STRATEX99_CONTEXT_EVIDENCE_REQUIRED:${layer}`);
+        }
+        if (value.status === "partial" && CRITICAL_CONTEXT_LAYERS.includes(layer as keyof Stratex99Context)) {
+          blockers.push(`STRATEX99_CRITICAL_CONTEXT_INCOMPLETE:${layer}`);
+        } else if (value.status === "partial") {
           alerts.push(`STRATEX99_CONTEXT_PARTIAL:${layer}`);
         }
       }
@@ -211,10 +211,15 @@ export function compileSkill(input: unknown): CompiledSkill {
 
     if (!skill.stratex9) {
       blockers.push("STRATEX9_QUALIFICATION_REQUIRED");
-    } else if (skill.stratex9.status === "no_go") {
-      blockers.push("STRATEX9_NO_GO");
-    } else if (skill.stratex9.status === "conditional") {
-      alerts.push("STRATEX9_CONDITIONAL");
+    } else {
+      if (skill.stratex9.evidenceRefs.length === 0) {
+        blockers.push("STRATEX9_EVIDENCE_REQUIRED");
+      }
+      if (skill.stratex9.status === "no_go") {
+        blockers.push("STRATEX9_NO_GO");
+      } else if (skill.stratex9.status === "conditional") {
+        alerts.push("STRATEX9_CONDITIONAL");
+      }
     }
   }
 
