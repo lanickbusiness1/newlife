@@ -4,31 +4,32 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import {
+  GENESIS_AUTH_ANCHOR,
+  InvocationContextSchema,
+  authenticateBearerHeader,
+  bindAuthenticatedContext,
+  loadOidcVerifierConfig,
+  loadTrustedStdioIdentity,
+  type AuthenticatedIdentity,
+  type BoundRequestContext
+} from "./auth.js";
+import { authorizeContext, GENESIS_AUTHZ_ANCHOR } from "./authorization.js";
 import { registerSkillMcpTools, SKILL_MCP_HEALTH } from "./mcpSkillTools.js";
 import { compileRevenueEngine } from "./revenueEngine.js";
 
-const SERVICE_VERSION = "0.3.0";
+const SERVICE_VERSION = "0.4.0";
 
-const RequestContext = z.object({
-  tenantId: z.string().min(1),
-  actorId: z.string().min(1),
-  agentId: z.string().min(1),
-  correlationId: z.string().uuid(),
-  purpose: z.string().min(3),
-  permissionScope: z.array(z.string()).default([]),
-  dataClassification: z.enum(["public", "internal", "confidential", "restricted"]),
-  approvalContext: z.string().optional()
-});
+type Context = BoundRequestContext;
 
-type Context = z.infer<typeof RequestContext>;
-
-function authorize(ctx: Context, requiredScope: string) {
-  if (!ctx.permissionScope.includes(requiredScope)) {
-    throw new Error(`ECES_DENY: scope '${requiredScope}' absent`);
+function safeAuthErrorCode(error: unknown): string {
+  if (
+    error instanceof Error &&
+    /^AUTH_[A-Z0-9_]+(?::[A-Za-z0-9_.+-]+)?$/.test(error.message)
+  ) {
+    return error.message;
   }
-  if (ctx.dataClassification === "restricted" && !ctx.approvalContext) {
-    throw new Error("ECES_REVIEW_REQUIRED: approvalContext absent");
-  }
+  return "AUTH_FAILED";
 }
 
 function governed(ctx: Context, tool: string, data: unknown) {
@@ -39,6 +40,8 @@ function governed(ctx: Context, tool: string, data: unknown) {
     tenantId: ctx.tenantId,
     actorId: ctx.actorId,
     agentId: ctx.agentId,
+    issuer: ctx.issuer,
+    roles: ctx.roles,
     correlationId: ctx.correlationId,
     purpose: ctx.purpose,
     tool,
@@ -50,15 +53,19 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.72,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 governed MCP active." },
+    eces: {
+      status: "allowed",
+      gate: "G8.2",
+      reason: "OIDC identity + ASIR authorization validated; GENESIS V4 governed MCP active."
+    },
     auditId,
     limitations: [
-      "MCP v0.3.0: Skill Factory/Registry/Country Compiler are deterministic and CI-verifiable; production still requires deployed runtime, durable registry storage, monitoring, backup/restore and rollback proof."
+      "MCP v0.4.0 binds HTTP identity/scopes to verified OIDC/JWKS claims. Production still requires a real institutional IdP, durable registry storage, monitoring, backup/restore, rollback and multi-tenant environment proof."
     ]
   };
 }
 
-function buildServer() {
+function buildServer(identity: AuthenticatedIdentity) {
   const server = new McpServer({
     name: "afriagenesis-intelligence-mcp",
     version: SERVICE_VERSION
@@ -72,9 +79,10 @@ function buildServer() {
     handler: (args: any) => Promise<unknown>
   ) {
     server.tool(name, description, inputSchema, async (args: any) => {
-      const ctx = RequestContext.parse(args.context);
-      authorize(ctx, requiredScope);
-      const data = await handler(args);
+      const invocation = InvocationContextSchema.parse(args.context);
+      const ctx = bindAuthenticatedContext(identity, invocation);
+      authorizeContext(ctx, requiredScope);
+      const data = await handler({ ...args, context: ctx });
       return {
         content: [{ type: "text", text: JSON.stringify(governed(ctx, name, data)) }]
       };
@@ -82,62 +90,62 @@ function buildServer() {
   }
 
   register("entity.search", "Recherche des entités dans le tenant.", {
-    context: RequestContext, query: z.string().min(2)
+    context: InvocationContextSchema, query: z.string().min(2)
   }, "entity:read", async ({ context, query }) => ({
     tenantId: context.tenantId, query, items: []
   }));
 
   register("entity.get", "Retourne une entité par identifiant.", {
-    context: RequestContext, entityId: z.string().min(1)
+    context: InvocationContextSchema, entityId: z.string().min(1)
   }, "entity:read", async ({ context, entityId }) => ({
     tenantId: context.tenantId, entityId, status: "mock"
   }));
 
   register("evidence.search", "Recherche des preuves.", {
-    context: RequestContext, query: z.string().min(2)
+    context: InvocationContextSchema, query: z.string().min(2)
   }, "evidence:read", async ({ context, query }) => ({
     tenantId: context.tenantId, query, items: []
   }));
 
   register("evidence.get_lineage", "Retourne le lineage d’une preuve.", {
-    context: RequestContext, evidenceId: z.string().min(1)
+    context: InvocationContextSchema, evidenceId: z.string().min(1)
   }, "evidence:read", async ({ context, evidenceId }) => ({
     tenantId: context.tenantId, evidenceId, lineage: []
   }));
 
   register("signal.ingest", "Ingestion contrôlée d’un signal non sensible.", {
-    context: RequestContext, payload: z.unknown()
+    context: InvocationContextSchema, payload: z.unknown()
   }, "signal:write", async ({ context, payload }) => ({
     tenantId: context.tenantId, accepted: true, payload
   }));
 
   register("opportunity.score", "Calcule un score explicable.", {
-    context: RequestContext, payload: z.unknown()
+    context: InvocationContextSchema, payload: z.unknown()
   }, "opportunity:score", async ({ context, payload }) => ({
     tenantId: context.tenantId, score: 0, factors: [], payload
   }));
 
   register("opportunity.explain_score", "Explique un score d’opportunité.", {
-    context: RequestContext, opportunityId: z.string().min(1)
+    context: InvocationContextSchema, opportunityId: z.string().min(1)
   }, "opportunity:read", async ({ context, opportunityId }) => ({
     tenantId: context.tenantId, opportunityId, explanation: []
   }));
 
   register("executive.generate_brief", "Produit un brief exécutif gouverné.", {
-    context: RequestContext, topic: z.string().min(3)
+    context: InvocationContextSchema, topic: z.string().min(3)
   }, "executive:brief", async ({ context, topic }) => ({
     tenantId: context.tenantId, topic, priorities: [], risks: [], evidence: []
   }));
 
   register("genome.revenue_engine.compile", "Compile un produit AfrIAgenesis® en moteur Release-to-Revenue GENESIS V4.", {
-    context: RequestContext,
+    context: InvocationContextSchema,
     payload: z.unknown()
   }, "revenue:plan", async ({ context, payload }) => ({
     tenantId: context.tenantId,
     ...compileRevenueEngine(payload)
   }));
 
-  registerSkillMcpTools(register, RequestContext);
+  registerSkillMcpTools(register, InvocationContextSchema);
 
   return server;
 }
@@ -147,9 +155,11 @@ const mode = process.argv.find(v => v.startsWith("--transport="))?.split("=")[1]
   ?? "http";
 
 if (mode === "stdio") {
-  const server = buildServer();
+  const identity = loadTrustedStdioIdentity();
+  const server = buildServer(identity);
   await server.connect(new StdioServerTransport());
 } else {
+  const oidcConfig = loadOidcVerifierConfig();
   const app = express();
   app.use(express.json({ limit: "1mb" }));
 
@@ -159,13 +169,33 @@ if (mode === "stdio") {
       service: "afriagenesis-intelligence-mcp",
       version: SERVICE_VERSION,
       genome: "GENESIS_V4",
+      auth: GENESIS_AUTH_ANCHOR,
+      authorization: GENESIS_AUTHZ_ANCHOR,
       revenueEngine: "GEN-V4-REV-ENGINE-001",
       ...SKILL_MCP_HEALTH
     });
   });
 
   app.post("/mcp", async (req, res) => {
-    const server = buildServer();
+    let identity: AuthenticatedIdentity;
+    try {
+      identity = await authenticateBearerHeader(req.get("authorization"), oidcConfig);
+    } catch (error) {
+      const auditId = randomUUID();
+      const errorCode = safeAuthErrorCode(error);
+      console.error(JSON.stringify({
+        auditId,
+        at: new Date().toISOString(),
+        route: "/mcp",
+        status: "denied",
+        reason: errorCode
+      }));
+      res.setHeader("WWW-Authenticate", "Bearer");
+      res.status(401).json({ error: errorCode, auditId });
+      return;
+    }
+
+    const server = buildServer(identity);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true
