@@ -7,7 +7,12 @@ import {
   GENESIS_V4_SKILL_FACTORY_ANCHOR,
   Stratex99ContextSchema
 } from "./skillFactory.js";
-import { GENESIS_SKILL_REGISTRY_VERSION, SkillRegistry, type InstallApprovals } from "./skillRegistry.js";
+import {
+  GENESIS_SKILL_REGISTRY_VERSION,
+  SkillRegistry,
+  type InstallApprovals,
+  type RegistryEntry
+} from "./skillRegistry.js";
 
 export const SKILL_MCP_HEALTH = {
   skillFactory: GENESIS_V4_SKILL_FACTORY_ANCHOR,
@@ -79,6 +84,22 @@ const InstallApprovalsSchema = z.object({
   doubleReview: z.boolean().optional(),
   m8Approval: z.boolean().optional()
 }).default({});
+
+function authorizeRegistryEntry(context: any, entry: RegistryEntry): void {
+  authorizeTerritorialTarget(context, {
+    countries: entry.skill.countries,
+    organizations: entry.skill.institutions
+  });
+}
+
+function registryEntryVisible(context: any, entry: RegistryEntry): boolean {
+  try {
+    authorizeRegistryEntry(context, entry);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function validateInstallApprovalAuthority(
   approvals: InstallApprovals,
@@ -158,22 +179,29 @@ export function registerSkillMcpTools(
 
   register(
     "genome.skill_registry.list",
-    "Liste les skills du registre après vérification d'intégrité SHA-256.",
+    "Liste uniquement les skills visibles dans le périmètre ABAC vérifié, après contrôle d'intégrité SHA-256.",
     { context: contextSchema },
     "genome:skill:read",
-    async () => registry.list()
+    async ({ context }) => {
+      const entries = await registry.list();
+      return entries.filter(entry => registryEntryVisible(context, entry));
+    }
   );
 
   register(
     "genome.skill_registry.read",
-    "Lit une version précise d'un skill et vérifie son intégrité SHA-256.",
+    "Lit une version précise d'un skill, vérifie son intégrité SHA-256 puis son périmètre ABAC territorial.",
     {
       context: contextSchema,
       id: z.string().min(3),
       version: z.string().regex(/^\d+\.\d+\.\d+$/)
     },
     "genome:skill:read",
-    async ({ id, version }) => registry.read(id, version)
+    async ({ context, id, version }) => {
+      const entry = await registry.read(id, version);
+      authorizeRegistryEntry(context, entry);
+      return entry;
+    }
   );
 
   register(
