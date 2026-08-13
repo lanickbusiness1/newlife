@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { authorizeTerritorialTarget } from "./authorization.js";
+import { GENESIS_CONTEXT_PACK_PROVENANCE_VERSION } from "./contextPackProvenance.js";
 import { compileCountrySkill, GENESIS_V4_COUNTRY_COMPILER_ANCHOR } from "./countryCompiler.js";
 import {
   GENESIS_GOVERNANCE_APPROVAL_LEDGER_VERSION,
@@ -25,6 +26,7 @@ export const SKILL_MCP_HEALTH = {
   skillRegistry: GENESIS_SKILL_REGISTRY_VERSION,
   approvalLedger: GENESIS_GOVERNANCE_APPROVAL_LEDGER_VERSION,
   approvalRevocation: GENESIS_GOVERNANCE_APPROVAL_REVOCATION_VERSION,
+  contextPackProvenance: GENESIS_CONTEXT_PACK_PROVENANCE_VERSION,
   countryCompiler: GENESIS_V4_COUNTRY_COMPILER_ANCHOR
 } as const;
 
@@ -79,9 +81,30 @@ const PromotionSchema = z.object({
   hardcodedNationalRule: z.boolean()
 });
 
+const ContextPackSourceSchema = z.object({
+  sourceId: z.string().trim().min(3),
+  publisher: z.string().trim().min(2),
+  locator: z.string().trim().min(3),
+  retrievedAt: z.string().trim().min(1),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/).optional()
+}).strict();
+
+const ContextPackProvenanceInputSchema = z.object({
+  provenanceVersion: z.literal(GENESIS_CONTEXT_PACK_PROVENANCE_VERSION),
+  contextPackId: z.string().regex(/^[a-z0-9][a-z0-9._-]{2,127}$/),
+  version: z.string().regex(/^\d+\.\d+\.\d+$/),
+  countryCode: z.string().regex(/^[A-Za-z]{2,3}$/),
+  issuer: z.string().trim().min(3),
+  issuedAt: z.string().trim().min(1),
+  expiresAt: z.string().trim().min(1),
+  sources: z.array(ContextPackSourceSchema).min(1),
+  contextSha256: z.string().regex(/^[a-f0-9]{64}$/)
+}).strict();
+
 const CountryCompileSchema = z.object({
   countryCode: z.string().min(2).max(3),
   contextPack: Stratex99ContextSchema,
+  contextProvenance: ContextPackProvenanceInputSchema,
   stratex9Qualification: z.object({
     status: z.enum(["go", "conditional", "no_go"]),
     evidenceRefs: z.array(z.string().min(1))
@@ -125,10 +148,6 @@ function registryEntryVisible(context: any, entry: RegistryEntry): boolean {
   }
 }
 
-/**
- * Legacy internal guard retained for lower-level registry tests only.
- * The MCP install surface no longer accepts approval booleans and does not call this helper.
- */
 export function validateInstallApprovalAuthority(
   approvals: InstallApprovals,
   permissionScope: string[]
@@ -271,7 +290,7 @@ export function registerSkillMcpTools(
 
   register(
     "genome.country_compiler.compile",
-    "Compose L0-L5 pour un pays avec Context Pack STRATEX-99, qualification STRATEX-9 et invariants GENOME.",
+    "Compose L0-L5 pour un pays avec Context Pack STRATEX-99 prouvé, qualification STRATEX-9 et invariants GENOME.",
     { context: contextSchema, payload: CountryCompileSchema },
     "genome:country:compile",
     async ({ context, payload }) => {
