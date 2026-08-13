@@ -6,7 +6,7 @@ import {
   GENESIS_V4_SKILL_FACTORY_ANCHOR,
   Stratex99ContextSchema
 } from "./skillFactory.js";
-import { GENESIS_SKILL_REGISTRY_VERSION, SkillRegistry } from "./skillRegistry.js";
+import { GENESIS_SKILL_REGISTRY_VERSION, SkillRegistry, type InstallApprovals } from "./skillRegistry.js";
 
 export const SKILL_MCP_HEALTH = {
   skillFactory: GENESIS_V4_SKILL_FACTORY_ANCHOR,
@@ -79,6 +79,18 @@ const InstallApprovalsSchema = z.object({
   m8Approval: z.boolean().optional()
 }).default({});
 
+export function validateInstallApprovalAuthority(
+  approvals: InstallApprovals,
+  permissionScope: string[]
+): void {
+  if (approvals.m8Approval && !permissionScope.includes("genome:skill:m8")) {
+    throw new Error("M8_APPROVAL_SCOPE_REQUIRED");
+  }
+  if (approvals.doubleReview && !permissionScope.includes("genome:skill:review")) {
+    throw new Error("DOUBLE_REVIEW_SCOPE_REQUIRED");
+  }
+}
+
 export function registerSkillMcpTools(
   register: RegisterFn,
   contextSchema: z.ZodTypeAny,
@@ -102,16 +114,18 @@ export function registerSkillMcpTools(
 
   register(
     "genome.skill_factory.install",
-    "Compile puis installe un skill gouverné dans le registre avec contrôle Double Review/M8.",
+    "Compile puis installe un skill gouverné dans le registre avec contrôle Double Review/M8 et scopes d'autorité dédiés.",
     {
       context: contextSchema,
       payload: z.unknown(),
       approvals: InstallApprovalsSchema
     },
     "genome:skill:install",
-    async ({ payload, approvals }) => {
+    async ({ context, payload, approvals }) => {
+      const parsedApprovals = InstallApprovalsSchema.parse(approvals);
+      validateInstallApprovalAuthority(parsedApprovals, context.permissionScope ?? []);
       const compiled = compileSkill(payload);
-      return registry.install(compiled, InstallApprovalsSchema.parse(approvals));
+      return registry.install(compiled, parsedApprovals);
     }
   );
 
