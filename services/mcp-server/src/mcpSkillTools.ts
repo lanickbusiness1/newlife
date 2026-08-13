@@ -3,6 +3,7 @@ import { authorizeTerritorialTarget } from "./authorization.js";
 import { compileCountrySkill, GENESIS_V4_COUNTRY_COMPILER_ANCHOR } from "./countryCompiler.js";
 import {
   GENESIS_GOVERNANCE_APPROVAL_LEDGER_VERSION,
+  GENESIS_GOVERNANCE_APPROVAL_REVOCATION_VERSION,
   GovernanceApprovalLedger,
   type InstallApprovalRefs
 } from "./governanceApprovalLedger.js";
@@ -23,6 +24,7 @@ export const SKILL_MCP_HEALTH = {
   skillFactory: GENESIS_V4_SKILL_FACTORY_ANCHOR,
   skillRegistry: GENESIS_SKILL_REGISTRY_VERSION,
   approvalLedger: GENESIS_GOVERNANCE_APPROVAL_LEDGER_VERSION,
+  approvalRevocation: GENESIS_GOVERNANCE_APPROVAL_REVOCATION_VERSION,
   countryCompiler: GENESIS_V4_COUNTRY_COMPILER_ANCHOR
 } as const;
 
@@ -31,6 +33,8 @@ export const SKILL_MCP_TOOL_NAMES = [
   "genome.skill_factory.match",
   "genome.skill_approval.review_attest",
   "genome.skill_approval.m8_attest",
+  "genome.skill_approval.review_revoke",
+  "genome.skill_approval.m8_revoke",
   "genome.skill_factory.install",
   "genome.skill_factory.promote",
   "genome.skill_registry.list",
@@ -92,6 +96,11 @@ const InstallApprovalRefsSchema = z.object({
   reviewApprovalId: z.string().uuid().optional(),
   m8ApprovalId: z.string().uuid().optional()
 }).strict().default({});
+
+const ApprovalRevocationInputSchema = {
+  approvalId: z.string().uuid(),
+  reason: z.string().trim().min(3).max(1000)
+};
 
 function authorizeCompiledSkill(context: any, compiled: ReturnType<typeof compileSkill>): void {
   authorizeTerritorialTarget(context, {
@@ -190,8 +199,26 @@ export function registerSkillMcpTools(
   );
 
   register(
+    "genome.skill_approval.review_revoke",
+    "Retire une attestation de Double Review via un événement append-only immuable, sans modifier l'attestation d'origine.",
+    { context: contextSchema, ...ApprovalRevocationInputSchema },
+    "genome:skill:review",
+    async ({ context, approvalId, reason }) =>
+      approvalLedger.revoke(approvalId, "double_review", context, reason)
+  );
+
+  register(
+    "genome.skill_approval.m8_revoke",
+    "Retire une attestation M8 via un événement append-only immuable, sans modifier l'attestation d'origine.",
+    { context: contextSchema, ...ApprovalRevocationInputSchema },
+    "genome:skill:m8",
+    async ({ context, approvalId, reason }) =>
+      approvalLedger.revoke(approvalId, "m8", context, reason)
+  );
+
+  register(
     "genome.skill_factory.install",
-    "Compile puis installe un skill gouverné après vérification d'attestations immuables et distinctes de Double Review/M8.",
+    "Compile puis installe un skill gouverné après vérification d'attestations immuables, non révoquées et distinctes de Double Review/M8.",
     {
       context: contextSchema,
       payload: z.unknown(),
