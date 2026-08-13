@@ -4,6 +4,7 @@ import {
   InvocationContextSchema,
   authenticateBearerHeader,
   bindAuthenticatedContext,
+  loadTrustedStdioIdentity,
   type OidcVerifierConfig
 } from "../src/auth";
 
@@ -148,5 +149,38 @@ describe("OIDC-bound MCP identity", () => {
     expect(bound.actorId).toBe("user-123");
     expect(bound.permissionScope).toEqual(identity.permissionScope);
     expect(bound.purpose).toBe("compile governed skill");
+  });
+
+  test("stdio identity is fail-closed unless explicitly trusted and is forbidden in production", () => {
+    expect(() => loadTrustedStdioIdentity({})).toThrow(/AUTH_STDIO_TRUST_REQUIRED/);
+
+    expect(() => loadTrustedStdioIdentity({
+      MCP_TRUSTED_STDIO: "true",
+      NODE_ENV: "production",
+      MCP_STDIO_TENANT_ID: "tenant-gn",
+      MCP_STDIO_ACTOR_ID: "operator-1",
+      MCP_STDIO_AGENT_ID: "local-codex",
+      MCP_STDIO_SCOPES: "genome:skill:read"
+    })).toThrow(/AUTH_STDIO_FORBIDDEN_IN_PRODUCTION/);
+  });
+
+  test("trusted stdio derives identity only from server environment", () => {
+    const identity = loadTrustedStdioIdentity({
+      MCP_TRUSTED_STDIO: "true",
+      NODE_ENV: "test",
+      MCP_STDIO_TENANT_ID: "tenant-gn",
+      MCP_STDIO_ACTOR_ID: "operator-1",
+      MCP_STDIO_AGENT_ID: "local-codex",
+      MCP_STDIO_SCOPES: "genome:skill:compile genome:skill:read",
+      MCP_STDIO_ROLES: "Analyst",
+      MCP_STDIO_AMR: "pwd"
+    });
+
+    expect(identity).toMatchObject({
+      tenantId: "tenant-gn",
+      actorId: "operator-1",
+      agentId: "local-codex"
+    });
+    expect(identity.permissionScope).toEqual(["genome:skill:compile", "genome:skill:read"]);
   });
 });
