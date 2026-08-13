@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
+import { fingerprintContextPack } from "../src/contextPackProvenance";
 import { compileCountrySkill } from "../src/countryCompiler";
 import { compileSkill, type SkillFactoryInput } from "../src/skillFactory";
 import { SkillRegistry } from "../src/skillRegistry";
@@ -22,6 +23,27 @@ const contextPack = {
   technologyDataAgenticAI: { status: "covered" as const, evidenceRefs: ["TECH-GN"] },
   governanceSovereigntyAssurance: { status: "covered" as const, evidenceRefs: ["GOV-GN"] }
 };
+
+function contextProvenance() {
+  return {
+    provenanceVersion: "GENESIS_CONTEXT_PACK_PROVENANCE_0.1.0" as const,
+    contextPackId: "stratex99.gn.govtech",
+    version: "1.0.0",
+    countryCode: "GN",
+    issuer: "AfrIAgenesis R.E.M.E",
+    issuedAt: "2026-08-13T12:00:00.000Z",
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    sources: [
+      {
+        sourceId: "GN-OFFICIAL-001",
+        publisher: "Government of Guinea",
+        locator: "official-source:GN-OFFICIAL-001",
+        retrievedAt: "2026-08-13T11:00:00.000Z"
+      }
+    ],
+    contextSha256: fingerprintContextPack(contextPack)
+  };
+}
 
 function input(level: SkillFactoryInput["level"], id: string, overrides: Partial<SkillFactoryInput> = {}): SkillFactoryInput {
   const territorial = ["L2", "L3", "L4", "L5"].includes(level);
@@ -197,6 +219,7 @@ describe("GENESIS V4 Country Compiler", () => {
     const output = await compileCountrySkill(registry, {
       countryCode: "GN",
       contextPack,
+      contextProvenance: contextProvenance(),
       stratex9Qualification: { status: "go", evidenceRefs: ["S9-GN"] },
       skillRefs: [
         { id: country.skill.id, version: country.skill.version },
@@ -210,5 +233,6 @@ describe("GENESIS V4 Country Compiler", () => {
     expect(output.lineage.map(item => item.level)).toEqual(["L0", "L1", "L3"]);
     expect(output.lineage.every(item => /^[a-f0-9]{64}$/.test(item.sha256))).toBe(true);
     expect(output.countryCode).toBe("GN");
+    expect(output.contextProvenance.contextSha256).toBe(fingerprintContextPack(contextPack));
   });
 });
