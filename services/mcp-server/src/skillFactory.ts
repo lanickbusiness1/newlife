@@ -291,9 +291,9 @@ function geographySimilarity(request: SkillRequest, candidate: SkillRecord): num
     ...(request.institutions ?? [])
   ];
   const available = [
-    ...candidate.regions,
-    ...candidate.countries,
-    ...candidate.institutions
+    ...(candidate.regions ?? []),
+    ...(candidate.countries ?? []),
+    ...(candidate.institutions ?? [])
   ];
   if (requested.length === 0) return 1;
   if (candidate.level === "L0" || candidate.level === "L1") return 1;
@@ -303,18 +303,18 @@ function geographySimilarity(request: SkillRequest, candidate: SkillRecord): num
 export function scoreSkillCompatibility(request: SkillRequest, candidate: SkillRecord): number {
   const domain = request.domain.toLowerCase() === candidate.domain.toLowerCase() ? 1 : 0;
   const problem = textSimilarity(request.problem, candidate.problem);
-  const triggers = setSimilarity(request.triggers, candidate.triggers);
+  const triggers = setSimilarity(request.triggers, candidate.triggers ?? []);
   const io = setSimilarity(
     [...request.inputs, ...request.outputs],
-    [...candidate.inputs, ...candidate.outputs]
+    [...(candidate.inputs ?? []), ...(candidate.outputs ?? [])]
   );
   const level = request.level === candidate.level ? 1 : 0.5;
   const geography = geographySimilarity(request, candidate);
   const dependencies = setSimilarity(
     [...request.dependencies, ...request.connectors],
-    [...candidate.dependencies, ...candidate.connectors]
+    [...(candidate.dependencies ?? []), ...(candidate.connectors ?? [])]
   );
-  const permissions = setSimilarity(request.permissions, candidate.permissions);
+  const permissions = setSimilarity(request.permissions, candidate.permissions ?? []);
 
   const score =
     domain * 0.25 +
