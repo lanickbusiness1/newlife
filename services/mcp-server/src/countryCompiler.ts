@@ -109,6 +109,12 @@ function enforceJurisdiction(countryCode: string, entry: RegistryEntry): void {
   }
 }
 
+function enforceLifecycle(entry: RegistryEntry): void {
+  if (entry.lifecycle.status === "deprecated") {
+    throw new Error(`DEPRECATED_SKILL_NOT_COMPOSABLE:${entry.skill.id}@${entry.skill.version}`);
+  }
+}
+
 export async function compileCountrySkill(
   registry: SkillRegistry,
   input: CountryCompileInput
@@ -131,6 +137,7 @@ export async function compileCountrySkill(
   const lineage: CountrySkillLineage[] = [];
 
   for (const entry of entries) {
+    enforceLifecycle(entry);
     enforceJurisdiction(countryCode, entry);
 
     for (const [key, value] of Object.entries(entry.skill.universalInvariants)) {
