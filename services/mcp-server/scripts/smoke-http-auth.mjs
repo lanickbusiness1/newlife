@@ -16,7 +16,7 @@ function listen(server) {
   });
 }
 
-function createToken(issuer, scope) {
+function createToken(issuer, scope, extraClaims = {}) {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT", kid };
   const payload = {
@@ -31,7 +31,8 @@ function createToken(issuer, scope) {
     iat: now - 1,
     nbf: now - 1,
     exp: now + 300,
-    jti: randomUUID()
+    jti: randomUUID(),
+    ...extraClaims
   };
   const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -62,6 +63,21 @@ function invocation(extra = {}) {
     purpose: "verify OIDC-bound MCP authorization",
     dataClassification: "internal",
     ...extra
+  };
+}
+
+function matchRequest(country) {
+  return {
+    level: "L3",
+    domain: "govtech.procurement",
+    problem: "verify supplier eligibility before procurement submission",
+    triggers: ["supplier onboarding"],
+    inputs: ["supplier_profile"],
+    outputs: ["eligibility_status"],
+    dependencies: [],
+    connectors: [],
+    permissions: ["supplier:read"],
+    countries: [country]
   };
 }
 
@@ -130,7 +146,11 @@ try {
   });
   if (unauthenticated.status !== 401) throw new Error(`SMOKE_UNAUTH_STATUS:${unauthenticated.status}`);
 
-  const allowedToken = createToken(issuer, "genome:skill:read");
+  const allowedToken = createToken(
+    issuer,
+    "genome:skill:read",
+    { countries: ["GN"], organizations: ["PPCC"], missions: ["govtech-procurement"] }
+  );
   allowedClient = await connectClient(mcpUrl, allowedToken, "smoke-allowed");
   const tools = await allowedClient.listTools();
   if (!tools.tools.some(tool => tool.name === "genome.skill_registry.list")) {
@@ -148,7 +168,19 @@ try {
   if (governed.eces?.status !== "allowed") throw new Error("SMOKE_ECES_NOT_ALLOWED");
   if (!Array.isArray(governed.data)) throw new Error("SMOKE_REGISTRY_LIST_NOT_ARRAY");
 
-  const deniedToken = createToken(issuer, "genome:skill:compile");
+  const matchGn = await allowedClient.callTool({
+    name: "genome.skill_factory.match",
+    arguments: { context: invocation(), request: matchRequest("GN") }
+  });
+  if (matchGn.isError) throw new Error(`SMOKE_GN_ABAC_DENIED:${JSON.stringify(matchGn.content)}`);
+
+  const matchCi = await allowedClient.callTool({
+    name: "genome.skill_factory.match",
+    arguments: { context: invocation(), request: matchRequest("CI") }
+  });
+  if (!matchCi.isError) throw new Error("SMOKE_CI_ABAC_ACCEPTED");
+
+  const deniedToken = createToken(issuer, "genome:skill:compile", { countries: ["GN"] });
   deniedClient = await connectClient(mcpUrl, deniedToken, "smoke-denied");
 
   const insufficient = await deniedClient.callTool({
@@ -163,7 +195,8 @@ try {
       context: invocation({
         permissionScope: ["genome:skill:read"],
         tenantId: "forged-tenant",
-        actorId: "forged-admin"
+        actorId: "forged-admin",
+        allowedCountries: ["CI"]
       })
     }
   });
@@ -177,6 +210,8 @@ try {
       version: health.version
     },
     authenticatedTool: "genome.skill_registry.list",
+    territorialCountryAllowed: "GN",
+    territorialCountryDenied: "CI",
     insufficientScopeDenied: true,
     forgedContextDenied: true
   }));
