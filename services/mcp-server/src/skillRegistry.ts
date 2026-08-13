@@ -198,8 +198,13 @@ export class SkillRegistry {
     });
   }
 
-  async match(request: SkillRequest): Promise<RegistryMatch> {
-    const candidates = (await this.list()).filter(entry => entry.lifecycle.status === "active");
+  async match(
+    request: SkillRequest,
+    candidateFilter: (entry: RegistryEntry) => boolean = () => true
+  ): Promise<RegistryMatch> {
+    const candidates = (await this.list()).filter(
+      entry => entry.lifecycle.status === "active" && candidateFilter(entry)
+    );
     if (candidates.length === 0) {
       return { best: null, score: 0, decision: "compile_gap" };
     }
