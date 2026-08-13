@@ -75,6 +75,27 @@ describe("GENESIS V4 Skill Factory security hardening", () => {
     expect(skill.doubleReviewRequired).toBe(true);
   });
 
+  test("blocks territorial context layers that have no evidence reference", () => {
+    const skill = compileSkill(validInput({
+      context: {
+        ...context,
+        culturalHumanAdoption: { status: "covered", evidenceRefs: [] }
+      }
+    }));
+
+    expect(skill.status).toBe("blocked");
+    expect(skill.blockers).toContain("STRATEX99_CONTEXT_EVIDENCE_REQUIRED:culturalHumanAdoption");
+  });
+
+  test("blocks STRATEX-9 qualification without evidence", () => {
+    const skill = compileSkill(validInput({
+      stratex9: { status: "go", evidenceRefs: [] }
+    }));
+
+    expect(skill.status).toBe("blocked");
+    expect(skill.blockers).toContain("STRATEX9_EVIDENCE_REQUIRED");
+  });
+
   test("detects secrets embedded in configurable metadata", () => {
     const skill = compileSkill(validInput({
       configurableMetadata: { apiKey: "super-secret-live-key" }
