@@ -12,3 +12,13 @@ services:
         value: http
       - key: NODE_ENV
         value: production
+      - key: OIDC_ISSUER
+        sync: false
+      - key: OIDC_AUDIENCE
+        sync: false
+      - key: OIDC_JWKS_URI
+        sync: false
+      - key: OIDC_CLOCK_TOLERANCE_SECONDS
+        value: "30"
+      - key: OIDC_JWKS_CACHE_SECONDS
+        value: "300"
