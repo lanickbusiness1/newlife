@@ -29,13 +29,20 @@ Passerelle MCP gouvernée, deny-by-default du Universal Executive Intelligence O
 - `genome.skill_registry.read` — lit une version et vérifie SHA-256.
 - `genome.country_compiler.compile` — compose Core + Domain + Regional + Country + Institution + Transaction avec Context Pack STRATEX-99 et invariants GENOME.
 
-### Scopes minimaux
+### Scopes minimaux des outils
 
 - `genome:skill:compile`
 - `genome:skill:read`
 - `genome:skill:install`
 - `genome:skill:promote`
 - `genome:country:compile`
+
+### Scopes d’autorité — non substituables
+
+- `genome:skill:review` — autorité permettant d’attester la Double Review lors d’une installation.
+- `genome:skill:m8` — autorité permettant d’attester une approbation M8 lors d’une installation sensible.
+
+Un booléen d’approbation sans le scope d’autorité correspondant est refusé. **L’approbation M8 ne fait pas partie du Skill DNA** : un skill ne peut donc pas s’auto-déclarer approuvé.
 
 ## Vérification reproductible
 
@@ -60,6 +67,7 @@ Le fichier `/render.yaml` déploie ce service depuis `services/mcp-server`.
 
 **Code/CI vérifié ne signifie pas production-ready.** Un claim production pour la Skill Factory reste interdit tant que les preuves suivantes ne sont pas disponibles :
 
+- identité authentifiée et scopes dérivés de claims serveur, et non acceptés comme simples déclarations du client ;
 - image Docker réellement construite et exécutée ;
 - runtime déployé et healthcheck observé ;
 - volume persistant `SKILL_REGISTRY_DIR` ;
@@ -71,4 +79,6 @@ Le fichier `/render.yaml` déploie ce service depuis `services/mcp-server`.
 
 ## Statut de sécurité
 
-Les outils Skill Factory sont déterministes et gouvernés, mais les adaptateurs métier historiques restent partiellement simulés. Aucune donnée sensible ne doit être connectée sans authentification forte, isolation multi-tenant appropriée, secrets manager, tests adversariaux et validation S7+.
+Les outils Skill Factory sont déterministes et gouvernés au niveau logique. **Dans l’état actuel du service, `RequestContext.permissionScope` vient encore de la requête** : tant que ces scopes ne sont pas liés à une identité authentifiée et à des claims signés/contrôlés côté serveur, ils constituent une politique de gouvernance testable, pas une frontière d’autorisation suffisante pour la production.
+
+Les adaptateurs métier historiques restent partiellement simulés. Aucune donnée sensible ne doit être connectée sans authentification forte, isolation multi-tenant appropriée, secrets manager, tests adversariaux et validation S7+.
