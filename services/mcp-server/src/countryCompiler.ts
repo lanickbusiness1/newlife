@@ -1,4 +1,8 @@
 import {
+  verifyContextPackProvenance,
+  type ContextPackProvenance
+} from "./contextPackProvenance.js";
+import {
   Stratex99ContextSchema,
   type SkillLevel,
   type Stratex99Context
@@ -15,6 +19,7 @@ export interface Stratex9CountryQualification {
 export interface CountryCompileInput {
   countryCode: string;
   contextPack?: Stratex99Context;
+  contextProvenance?: ContextPackProvenance;
   stratex9Qualification: Stratex9CountryQualification;
   skillRefs: Array<{ id: string; version: string }>;
 }
@@ -30,6 +35,7 @@ export interface CountryCompiledSkill {
   anchor: typeof GENESIS_V4_COUNTRY_COMPILER_ANCHOR;
   countryCode: string;
   contextPack: Stratex99Context;
+  contextProvenance: ContextPackProvenance;
   stratex9Qualification: Stratex9CountryQualification;
   configuration: Record<string, unknown>;
   universalInvariants: Record<string, unknown>;
@@ -162,10 +168,17 @@ export async function compileCountrySkill(
     });
   }
 
+  const contextProvenance = verifyContextPackProvenance(
+    input.contextProvenance,
+    countryCode,
+    contextPack
+  );
+
   return {
     anchor: GENESIS_V4_COUNTRY_COMPILER_ANCHOR,
     countryCode,
     contextPack,
+    contextProvenance,
     stratex9Qualification: input.stratex9Qualification,
     configuration,
     universalInvariants,
