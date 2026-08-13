@@ -43,13 +43,16 @@ export class PersistenceCoordinator {
   private async acquireGate(): Promise<GateLease> {
     await mkdir(this.rootDir, { recursive: true });
     const gate = this.gatePath();
-    try {
-      await mkdir(gate);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "EEXIST") {
-        throw new Error("PERSISTENCE_COORDINATION_BUSY");
+    const deadline = Date.now() + 1000;
+    while (true) {
+      try {
+        await mkdir(gate);
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        if (Date.now() >= deadline) throw new Error("PERSISTENCE_COORDINATION_BUSY");
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
-      throw error;
     }
     return {
       release: async () => rm(gate, { recursive: true, force: true })
