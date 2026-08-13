@@ -68,14 +68,10 @@ function digest(payload: IntegrityPayload): string {
 }
 
 function safeSegment(value: string): string {
-  if (!value || value === "." || value === "..") {
+  if (!value || value === "." || value === ".." || !/^[A-Za-z0-9._-]+$/.test(value)) {
     throw new Error("SKILL_REGISTRY_INVALID_PATH_SEGMENT");
   }
-  const normalized = value.replace(/[^A-Za-z0-9._-]/g, "_");
-  if (!normalized || normalized === "." || normalized === "..") {
-    throw new Error("SKILL_REGISTRY_INVALID_PATH_SEGMENT");
-  }
-  return normalized;
+  return value;
 }
 
 export class SkillRegistry {
@@ -122,16 +118,29 @@ export class SkillRegistry {
     await rename(temporary, record);
   }
 
+  private async assertVersionAvailable(id: string, version: string): Promise<void> {
+    const record = this.recordPath(id, version);
+    try {
+      await readFile(record, "utf8");
+      throw new Error("SKILL_VERSION_IMMUTABLE");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+  }
+
   async install(skill: CompiledSkill, approvals: InstallApprovals = {}): Promise<RegistryEntry> {
     if (skill.status === "blocked") {
       throw new Error("SKILL_INSTALL_BLOCKED");
     }
-    if (skill.status === "alert_ready" && !approvals.doubleReview) {
-      throw new Error("DOUBLE_REVIEW_REQUIRED");
-    }
     if (skill.status === "m8_required" && !approvals.m8Approval) {
       throw new Error("M8_APPROVAL_REQUIRED");
     }
+    if (skill.doubleReviewRequired && !approvals.doubleReview) {
+      throw new Error("DOUBLE_REVIEW_REQUIRED");
+    }
+
+    await this.assertVersionAvailable(skill.id, skill.version);
 
     const payload: IntegrityPayload = {
       registryVersion: GENESIS_SKILL_REGISTRY_VERSION,
