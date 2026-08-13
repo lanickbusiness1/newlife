@@ -171,7 +171,8 @@ const DESTRUCTIVE_PATTERNS: RegExp[] = [
   /\bchmod\s+777\b/i,
   /\bgit\s+reset\s+--hard\b/i,
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i,
-  /\b(?:api[_-]?key|access[_-]?token|secret|password)\s*[:=]\s*[^\s]+/i
+  /\b(?:api[_-]?key|access[_-]?token|secret|password)\s*[:=]\s*[^\s]+/i,
+  /"(?:api[_-]?key|access[_-]?token|secret|password)"\s*:\s*"[^"\n]+"/i
 ];
 
 function parseSkillInput(input: unknown): ParsedSkillFactoryInput {
@@ -184,12 +185,7 @@ function parseSkillInput(input: unknown): ParsedSkillFactoryInput {
 }
 
 function hasDestructiveContent(input: ParsedSkillFactoryInput): boolean {
-  const text = [
-    ...input.procedure,
-    ...input.verification,
-    ...input.dependencies,
-    ...input.connectors
-  ].join("\n");
+  const text = JSON.stringify(input);
   return DESTRUCTIVE_PATTERNS.some(pattern => pattern.test(text));
 }
 
@@ -254,7 +250,7 @@ export function compileSkill(input: unknown): CompiledSkill {
     gates: { m6, s7plus, m8 },
     blockers,
     alerts,
-    doubleReviewRequired: status === "alert_ready" || status === "m8_required",
+    doubleReviewRequired: sensitive || status === "alert_ready" || status === "m8_required",
     m8ApprovalRequired
   };
 }
