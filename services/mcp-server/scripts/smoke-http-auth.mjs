@@ -1,6 +1,9 @@
 import { createServer } from "node:http";
 import { generateKeyPairSync, randomUUID, sign } from "node:crypto";
 import { spawn } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
@@ -81,6 +84,51 @@ function matchRequest(country) {
   };
 }
 
+const contextPack = {
+  languageSemantic: { status: "covered", evidenceRefs: ["SMOKE-LANG-GN"] },
+  regulatoryLegal: { status: "covered", evidenceRefs: ["SMOKE-LEGAL-GN"] },
+  institutional: { status: "covered", evidenceRefs: ["SMOKE-INST-GN"] },
+  economicFinancialPayment: { status: "covered", evidenceRefs: ["SMOKE-ECO-GN"] },
+  culturalHumanAdoption: { status: "covered", evidenceRefs: ["SMOKE-CULT-GN"] },
+  infrastructureResilience: { status: "covered", evidenceRefs: ["SMOKE-INFRA-GN"] },
+  marketBusinessRevenue: { status: "covered", evidenceRefs: ["SMOKE-MKT-GN"] },
+  technologyDataAgenticAI: { status: "covered", evidenceRefs: ["SMOKE-TECH-GN"] },
+  governanceSovereigntyAssurance: { status: "covered", evidenceRefs: ["SMOKE-GOV-GN"] }
+};
+
+function sensitiveSkillPayload() {
+  return {
+    id: "procurement.payment.release.http-smoke",
+    version: "1.0.0",
+    level: "L3",
+    domain: "govtech.procurement",
+    problem: "release governed procurement payment after verified milestone evidence",
+    triggers: ["milestone approved"],
+    inputs: ["milestone_evidence"],
+    outputs: ["payment_release_decision"],
+    dependencies: ["contract_registry"],
+    connectors: ["treasury"],
+    permissions: ["payment:propose"],
+    procedure: ["verify milestone evidence", "prepare payment release"],
+    verification: ["unit test", "human review"],
+    remeEvidence: ["SMOKE-REME-PAY-001"],
+    metrics: ["accuracy"],
+    rollback: "revoke pending release and restore previous state",
+    languages: ["fr"],
+    countries: ["GN"],
+    context: contextPack,
+    stratex9: { status: "go", evidenceRefs: ["SMOKE-S9-GN"] },
+    riskDomains: ["payment"],
+    outcomeEvidencePresent: true,
+    localRulesSeparated: true,
+    permissionsBounded: true,
+    doubleReviewPassed: true,
+    secondContextTestPassed: true,
+    configurableMetadata: {},
+    universalInvariants: {}
+  };
+}
+
 async function connectClient(url, token, name) {
   const client = new Client({ name, version: "1.0.0" }, { capabilities: {} });
   const transport = new StreamableHTTPClientTransport(new URL(`${url}/mcp`), {
@@ -90,6 +138,15 @@ async function connectClient(url, token, name) {
   });
   await client.connect(transport);
   return client;
+}
+
+function extractGovernedData(result, label) {
+  if (result.isError) throw new Error(`${label}:${JSON.stringify(result.content)}`);
+  const first = result.content[0];
+  if (!first || first.type !== "text") throw new Error(`${label}_CONTENT`);
+  const governed = JSON.parse(first.text);
+  if (governed.eces?.status !== "allowed") throw new Error(`${label}_ECES`);
+  return governed.data;
 }
 
 const jwksServer = createServer((req, res) => {
@@ -105,9 +162,10 @@ const jwksServer = createServer((req, res) => {
 });
 
 let child;
-let allowedClient;
-let deniedClient;
+const clients = [];
 const stderr = [];
+const registryRoot = await mkdtemp(path.join(tmpdir(), "genesis-http-registry-"));
+const approvalRoot = await mkdtemp(path.join(tmpdir(), "genesis-http-approvals-"));
 
 try {
   const address = await listen(jwksServer);
@@ -129,7 +187,10 @@ try {
       OIDC_ISSUER: issuer,
       OIDC_AUDIENCE: audience,
       OIDC_JWKS_URI: `${issuer}/jwks`,
-      OIDC_ALLOW_INSECURE_JWKS: "true"
+      OIDC_ALLOW_INSECURE_JWKS: "true",
+      SKILL_REGISTRY_DIR: registryRoot,
+      GOVERNANCE_APPROVAL_DIR: approvalRoot,
+      GOVERNANCE_APPROVAL_TTL_SECONDS: "3600"
     },
     stdio: ["ignore", "ignore", "pipe"]
   });
@@ -138,6 +199,9 @@ try {
   const health = await waitForHealth(mcpUrl, child, stderr);
   if (health.auth !== "GEN-V4-OIDC-AUTH-001") throw new Error("SMOKE_AUTH_HEALTH_MISSING");
   if (health.authorization !== "GEN-V4-ASIR-AUTHZ-001") throw new Error("SMOKE_AUTHZ_HEALTH_MISSING");
+  if (health.approvalLedger !== "GENESIS_GOVERNANCE_APPROVAL_LEDGER_0.1.0") {
+    throw new Error("SMOKE_APPROVAL_LEDGER_HEALTH_MISSING");
+  }
 
   const unauthenticated = await fetch(`${mcpUrl}/mcp`, {
     method: "POST",
@@ -151,22 +215,25 @@ try {
     "genome:skill:read",
     { countries: ["GN"], organizations: ["PPCC"], missions: ["govtech-procurement"] }
   );
-  allowedClient = await connectClient(mcpUrl, allowedToken, "smoke-allowed");
+  const allowedClient = await connectClient(mcpUrl, allowedToken, "smoke-allowed");
+  clients.push(allowedClient);
   const tools = await allowedClient.listTools();
   if (!tools.tools.some(tool => tool.name === "genome.skill_registry.list")) {
     throw new Error("SMOKE_TOOL_LIST_MISSING");
+  }
+  if (!tools.tools.some(tool => tool.name === "genome.skill_approval.review_attest")) {
+    throw new Error("SMOKE_REVIEW_ATTEST_TOOL_MISSING");
+  }
+  if (!tools.tools.some(tool => tool.name === "genome.skill_approval.m8_attest")) {
+    throw new Error("SMOKE_M8_ATTEST_TOOL_MISSING");
   }
 
   const allowed = await allowedClient.callTool({
     name: "genome.skill_registry.list",
     arguments: { context: invocation() }
   });
-  if (allowed.isError) throw new Error(`SMOKE_ALLOWED_TOOL_FAILED:${JSON.stringify(allowed.content)}`);
-  const first = allowed.content[0];
-  if (!first || first.type !== "text") throw new Error("SMOKE_ALLOWED_TOOL_CONTENT");
-  const governed = JSON.parse(first.text);
-  if (governed.eces?.status !== "allowed") throw new Error("SMOKE_ECES_NOT_ALLOWED");
-  if (!Array.isArray(governed.data)) throw new Error("SMOKE_REGISTRY_LIST_NOT_ARRAY");
+  const visibleRegistry = extractGovernedData(allowed, "SMOKE_ALLOWED_TOOL_FAILED");
+  if (!Array.isArray(visibleRegistry)) throw new Error("SMOKE_REGISTRY_LIST_NOT_ARRAY");
 
   const matchGn = await allowedClient.callTool({
     name: "genome.skill_factory.match",
@@ -181,7 +248,8 @@ try {
   if (!matchCi.isError) throw new Error("SMOKE_CI_ABAC_ACCEPTED");
 
   const deniedToken = createToken(issuer, "genome:skill:compile", { countries: ["GN"] });
-  deniedClient = await connectClient(mcpUrl, deniedToken, "smoke-denied");
+  const deniedClient = await connectClient(mcpUrl, deniedToken, "smoke-denied");
+  clients.push(deniedClient);
 
   const insufficient = await deniedClient.callTool({
     name: "genome.skill_registry.list",
@@ -202,22 +270,117 @@ try {
   });
   if (!forged.isError) throw new Error("SMOKE_FORGED_CONTEXT_ACCEPTED");
 
+  const skillPayload = sensitiveSkillPayload();
+  const reviewerToken = createToken(
+    issuer,
+    "genome:skill:review genome:skill:install",
+    {
+      sub: "reviewer-1",
+      agent_id: "review-agent",
+      roles: ["Reviewer"],
+      amr: ["pwd", "mfa"],
+      countries: ["GN"],
+      missions: ["govtech-procurement"]
+    }
+  );
+  const reviewerClient = await connectClient(mcpUrl, reviewerToken, "smoke-reviewer");
+  clients.push(reviewerClient);
+
+  const m8Token = createToken(
+    issuer,
+    "genome:skill:m8",
+    {
+      sub: "m8-1",
+      agent_id: "m8-agent",
+      roles: ["M8 Committee"],
+      amr: ["pwd", "mfa"],
+      countries: ["GN"],
+      missions: ["govtech-procurement"]
+    }
+  );
+  const m8Client = await connectClient(mcpUrl, m8Token, "smoke-m8");
+  clients.push(m8Client);
+
+  const installerToken = createToken(
+    issuer,
+    "genome:skill:install",
+    {
+      sub: "installer-1",
+      agent_id: "installer-agent",
+      roles: ["Workflow Orchestrator"],
+      countries: ["GN"],
+      missions: ["govtech-procurement"]
+    }
+  );
+  const installerClient = await connectClient(mcpUrl, installerToken, "smoke-installer");
+  clients.push(installerClient);
+
+  const reviewResult = await reviewerClient.callTool({
+    name: "genome.skill_approval.review_attest",
+    arguments: { context: invocation(), payload: skillPayload }
+  });
+  const reviewApproval = extractGovernedData(reviewResult, "SMOKE_REVIEW_ATTEST_FAILED");
+  if (!reviewApproval?.approvalId) throw new Error("SMOKE_REVIEW_APPROVAL_ID_MISSING");
+
+  const m8Result = await m8Client.callTool({
+    name: "genome.skill_approval.m8_attest",
+    arguments: { context: invocation(), payload: skillPayload }
+  });
+  const m8Approval = extractGovernedData(m8Result, "SMOKE_M8_ATTEST_FAILED");
+  if (!m8Approval?.approvalId) throw new Error("SMOKE_M8_APPROVAL_ID_MISSING");
+
+  const selfInstall = await reviewerClient.callTool({
+    name: "genome.skill_factory.install",
+    arguments: {
+      context: invocation(),
+      payload: skillPayload,
+      approvalRefs: {
+        reviewApprovalId: reviewApproval.approvalId,
+        m8ApprovalId: m8Approval.approvalId
+      }
+    }
+  });
+  if (!selfInstall.isError) throw new Error("SMOKE_REVIEWER_SELF_INSTALL_ACCEPTED");
+
+  const installResult = await installerClient.callTool({
+    name: "genome.skill_factory.install",
+    arguments: {
+      context: invocation(),
+      payload: skillPayload,
+      approvalRefs: {
+        reviewApprovalId: reviewApproval.approvalId,
+        m8ApprovalId: m8Approval.approvalId
+      }
+    }
+  });
+  const installed = extractGovernedData(installResult, "SMOKE_THREE_ACTOR_INSTALL_FAILED");
+  if (installed?.skill?.id !== skillPayload.id) throw new Error("SMOKE_INSTALLED_SKILL_MISMATCH");
+
   console.log(JSON.stringify({
     status: "ok",
     health: {
       auth: health.auth,
       authorization: health.authorization,
+      approvalLedger: health.approvalLedger,
       version: health.version
     },
     authenticatedTool: "genome.skill_registry.list",
     territorialCountryAllowed: "GN",
     territorialCountryDenied: "CI",
     insufficientScopeDenied: true,
-    forgedContextDenied: true
+    forgedContextDenied: true,
+    governance: {
+      reviewer: reviewApproval.actorId,
+      m8: m8Approval.actorId,
+      installer: "installer-1",
+      reviewerSelfInstallDenied: true,
+      sensitiveInstallSucceeded: true
+    }
   }));
 } finally {
-  try { await allowedClient?.close(); } catch {}
-  try { await deniedClient?.close(); } catch {}
+  for (const client of clients) {
+    try { await client.close(); } catch {}
+  }
   if (child && child.exitCode === null) {
     child.kill("SIGTERM");
     await new Promise(resolve => {
@@ -226,4 +389,8 @@ try {
     });
   }
   await new Promise(resolve => jwksServer.close(resolve));
+  await Promise.all([
+    rm(registryRoot, { recursive: true, force: true }),
+    rm(approvalRoot, { recursive: true, force: true })
+  ]);
 }
