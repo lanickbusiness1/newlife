@@ -77,6 +77,29 @@ describe("Skill MCP territorial wiring", () => {
       .rejects.toThrow(/ECES_ABAC_COUNTRY_DENY:CI/);
   });
 
+  test("registry match filters unauthorized candidates before ranking", async () => {
+    const guinea = fakeEntry("country.gn", ["GN"]);
+    const ivoryCoast = fakeEntry("country.ci", ["CI"]);
+    const registry = {
+      match: async (_request: unknown, candidateFilter?: (entry: any) => boolean) => {
+        if (typeof candidateFilter !== "function") {
+          throw new Error("CANDIDATE_FILTER_MISSING");
+        }
+        const visible = [ivoryCoast, guinea].filter(candidateFilter);
+        return {
+          best: visible[0] ?? null,
+          score: visible.length > 0 ? 0.95 : 0,
+          decision: visible.length > 0 ? "reuse_or_compose" : "compile_gap"
+        };
+      }
+    } as unknown as SkillRegistry;
+    const handlers = capture(registry);
+    const match = handlers.get("genome.skill_factory.match");
+
+    await expect(match?.({ context: context(["GN"]), request: request("GN") }))
+      .resolves.toMatchObject({ best: { skill: { id: "country.gn" } } });
+  });
+
   test("registry list hides territorial skills outside verified attributes", async () => {
     const global = fakeEntry("core.global");
     const guinea = fakeEntry("country.gn", ["GN"]);
