@@ -53,9 +53,15 @@ npm run typecheck
 npm test
 npm run build
 npm run smoke:mcp
+docker build --tag afriagenesis-mcp:ci .
+docker run --rm afriagenesis-mcp:ci npm run smoke:mcp
 ```
 
 Le smoke prouve le chemin déterministe `compile → registry install → SHA read → Registry-first match → Country Compiler` sur un registre temporaire.
+
+### Preuve Docker CI
+
+GitHub Actions construit désormais l’image MCP, exécute `npm run smoke:mcp` **dans l’image**, démarre le conteneur et vérifie `GET /health` depuis le runner. Cette preuve valide la constructibilité et le démarrage containerisé de l’image ; elle ne prouve pas encore un déploiement externe persistant.
 
 ## Déploiement
 
@@ -65,16 +71,17 @@ Le fichier `/render.yaml` déploie ce service depuis `services/mcp-server`.
 
 ## Frontière de preuve — obligatoire
 
-**Code/CI vérifié ne signifie pas production-ready.** Un claim production pour la Skill Factory reste interdit tant que les preuves suivantes ne sont pas disponibles :
+**Code/CI/Docker vérifiés ne signifient pas production-ready.** Un claim production pour la Skill Factory reste interdit tant que les preuves suivantes ne sont pas disponibles :
 
 - identité authentifiée et scopes dérivés de claims serveur, et non acceptés comme simples déclarations du client ;
-- image Docker réellement construite et exécutée ;
-- runtime déployé et healthcheck observé ;
+- déploiement externe persistant et healthcheck depuis l’environnement cible ;
 - volume persistant `SKILL_REGISTRY_DIR` ;
 - sauvegarde + restauration du registre testées ;
+- stratégie de concurrence/verrouillage du Registry en exécution multi-processus ou multi-instance ;
 - monitoring/alerting opérationnels ;
 - rollback réellement exécuté ;
 - isolation et politique de données validées pour les usages institutionnels ;
+- provenance/version territoriale forte des Context Packs ;
 - double revue M6/S7+/M8 des périmètres sensibles.
 
 ## Statut de sécurité
