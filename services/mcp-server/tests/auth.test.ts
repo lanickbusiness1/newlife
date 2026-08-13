@@ -81,17 +81,47 @@ describe("OIDC-bound MCP identity", () => {
 
   test("requires MFA evidence for M8 and double-review authority scopes", async () => {
     await expect(authenticateBearerHeader(
-      `Bearer ${jwt({ scope: "genome:skill:install genome:skill:m8", amr: ["pwd"] })}`,
+      `Bearer ${jwt({
+        scope: "genome:skill:install genome:skill:m8",
+        roles: ["M8 Committee"],
+        amr: ["pwd"]
+      })}`,
       config,
       fetchJwks
     )).rejects.toThrow(/AUTH_MFA_REQUIRED/);
 
     const identity = await authenticateBearerHeader(
-      `Bearer ${jwt({ scope: "genome:skill:install genome:skill:m8 genome:skill:review", amr: ["pwd", "mfa"] })}`,
+      `Bearer ${jwt({
+        scope: "genome:skill:install genome:skill:m8 genome:skill:review",
+        roles: ["M8 Committee", "Reviewer"],
+        amr: ["pwd", "mfa"]
+      })}`,
       config,
       fetchJwks
     );
     expect(identity.permissionScope).toContain("genome:skill:m8");
+  });
+
+  test("requires canonical human authority roles for sensitive authority scopes", async () => {
+    await expect(authenticateBearerHeader(
+      `Bearer ${jwt({
+        scope: "genome:skill:install genome:skill:m8",
+        roles: ["Analyst"],
+        amr: ["pwd", "mfa"]
+      })}`,
+      config,
+      fetchJwks
+    )).rejects.toThrow(/AUTH_ROLE_REQUIRED:M8/);
+
+    await expect(authenticateBearerHeader(
+      `Bearer ${jwt({
+        scope: "genome:skill:install genome:skill:review",
+        roles: ["Analyst"],
+        amr: ["pwd", "mfa"]
+      })}`,
+      config,
+      fetchJwks
+    )).rejects.toThrow(/AUTH_ROLE_REQUIRED:REVIEW/);
   });
 
   test("client invocation context cannot declare identity or permission scopes", () => {
