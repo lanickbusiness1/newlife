@@ -12,3 +12,19 @@ services:
         value: http
       - key: NODE_ENV
         value: production
+      - key: OIDC_ISSUER
+        sync: false
+      - key: OIDC_AUDIENCE
+        sync: false
+      - key: OIDC_JWKS_URI
+        sync: false
+      - key: OIDC_CLOCK_TOLERANCE_SECONDS
+        value: "30"
+      - key: OIDC_JWKS_CACHE_SECONDS
+        value: "300"
+      - key: SKILL_REGISTRY_DIR
+        value: /var/lib/afriagenesis/skill-registry
+      - key: GOVERNANCE_APPROVAL_DIR
+        value: /var/lib/afriagenesis/governance-approvals
+      - key: GOVERNANCE_APPROVAL_TTL_SECONDS
+        value: "3600"

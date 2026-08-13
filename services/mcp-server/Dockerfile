@@ -12,5 +12,6 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
+COPY scripts ./scripts
 EXPOSE 10000
 CMD ["npm", "start"]
