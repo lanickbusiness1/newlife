@@ -144,6 +144,22 @@ describe("GENESIS V4 Country Compiler", () => {
     })).rejects.toThrow(/JURISDICTION_MISMATCH/);
   });
 
+  test("rejects deprecated skills from a country composition", async () => {
+    const registry = await setup();
+    const country = await registry.install(compileSkill(input("L3", "country.procurement.gn")));
+    await registry.deprecate(country.skill.id, country.skill.version, {
+      id: "country.procurement.gn",
+      version: "1.1.0"
+    });
+
+    await expect(compileCountrySkill(registry, {
+      countryCode: "GN",
+      contextPack,
+      stratex9Qualification: { status: "go", evidenceRefs: ["S9-GN"] },
+      skillRefs: [{ id: country.skill.id, version: country.skill.version }]
+    })).rejects.toThrow(/DEPRECATED_SKILL_NOT_COMPOSABLE/);
+  });
+
   test("preserves universal invariants against country overrides", async () => {
     const registry = await setup();
     const core = await registry.install(compileSkill(input("L0", "core.procurement", {
