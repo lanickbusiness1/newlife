@@ -6,7 +6,6 @@ import { registerSkillMcpTools } from "../src/mcpSkillTools";
 import type { SkillRegistry } from "../src/skillRegistry";
 
 const contextSchema = z.any();
-
 type Handler = (args: any) => Promise<unknown>;
 
 const contextPack = {
@@ -90,7 +89,6 @@ function capture(registry: SkillRegistry, ledger: GovernanceApprovalLedger) {
 describe("Skill MCP governance approval wiring", () => {
   test("registers distinct review and M8 attestation tools with distinct scopes", () => {
     const { handlers, scopes } = capture({} as SkillRegistry, {} as GovernanceApprovalLedger);
-
     expect(handlers.has("genome.skill_approval.review_attest")).toBe(true);
     expect(handlers.has("genome.skill_approval.m8_attest")).toBe(true);
     expect(scopes.get("genome.skill_approval.review_attest")).toBe("genome:skill:review");
@@ -102,7 +100,6 @@ describe("Skill MCP governance approval wiring", () => {
     const install = schemas.get("genome.skill_factory.install");
     expect(install?.approvalRefs).toBeDefined();
     expect(install?.approvals).toBeUndefined();
-
     expect(() => install?.approvalRefs.parse({
       reviewApprovalId: "06d8d70b-f038-4272-858c-f60a78263e13",
       m8ApprovalId: "16d8d70b-f038-4272-858c-f60a78263e13"
@@ -121,12 +118,10 @@ describe("Skill MCP governance approval wiring", () => {
     const { handlers } = capture({} as SkillRegistry, ledger);
 
     await handlers.get("genome.skill_approval.review_attest")?.({
-      context: ctx("reviewer-1", ["genome:skill:review"], ["Reviewer"]),
-      payload
+      context: ctx("reviewer-1", ["genome:skill:review"], ["Reviewer"]), payload
     });
     await handlers.get("genome.skill_approval.m8_attest")?.({
-      context: ctx("m8-1", ["genome:skill:m8"], ["M8 Committee"]),
-      payload
+      context: ctx("m8-1", ["genome:skill:m8"], ["M8 Committee"]), payload
     });
 
     expect(calls).toEqual([
@@ -135,12 +130,22 @@ describe("Skill MCP governance approval wiring", () => {
     ]);
   });
 
-  test("install verifies ledger attestations before registry installation", async () => {
+  test("install keeps approval verification locked through the registry write", async () => {
     const events: string[] = [];
     const ledger = {
-      verifyInstall: async (_skill: any, refs: any, context: BoundRequestContext) => {
-        events.push(`verify:${context.actorId}:${refs.reviewApprovalId}:${refs.m8ApprovalId}`);
-        return { doubleReview: true, m8Approval: true };
+      verifyInstall: async () => {
+        throw new Error("UNSAFE_VERIFY_INSTALL_PATH_USED");
+      },
+      withVerifiedInstall: async (
+        skill: any,
+        refs: any,
+        context: BoundRequestContext,
+        operation: (approvals: { doubleReview: boolean; m8Approval: boolean }) => Promise<unknown>
+      ) => {
+        events.push(`critical-enter:${context.actorId}:${refs.reviewApprovalId}:${refs.m8ApprovalId}`);
+        const result = await operation({ doubleReview: true, m8Approval: true });
+        events.push(`critical-exit:${skill.id}`);
+        return result;
       }
     } as unknown as GovernanceApprovalLedger;
     const registry = {
@@ -161,8 +166,9 @@ describe("Skill MCP governance approval wiring", () => {
     });
 
     expect(events).toEqual([
-      "verify:installer-1:06d8d70b-f038-4272-858c-f60a78263e13:16d8d70b-f038-4272-858c-f60a78263e13",
-      "install:procurement.payment.release:true:true"
+      "critical-enter:installer-1:06d8d70b-f038-4272-858c-f60a78263e13:16d8d70b-f038-4272-858c-f60a78263e13",
+      "install:procurement.payment.release:true:true",
+      "critical-exit:procurement.payment.release"
     ]);
   });
 });
