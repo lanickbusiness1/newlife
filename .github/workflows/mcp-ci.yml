@@ -42,20 +42,46 @@ jobs:
         run: docker build --tag afriagenesis-mcp:ci .
       - name: Run Skill Factory smoke inside Docker image
         run: docker run --rm afriagenesis-mcp:ci npm run smoke:mcp
-      - name: Verify containerized MCP health
+      - name: Verify OIDC-configured container, health and unauthenticated denial
         shell: bash
         run: |
           set -euo pipefail
-          docker run -d --name afriagenesis-mcp-ci -p 10000:10000 afriagenesis-mcp:ci
+          docker run -d \
+            --name afriagenesis-mcp-ci \
+            -p 10000:10000 \
+            -e OIDC_ISSUER=https://id.afriagenesis.test \
+            -e OIDC_AUDIENCE=afriagenesis-mcp \
+            -e OIDC_JWKS_URI=https://id.afriagenesis.test/.well-known/jwks.json \
+            afriagenesis-mcp:ci
+
+          healthy=false
           for attempt in $(seq 1 20); do
             if curl --fail --silent --show-error http://127.0.0.1:10000/health > /tmp/mcp-health.json; then
-              cat /tmp/mcp-health.json
-              exit 0
+              healthy=true
+              break
             fi
             sleep 1
           done
-          docker logs afriagenesis-mcp-ci || true
-          exit 1
+          if [ "$healthy" != "true" ]; then
+            docker logs afriagenesis-mcp-ci || true
+            exit 1
+          fi
+
+          cat /tmp/mcp-health.json
+          grep -q '"version":"0.4.0"' /tmp/mcp-health.json
+          grep -q '"auth":"GEN-V4-OIDC-AUTH-001"' /tmp/mcp-health.json
+          grep -q '"authorization":"GEN-V4-ASIR-AUTHZ-001"' /tmp/mcp-health.json
+
+          status=$(curl --silent --show-error \
+            --output /tmp/mcp-unauth.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header 'content-type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"ping"}' \
+            http://127.0.0.1:10000/mcp)
+          cat /tmp/mcp-unauth.json
+          test "$status" = "401"
+          grep -q 'AUTH_BEARER_REQUIRED' /tmp/mcp-unauth.json
       - name: Cleanup MCP container
         if: always()
         run: docker rm -f afriagenesis-mcp-ci >/dev/null 2>&1 || true
