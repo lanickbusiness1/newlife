@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { link, mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   SKILL_REUSE_THRESHOLD,
@@ -110,22 +110,29 @@ export class SkillRegistry {
     };
   }
 
-  private async writeEntry(entry: RegistryEntry): Promise<void> {
+  private async writeMutableEntry(entry: RegistryEntry): Promise<void> {
     const record = this.recordPath(entry.skill.id, entry.skill.version);
     await mkdir(path.dirname(record), { recursive: true });
-    const temporary = `${record}.${process.pid}.${Date.now()}.tmp`;
+    const temporary = `${record}.${process.pid}.${randomUUID()}.tmp`;
     await writeFile(temporary, `${JSON.stringify(entry, null, 2)}\n`, "utf8");
     await rename(temporary, record);
   }
 
-  private async assertVersionAvailable(id: string, version: string): Promise<void> {
-    const record = this.recordPath(id, version);
+  private async writeNewImmutableEntry(entry: RegistryEntry): Promise<void> {
+    const record = this.recordPath(entry.skill.id, entry.skill.version);
+    await mkdir(path.dirname(record), { recursive: true });
+    const temporary = `${record}.${process.pid}.${randomUUID()}.tmp`;
+    await writeFile(temporary, `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+
     try {
-      await readFile(record, "utf8");
-      throw new Error("SKILL_VERSION_IMMUTABLE");
+      await link(temporary, record);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+        throw new Error("SKILL_VERSION_IMMUTABLE");
+      }
       throw error;
+    } finally {
+      await unlink(temporary).catch(() => undefined);
     }
   }
 
@@ -140,8 +147,6 @@ export class SkillRegistry {
       throw new Error("DOUBLE_REVIEW_REQUIRED");
     }
 
-    await this.assertVersionAvailable(skill.id, skill.version);
-
     const payload: IntegrityPayload = {
       registryVersion: GENESIS_SKILL_REGISTRY_VERSION,
       skill,
@@ -149,7 +154,7 @@ export class SkillRegistry {
       lifecycle: { status: "active" }
     };
     const entry = this.withIntegrity(payload);
-    await this.writeEntry(entry);
+    await this.writeNewImmutableEntry(entry);
     return entry;
   }
 
@@ -230,7 +235,7 @@ export class SkillRegistry {
       }
     };
     const updated = this.withIntegrity(payload);
-    await this.writeEntry(updated);
+    await this.writeMutableEntry(updated);
     return updated;
   }
 }
