@@ -38,10 +38,13 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run smoke:mcp
+      - run: npm run smoke:http-auth
       - name: Build MCP Docker image
         run: docker build --tag afriagenesis-mcp:ci .
       - name: Run Skill Factory smoke inside Docker image
         run: docker run --rm afriagenesis-mcp:ci npm run smoke:mcp
+      - name: Run authenticated HTTP MCP smoke inside Docker image
+        run: docker run --rm afriagenesis-mcp:ci npm run smoke:http-auth
       - name: Verify OIDC-configured container, health and unauthenticated denial
         shell: bash
         run: |
