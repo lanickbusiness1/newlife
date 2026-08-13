@@ -1,6 +1,6 @@
 {
   "name": "@afriagenesis/intelligence-mcp-server",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "engines": {"node": ">=24 <25"},
@@ -12,7 +12,8 @@
     "start:stdio": "node dist/index.js --transport=stdio",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "smoke:mcp": "node scripts/smoke-mcp.mjs"
+    "smoke:mcp": "node scripts/smoke-mcp.mjs",
+    "smoke:http-auth": "node scripts/smoke-http-auth.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
