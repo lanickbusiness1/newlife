@@ -35,6 +35,9 @@ export interface AuthenticatedIdentity {
   permissionScope: string[];
   roles: string[];
   amr: string[];
+  allowedCountries: string[];
+  allowedOrganizations: string[];
+  allowedMissions: string[];
   tokenId?: string;
 }
 
@@ -63,6 +66,9 @@ interface JwtClaims extends Record<string, unknown> {
   scp?: unknown;
   roles?: unknown;
   amr?: unknown;
+  countries?: unknown;
+  organizations?: unknown;
+  missions?: unknown;
 }
 
 interface JwksDocument {
@@ -370,6 +376,10 @@ function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
 
+function normalizeCountries(values: string[]): string[] {
+  return unique(values.map(value => value === "*" ? "*" : value.toUpperCase()));
+}
+
 function hasAnyRole(roles: string[], allowed: Set<string>): boolean {
   return roles.some(role => allowed.has(role));
 }
@@ -405,6 +415,9 @@ function identityFromClaims(claims: JwtClaims, config: OidcVerifierConfig): Auth
   ]);
   const roles = unique(stringList(claims.roles));
   const amr = unique(stringList(claims.amr));
+  const allowedCountries = normalizeCountries(stringList(claims.countries));
+  const allowedOrganizations = unique(stringList(claims.organizations));
+  const allowedMissions = unique(stringList(claims.missions));
 
   validateAuthorityBindings(permissionScope, roles, amr);
 
@@ -416,6 +429,9 @@ function identityFromClaims(claims: JwtClaims, config: OidcVerifierConfig): Auth
     permissionScope,
     roles,
     amr,
+    allowedCountries,
+    allowedOrganizations,
+    allowedMissions,
     ...(typeof claims.jti === "string" && claims.jti.trim() ? { tokenId: claims.jti.trim() } : {})
   };
 }
@@ -445,7 +461,10 @@ export function bindAuthenticatedContext(
     ...identity,
     permissionScope: [...identity.permissionScope],
     roles: [...identity.roles],
-    amr: [...identity.amr]
+    amr: [...identity.amr],
+    allowedCountries: [...identity.allowedCountries],
+    allowedOrganizations: [...identity.allowedOrganizations],
+    allowedMissions: [...identity.allowedMissions]
   };
 }
 
@@ -465,6 +484,9 @@ export function loadTrustedStdioIdentity(
   const permissionScope = unique(stringList(env.MCP_STDIO_SCOPES));
   const roles = unique(stringList(env.MCP_STDIO_ROLES));
   const amr = unique(stringList(env.MCP_STDIO_AMR));
+  const allowedCountries = normalizeCountries(stringList(env.MCP_STDIO_COUNTRIES));
+  const allowedOrganizations = unique(stringList(env.MCP_STDIO_ORGANIZATIONS));
+  const allowedMissions = unique(stringList(env.MCP_STDIO_MISSIONS));
 
   validateAuthorityBindings(permissionScope, roles, amr);
 
@@ -475,6 +497,9 @@ export function loadTrustedStdioIdentity(
     agentId,
     permissionScope,
     roles,
-    amr
+    amr,
+    allowedCountries,
+    allowedOrganizations,
+    allowedMissions
   };
 }
