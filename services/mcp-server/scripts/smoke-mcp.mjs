@@ -99,6 +99,23 @@ try {
   if (approvalRead.actorId !== "smoke-reviewer") throw new Error("SMOKE_APPROVAL_ACTOR");
   if (!/^[a-f0-9]{64}$/.test(approvalRead.integrity.sha256)) throw new Error("SMOKE_APPROVAL_INTEGRITY");
 
+  const revocation = await approvalLedger.revoke(
+    approval.approvalId,
+    "double_review",
+    reviewer,
+    "smoke review withdrawn"
+  );
+  const revocationRead = await approvalLedger.readRevocation(approval.approvalId);
+  if (!revocationRead) throw new Error("SMOKE_REVOCATION_MISSING");
+  if (revocationRead.revocationId !== revocation.revocationId) throw new Error("SMOKE_REVOCATION_ID");
+  if (!/^[a-f0-9]{64}$/.test(revocationRead.integrity.sha256)) {
+    throw new Error("SMOKE_REVOCATION_INTEGRITY");
+  }
+  const originalAfterRevocation = await approvalLedger.read(approval.approvalId);
+  if (originalAfterRevocation.integrity.sha256 !== approvalRead.integrity.sha256) {
+    throw new Error("SMOKE_APPROVAL_MUTATED_BY_REVOCATION");
+  }
+
   const country = await compileCountrySkill(registry, {
     countryCode: "GN",
     contextPack,
@@ -107,9 +124,12 @@ try {
   });
   if (country.configuration.currency !== "GNF") throw new Error("SMOKE_COUNTRY_CURRENCY");
   if (!country.universalInvariants.auditRequired) throw new Error("SMOKE_GENOME_INVARIANT");
-  if (SKILL_MCP_TOOL_NAMES.length !== 9) throw new Error("SMOKE_MCP_TOOL_COUNT");
+  if (SKILL_MCP_TOOL_NAMES.length !== 11) throw new Error("SMOKE_MCP_TOOL_COUNT");
   if (SKILL_MCP_HEALTH.approvalLedger !== "GENESIS_GOVERNANCE_APPROVAL_LEDGER_0.1.0") {
     throw new Error("SMOKE_APPROVAL_LEDGER_HEALTH");
+  }
+  if (SKILL_MCP_HEALTH.approvalRevocation !== "GENESIS_GOVERNANCE_APPROVAL_REVOCATION_0.1.0") {
+    throw new Error("SMOKE_APPROVAL_REVOCATION_HEALTH");
   }
 
   console.log(JSON.stringify({
@@ -121,6 +141,11 @@ try {
       approvalId: approvalRead.approvalId,
       kind: approvalRead.kind,
       integrity: approvalRead.integrity.sha256
+    },
+    revocation: {
+      revocationId: revocationRead.revocationId,
+      approvalId: revocationRead.approvalId,
+      integrity: revocationRead.integrity.sha256
     },
     match: { decision: match.decision, score: match.score },
     country: country.countryCode,
