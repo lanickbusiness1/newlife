@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { authorizeTerritorialTarget } from "./authorization.js";
 import { compileCountrySkill, GENESIS_V4_COUNTRY_COMPILER_ANCHOR } from "./countryCompiler.js";
 import {
   compileSkill,
@@ -101,7 +102,14 @@ export function registerSkillMcpTools(
     "Compile un Skill DNA GENESIS V4 avec contextualisation STRATEX-99 et gates M6/S7+/M8.",
     { context: contextSchema, payload: z.unknown() },
     "genome:skill:compile",
-    async ({ payload }) => compileSkill(payload)
+    async ({ context, payload }) => {
+      const compiled = compileSkill(payload);
+      authorizeTerritorialTarget(context, {
+        countries: compiled.countries,
+        organizations: compiled.institutions
+      });
+      return compiled;
+    }
   );
 
   register(
@@ -109,7 +117,14 @@ export function registerSkillMcpTools(
     "Recherche Registry-first et décide reuse_or_compose à partir du seuil canonique de 80%.",
     { context: contextSchema, request: SkillRequestSchema },
     "genome:skill:read",
-    async ({ request }) => registry.match(SkillRequestSchema.parse(request))
+    async ({ context, request }) => {
+      const parsed = SkillRequestSchema.parse(request);
+      authorizeTerritorialTarget(context, {
+        countries: parsed.countries,
+        organizations: parsed.institutions
+      });
+      return registry.match(parsed);
+    }
   );
 
   register(
@@ -125,6 +140,10 @@ export function registerSkillMcpTools(
       const parsedApprovals = InstallApprovalsSchema.parse(approvals);
       validateInstallApprovalAuthority(parsedApprovals, context.permissionScope ?? []);
       const compiled = compileSkill(payload);
+      authorizeTerritorialTarget(context, {
+        countries: compiled.countries,
+        organizations: compiled.institutions
+      });
       return registry.install(compiled, parsedApprovals);
     }
   );
@@ -162,6 +181,18 @@ export function registerSkillMcpTools(
     "Compose L0-L5 pour un pays avec Context Pack STRATEX-99, qualification STRATEX-9 et invariants GENOME.",
     { context: contextSchema, payload: CountryCompileSchema },
     "genome:country:compile",
-    async ({ payload }) => compileCountrySkill(registry, CountryCompileSchema.parse(payload))
+    async ({ context, payload }) => {
+      const parsed = CountryCompileSchema.parse(payload);
+      authorizeTerritorialTarget(context, { countries: [parsed.countryCode] });
+
+      const referenced = await Promise.all(
+        parsed.skillRefs.map(ref => registry.read(ref.id, ref.version))
+      );
+      authorizeTerritorialTarget(context, {
+        organizations: referenced.flatMap(entry => entry.skill.institutions)
+      });
+
+      return compileCountrySkill(registry, parsed);
+    }
   );
 }
