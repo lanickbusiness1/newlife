@@ -2,6 +2,11 @@ import { z } from "zod";
 import { authorizeTerritorialTarget } from "./authorization.js";
 import { compileCountrySkill, GENESIS_V4_COUNTRY_COMPILER_ANCHOR } from "./countryCompiler.js";
 import {
+  GENESIS_GOVERNANCE_APPROVAL_LEDGER_VERSION,
+  GovernanceApprovalLedger,
+  type InstallApprovalRefs
+} from "./governanceApprovalLedger.js";
+import {
   compileSkill,
   evaluatePromotion,
   GENESIS_V4_SKILL_FACTORY_ANCHOR,
@@ -17,12 +22,15 @@ import {
 export const SKILL_MCP_HEALTH = {
   skillFactory: GENESIS_V4_SKILL_FACTORY_ANCHOR,
   skillRegistry: GENESIS_SKILL_REGISTRY_VERSION,
+  approvalLedger: GENESIS_GOVERNANCE_APPROVAL_LEDGER_VERSION,
   countryCompiler: GENESIS_V4_COUNTRY_COMPILER_ANCHOR
 } as const;
 
 export const SKILL_MCP_TOOL_NAMES = [
   "genome.skill_factory.compile",
   "genome.skill_factory.match",
+  "genome.skill_approval.review_attest",
+  "genome.skill_approval.m8_attest",
   "genome.skill_factory.install",
   "genome.skill_factory.promote",
   "genome.skill_registry.list",
@@ -80,10 +88,17 @@ const CountryCompileSchema = z.object({
   })).min(1)
 });
 
-const InstallApprovalsSchema = z.object({
-  doubleReview: z.boolean().optional(),
-  m8Approval: z.boolean().optional()
-}).default({});
+const InstallApprovalRefsSchema = z.object({
+  reviewApprovalId: z.string().uuid().optional(),
+  m8ApprovalId: z.string().uuid().optional()
+}).strict().default({});
+
+function authorizeCompiledSkill(context: any, compiled: ReturnType<typeof compileSkill>): void {
+  authorizeTerritorialTarget(context, {
+    countries: compiled.countries,
+    organizations: compiled.institutions
+  });
+}
 
 function authorizeRegistryEntry(context: any, entry: RegistryEntry): void {
   authorizeTerritorialTarget(context, {
@@ -101,6 +116,10 @@ function registryEntryVisible(context: any, entry: RegistryEntry): boolean {
   }
 }
 
+/**
+ * Legacy internal guard retained for lower-level registry tests only.
+ * The MCP install surface no longer accepts approval booleans and does not call this helper.
+ */
 export function validateInstallApprovalAuthority(
   approvals: InstallApprovals,
   permissionScope: string[]
@@ -116,7 +135,8 @@ export function validateInstallApprovalAuthority(
 export function registerSkillMcpTools(
   register: RegisterFn,
   contextSchema: z.ZodTypeAny,
-  registry = new SkillRegistry()
+  registry = new SkillRegistry(),
+  approvalLedger = new GovernanceApprovalLedger()
 ): void {
   register(
     "genome.skill_factory.compile",
@@ -125,10 +145,7 @@ export function registerSkillMcpTools(
     "genome:skill:compile",
     async ({ context, payload }) => {
       const compiled = compileSkill(payload);
-      authorizeTerritorialTarget(context, {
-        countries: compiled.countries,
-        organizations: compiled.institutions
-      });
+      authorizeCompiledSkill(context, compiled);
       return compiled;
     }
   );
@@ -149,23 +166,44 @@ export function registerSkillMcpTools(
   );
 
   register(
+    "genome.skill_approval.review_attest",
+    "Atteste la Double Review d'un Skill DNA exact. L'attestation est immuable, fingerprintée, expirante et liée à l'identité OIDC du reviewer.",
+    { context: contextSchema, payload: z.unknown() },
+    "genome:skill:review",
+    async ({ context, payload }) => {
+      const compiled = compileSkill(payload);
+      authorizeCompiledSkill(context, compiled);
+      return approvalLedger.attest(compiled, "double_review", context);
+    }
+  );
+
+  register(
+    "genome.skill_approval.m8_attest",
+    "Atteste l'approbation M8 d'un Skill DNA sensible exact. L'attestation est immuable, fingerprintée, expirante et liée à l'identité OIDC M8 avec MFA.",
+    { context: contextSchema, payload: z.unknown() },
+    "genome:skill:m8",
+    async ({ context, payload }) => {
+      const compiled = compileSkill(payload);
+      authorizeCompiledSkill(context, compiled);
+      return approvalLedger.attest(compiled, "m8", context);
+    }
+  );
+
+  register(
     "genome.skill_factory.install",
-    "Compile puis installe un skill gouverné dans le registre avec contrôle Double Review/M8 et scopes d'autorité dédiés.",
+    "Compile puis installe un skill gouverné après vérification d'attestations immuables et distinctes de Double Review/M8.",
     {
       context: contextSchema,
       payload: z.unknown(),
-      approvals: InstallApprovalsSchema
+      approvalRefs: InstallApprovalRefsSchema
     },
     "genome:skill:install",
-    async ({ context, payload, approvals }) => {
-      const parsedApprovals = InstallApprovalsSchema.parse(approvals);
-      validateInstallApprovalAuthority(parsedApprovals, context.permissionScope ?? []);
+    async ({ context, payload, approvalRefs }) => {
+      const refs = InstallApprovalRefsSchema.parse(approvalRefs) as InstallApprovalRefs;
       const compiled = compileSkill(payload);
-      authorizeTerritorialTarget(context, {
-        countries: compiled.countries,
-        organizations: compiled.institutions
-      });
-      return registry.install(compiled, parsedApprovals);
+      authorizeCompiledSkill(context, compiled);
+      const verifiedApprovals = await approvalLedger.verifyInstall(compiled, refs, context);
+      return registry.install(compiled, verifiedApprovals);
     }
   );
 
