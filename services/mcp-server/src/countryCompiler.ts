@@ -77,8 +77,14 @@ function validateContext(contextPack: Stratex99Context | undefined): Stratex99Co
   if (!parsed.success) {
     throw new Error("COUNTRY_CONTEXT_INVALID");
   }
-  for (const layer of CRITICAL_CONTEXT_LAYERS) {
-    if (parsed.data[layer].status === "partial") {
+  for (const [layer, value] of Object.entries(parsed.data)) {
+    if (value.evidenceRefs.length === 0) {
+      throw new Error(`COUNTRY_CONTEXT_EVIDENCE_REQUIRED:${layer}`);
+    }
+    if (
+      value.status === "partial" &&
+      CRITICAL_CONTEXT_LAYERS.includes(layer as keyof Stratex99Context)
+    ) {
       throw new Error(`COUNTRY_CONTEXT_CRITICAL_INCOMPLETE:${layer}`);
     }
   }
@@ -96,7 +102,7 @@ function validateStratex9(qualification: Stratex9CountryQualification): string[]
 }
 
 function enforceJurisdiction(countryCode: string, entry: RegistryEntry): void {
-  if (!["L3", "L4", "L5"].includes(entry.skill.level)) return;
+  if (!["L2", "L3", "L4", "L5"].includes(entry.skill.level)) return;
   const countries = entry.skill.countries.map(value => value.toUpperCase());
   if (countries.length > 0 && !countries.includes(countryCode)) {
     throw new Error(`JURISDICTION_MISMATCH:${entry.skill.id}:${countryCode}`);
