@@ -38,3 +38,24 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run smoke:mcp
+      - name: Build MCP Docker image
+        run: docker build --tag afriagenesis-mcp:ci .
+      - name: Run Skill Factory smoke inside Docker image
+        run: docker run --rm afriagenesis-mcp:ci npm run smoke:mcp
+      - name: Verify containerized MCP health
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name afriagenesis-mcp-ci -p 10000:10000 afriagenesis-mcp:ci
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error http://127.0.0.1:10000/health > /tmp/mcp-health.json; then
+              cat /tmp/mcp-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs afriagenesis-mcp-ci || true
+          exit 1
+      - name: Cleanup MCP container
+        if: always()
+        run: docker rm -f afriagenesis-mcp-ci >/dev/null 2>&1 || true
