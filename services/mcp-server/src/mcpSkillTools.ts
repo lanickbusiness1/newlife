@@ -237,7 +237,7 @@ export function registerSkillMcpTools(
 
   register(
     "genome.skill_factory.install",
-    "Compile puis installe un skill gouverné après vérification d'attestations immuables, non révoquées et distinctes de Double Review/M8.",
+    "Compile puis installe un skill gouverné dans une section critique conservant les locks d'attestation jusqu'à l'écriture Registry.",
     {
       context: contextSchema,
       payload: z.unknown(),
@@ -248,8 +248,12 @@ export function registerSkillMcpTools(
       const refs = InstallApprovalRefsSchema.parse(approvalRefs) as InstallApprovalRefs;
       const compiled = compileSkill(payload);
       authorizeCompiledSkill(context, compiled);
-      const verifiedApprovals = await approvalLedger.verifyInstall(compiled, refs, context);
-      return registry.install(compiled, verifiedApprovals);
+      return approvalLedger.withVerifiedInstall(
+        compiled,
+        refs,
+        context,
+        approvals => registry.install(compiled, approvals)
+      );
     }
   );
 
@@ -296,14 +300,12 @@ export function registerSkillMcpTools(
     async ({ context, payload }) => {
       const parsed = CountryCompileSchema.parse(payload);
       authorizeTerritorialTarget(context, { countries: [parsed.countryCode] });
-
       const referenced = await Promise.all(
         parsed.skillRefs.map(ref => registry.read(ref.id, ref.version))
       );
       authorizeTerritorialTarget(context, {
         organizations: referenced.flatMap(entry => entry.skill.institutions)
       });
-
       return compileCountrySkill(registry, parsed);
     }
   );
