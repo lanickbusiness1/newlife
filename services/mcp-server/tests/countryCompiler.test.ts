@@ -77,6 +77,21 @@ describe("GENESIS V4 Country Compiler", () => {
     })).rejects.toThrow(/COUNTRY_CONTEXT_REQUIRED/);
   });
 
+  test("requires evidence for every STRATEX-99 country context layer", async () => {
+    const registry = await setup();
+    const core = await registry.install(compileSkill(input("L0", "core.procurement")));
+
+    await expect(compileCountrySkill(registry, {
+      countryCode: "GN",
+      contextPack: {
+        ...contextPack,
+        culturalHumanAdoption: { status: "covered", evidenceRefs: [] }
+      },
+      stratex9Qualification: { status: "go", evidenceRefs: ["S9-GN"] },
+      skillRefs: [{ id: core.skill.id, version: core.skill.version }]
+    })).rejects.toThrow(/COUNTRY_CONTEXT_EVIDENCE_REQUIRED:culturalHumanAdoption/);
+  });
+
   test("rejects a STRATEX-9 no-go even when context exists", async () => {
     const registry = await setup();
     const core = await registry.install(compileSkill(input("L0", "core.procurement")));
@@ -105,6 +120,21 @@ describe("GENESIS V4 Country Compiler", () => {
     const registry = await setup();
     const liberia = compileSkill(input("L3", "country.supplier.verify", { countries: ["LR"] }));
     const saved = await registry.install(liberia);
+
+    await expect(compileCountrySkill(registry, {
+      countryCode: "GN",
+      contextPack,
+      stratex9Qualification: { status: "go", evidenceRefs: ["S9-GN"] },
+      skillRefs: [{ id: saved.skill.id, version: saved.skill.version }]
+    })).rejects.toThrow(/JURISDICTION_MISMATCH/);
+  });
+
+  test("rejects a regional skill whose declared country coverage excludes the target", async () => {
+    const registry = await setup();
+    const regional = compileSkill(input("L2", "regional.procurement.mru", {
+      countries: ["LR", "SL"]
+    }));
+    const saved = await registry.install(regional);
 
     await expect(compileCountrySkill(registry, {
       countryCode: "GN",
