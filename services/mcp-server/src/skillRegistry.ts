@@ -192,6 +192,9 @@ export class SkillRegistry {
       .map(entry => ({ entry, score: scoreSkillCompatibility(request, entry.skill) }))
       .sort((left, right) => right.score - left.score);
     const best = ranked[0];
+    if (!best) {
+      return { best: null, score: 0, decision: "compile_gap" };
+    }
     return {
       best: best.entry,
       score: best.score,
