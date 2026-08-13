@@ -78,12 +78,13 @@ describe("GENESIS Skill Registry", () => {
     });
   });
 
-  test("requires M8 approval for m8_required skills", async () => {
+  test("requires both M8 approval and double review for m8_required skills", async () => {
     const r = await registry();
     const skill = compileSkill(input({ riskDomains: ["payment"] }));
 
     await expect(r.install(skill)).rejects.toThrow(/M8_APPROVAL_REQUIRED/);
-    await expect(r.install(skill, { m8Approval: true })).resolves.toMatchObject({
+    await expect(r.install(skill, { m8Approval: true })).rejects.toThrow(/DOUBLE_REVIEW_REQUIRED/);
+    await expect(r.install(skill, { m8Approval: true, doubleReview: true })).resolves.toMatchObject({
       skill: { status: "m8_required" }
     });
   });
