@@ -63,10 +63,15 @@ async function registry() {
 }
 
 describe("GENESIS V4 Skill Factory security hardening", () => {
-  test("sensitive skills still require double review after M8 approval", () => {
-    const skill = compileSkill(validInput({ riskDomains: ["payment"], m8Approval: true }));
+  test("a sensitive Skill DNA cannot self-declare M8 approval", () => {
+    const raw = {
+      ...validInput({ riskDomains: ["payment"] }),
+      m8Approval: true
+    };
+    const skill = compileSkill(raw);
 
-    expect(skill.status).toBe("draft_ready");
+    expect(skill.status).toBe("m8_required");
+    expect(skill.m8ApprovalRequired).toBe(true);
     expect(skill.doubleReviewRequired).toBe(true);
   });
 
