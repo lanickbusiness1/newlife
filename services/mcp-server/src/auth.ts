@@ -102,6 +102,20 @@ const MFA_AMR_VALUES = new Set([
   "webauthn"
 ]);
 
+const M8_AUTHORITY_ROLES = new Set([
+  "M8 Committee",
+  "M8_REVIEWER"
+]);
+
+const REVIEW_AUTHORITY_ROLES = new Set([
+  "Reviewer",
+  "M6 Reviewer",
+  "S7+ Security Reviewer",
+  "M8 Committee",
+  "M8_REVIEWER",
+  "S7_REVIEWER"
+]);
+
 const jwksCache = new Map<string, { expiresAt: number; document: JwksDocument }>();
 
 function requiredEnv(env: NodeJS.ProcessEnv, key: string): string {
@@ -356,6 +370,10 @@ function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
 
+function hasAnyRole(roles: string[], allowed: Set<string>): boolean {
+  return roles.some(role => allowed.has(role));
+}
+
 function identityFromClaims(claims: JwtClaims, config: OidcVerifierConfig): AuthenticatedIdentity {
   const issuer = nonEmptyString(claims.iss, "AUTH_ISSUER_REQUIRED");
   if (issuer !== config.issuer) throw new Error("AUTH_ISSUER_MISMATCH");
@@ -373,6 +391,13 @@ function identityFromClaims(claims: JwtClaims, config: OidcVerifierConfig): Auth
   ]);
   const roles = unique(stringList(claims.roles));
   const amr = unique(stringList(claims.amr));
+
+  if (permissionScope.includes("genome:skill:m8") && !hasAnyRole(roles, M8_AUTHORITY_ROLES)) {
+    throw new Error("AUTH_ROLE_REQUIRED:M8");
+  }
+  if (permissionScope.includes("genome:skill:review") && !hasAnyRole(roles, REVIEW_AUTHORITY_ROLES)) {
+    throw new Error("AUTH_ROLE_REQUIRED:REVIEW");
+  }
 
   const requiresMfa = permissionScope.some(scope => MFA_AUTHORITY_SCOPES.has(scope));
   if (requiresMfa && !amr.some(method => MFA_AMR_VALUES.has(method.toLowerCase()))) {
