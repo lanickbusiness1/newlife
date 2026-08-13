@@ -8,6 +8,7 @@ describe("GENESIS V4 Skill Factory MCP surface", () => {
       skillRegistry: "GENESIS_SKILL_REGISTRY_0.2.0",
       approvalLedger: "GENESIS_GOVERNANCE_APPROVAL_LEDGER_0.1.0",
       approvalRevocation: "GENESIS_GOVERNANCE_APPROVAL_REVOCATION_0.1.0",
+      contextPackProvenance: "GENESIS_CONTEXT_PACK_PROVENANCE_0.1.0",
       countryCompiler: "GEN-V4-COUNTRY-COMPILER-001"
     });
   });
