@@ -81,6 +81,8 @@ const SkillFactoryInputSchema = z.object({
   warnings: z.array(z.string().min(1)).default([]),
   context: Stratex99ContextSchema.optional(),
   stratex9: Stratex9QualificationSchema.optional(),
+  configurableMetadata: z.record(z.unknown()).default({}),
+  universalInvariants: z.record(z.unknown()).default({}),
   outcomeEvidencePresent: z.boolean().default(false),
   localRulesSeparated: z.boolean().default(false),
   permissionsBounded: z.boolean().default(false),
