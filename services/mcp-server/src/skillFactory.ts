@@ -88,8 +88,7 @@ const SkillFactoryInputSchema = z.object({
   permissionsBounded: z.boolean().default(false),
   doubleReviewPassed: z.boolean().default(false),
   secondContextTestPassed: z.boolean().default(false),
-  hardcodedNationalRule: z.boolean().default(false),
-  m8Approval: z.boolean().default(false)
+  hardcodedNationalRule: z.boolean().default(false)
 });
 
 export type SkillFactoryInput = z.input<typeof SkillFactoryInputSchema>;
@@ -225,7 +224,7 @@ export function compileSkill(input: unknown): CompiledSkill {
   }
 
   const sensitive = skill.riskDomains.some(domain => SENSITIVE_RISK_DOMAINS.has(domain));
-  const m8ApprovalRequired = sensitive && !skill.m8Approval;
+  const m8ApprovalRequired = sensitive;
 
   const s7plus: GateStatus = destructive ? "fail" : "pass";
   const m8: GateStatus = m8ApprovalRequired ? "conditional" : "pass";
