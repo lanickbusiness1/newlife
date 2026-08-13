@@ -7,6 +7,7 @@ describe("GENESIS V4 Skill Factory MCP surface", () => {
       skillFactory: "GEN-V4-SKILL-FACTORY-002",
       skillRegistry: "GENESIS_SKILL_REGISTRY_0.2.0",
       approvalLedger: "GENESIS_GOVERNANCE_APPROVAL_LEDGER_0.1.0",
+      approvalRevocation: "GENESIS_GOVERNANCE_APPROVAL_REVOCATION_0.1.0",
       countryCompiler: "GEN-V4-COUNTRY-COMPILER-001"
     });
   });
@@ -17,6 +18,8 @@ describe("GENESIS V4 Skill Factory MCP surface", () => {
       "genome.skill_factory.match",
       "genome.skill_approval.review_attest",
       "genome.skill_approval.m8_attest",
+      "genome.skill_approval.review_revoke",
+      "genome.skill_approval.m8_revoke",
       "genome.skill_factory.install",
       "genome.skill_factory.promote",
       "genome.skill_registry.list",
