@@ -1,0 +1,2 @@
+import { CandidateHttpError, createCandidateRoute, readJsonObject, requiredString } from '@/lib/http/errors';import { createCandidateRuntime } from '@/lib/services/runtime';
+export const POST=createCandidateRoute(async request=>{const body=await readJsonObject(request);const jobId=requiredString(body.jobId,'jobId',100);if(body.consent!==true)throw new CandidateHttpError(400,'Explicit interview practice consent required');const{auth,interviewService}=await createCandidateRuntime(request);return Response.json(await interviewService.start(auth.candidate.id,jobId))});

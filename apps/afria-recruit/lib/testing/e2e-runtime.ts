@@ -2,140 +2,23 @@ import { DeterministicCandidateAiAdapter } from '../ai/deterministic-adapter.js'
 import type { ValidatedDecisionInput } from '../ai/persist-decision.js';
 import type { JobSpec } from '../domain/types.js';
 import { FixtureCandidateRepository, SYNTHETIC_CANDIDATE_ID } from '../repositories/fixture-candidate-repository.js';
-import {
-  CandidateOptimizerService,
-  type DecisionStore,
-  type HumanReviewStore,
-  type JobRepository,
-  type OwnedDecision,
-} from '../services/candidate-optimizer-service.js';
+import { CandidateOptimizerService, type DecisionStore, type HumanReviewStore, type JobRepository, type OwnedDecision } from '../services/candidate-optimizer-service.js';
+import { InterviewService, type ConsentStore, type InterviewRecord, type InterviewStore } from '../services/interview-service.js';
+import { ApplicationService, type ApplicationEventStore, type ApplicationRecord, type ApplicationStore, type ReviewGateStore } from '../services/application-service.js';
 
-export const E2E_ACCESS_TOKEN = 'e2e-synthetic-token';
-export const E2E_USER_ID = '00000000-0000-4000-8000-000000000001';
-export const E2E_JOB_ID = '00000000-0000-4000-8000-000000000202';
-
-const syntheticJob: JobSpec = {
-  id: E2E_JOB_ID,
-  title: 'Responsable programmes régionaux',
-  countryCode: 'SN',
-  requirements: [
-    {
-      id: 'skill:skill-project',
-      kind: 'skill',
-      label: 'Gestion de projets',
-      required: true,
-      skillId: 'skill-project',
-      minimumYears: 5,
-    },
-    {
-      id: 'skill:skill-logistics',
-      kind: 'skill',
-      label: 'Logistique humanitaire',
-      required: false,
-      skillId: 'skill-logistics',
-      minimumYears: 3,
-    },
-    {
-      id: 'skill:skill-finance',
-      kind: 'skill',
-      label: 'Conformité financière',
-      required: true,
-      skillId: 'skill-finance',
-      minimumYears: 2,
-    },
-    {
-      id: 'language:en',
-      kind: 'language',
-      label: 'Anglais B2',
-      required: true,
-      languageCode: 'en',
-      minimumLevel: 'B2',
-    },
-  ],
-};
-
-class FixtureJobRepository implements JobRepository {
-  async listOpen() {
-    return [structuredClone(syntheticJob)];
-  }
-
-  async getJobSpec(id: string) {
-    return id === E2E_JOB_ID ? structuredClone(syntheticJob) : null;
-  }
-}
-
-type E2EState = {
-  decisions: Map<string, OwnedDecision>;
-  reviews: Array<{ id: string; decisionId: string; reviewerId: string; outcome: 'approved' | 'rejected'; rationale: string }>;
-  nextDecision: number;
-  nextReview: number;
-};
-
-const globalState = globalThis as typeof globalThis & { __afriaRecruitE2EState?: E2EState };
-const state: E2EState = globalState.__afriaRecruitE2EState ?? {
-  decisions: new Map(),
-  reviews: [],
-  nextDecision: 1,
-  nextReview: 1,
-};
-globalState.__afriaRecruitE2EState = state;
-
-class MemoryDecisionStore implements DecisionStore {
-  async persist(input: ValidatedDecisionInput) {
-    const id = `e2e-decision-${state.nextDecision++}`;
-    state.decisions.set(id, {
-      id,
-      candidateId: input.candidateId,
-      jobId: input.jobId ?? null,
-      decisionType: input.decisionType,
-      output: input.output,
-    });
-    return id;
-  }
-
-  async findOwned(id: string, candidateId: string) {
-    const decision = state.decisions.get(id);
-    return decision?.candidateId === candidateId ? decision : null;
-  }
-}
-
-class MemoryReviewStore implements HumanReviewStore {
-  async persist(input: { decisionId: string; reviewerId: string; outcome: 'approved' | 'rejected'; rationale: string }) {
-    const id = `e2e-review-${state.nextReview++}`;
-    state.reviews.push({ id, ...input });
-    return id;
-  }
-}
-
-function e2eFlagsEnabled() {
-  return process.env.CI === 'true'
-    && process.env.GITHUB_ACTIONS === 'true'
-    && process.env.AFRIA_RECRUIT_E2E_MODE === '1';
-}
-
-export function isCandidateE2ERequest(request: Request) {
-  if (!e2eFlagsEnabled()) return false;
-  return request.headers.get('authorization') === `Bearer ${E2E_ACCESS_TOKEN}`;
-}
-
-export function createCandidateE2ERuntime() {
-  if (!e2eFlagsEnabled()) throw new Error('E2E runtime is disabled');
-  const service = new CandidateOptimizerService({
-    candidateRepository: new FixtureCandidateRepository(),
-    jobRepository: new FixtureJobRepository(),
-    aiAdapter: new DeterministicCandidateAiAdapter(),
-    decisionStore: new MemoryDecisionStore(),
-    reviewStore: new MemoryReviewStore(),
-    modelId: 'candidate-os-deterministic-e2e-v1',
-    modelProvider: 'deterministic',
-  });
-  return {
-    auth: {
-      accessToken: E2E_ACCESS_TOKEN,
-      user: { id: E2E_USER_ID },
-      candidate: { id: SYNTHETIC_CANDIDATE_ID, userId: E2E_USER_ID },
-      adminClient: null,
-    },
-    service,
-  };
-}
+export const E2E_ACCESS_TOKEN='e2e-synthetic-token';export const E2E_USER_ID='00000000-0000-4000-8000-000000000001';export const E2E_JOB_ID='00000000-0000-4000-8000-000000000202';
+const syntheticJob:JobSpec={id:E2E_JOB_ID,title:'Responsable programmes régionaux',countryCode:'SN',requirements:[{id:'skill:skill-project',kind:'skill',label:'Gestion de projets',required:true,skillId:'skill-project',minimumYears:5},{id:'skill:skill-logistics',kind:'skill',label:'Logistique humanitaire',required:false,skillId:'skill-logistics',minimumYears:3},{id:'skill:skill-finance',kind:'skill',label:'Conformité financière',required:true,skillId:'skill-finance',minimumYears:2},{id:'language:en',kind:'language',label:'Anglais B2',required:true,languageCode:'en',minimumLevel:'B2'}]};
+class FixtureJobRepository implements JobRepository{async listOpen(){return[structuredClone(syntheticJob)]}async getJobSpec(id:string){return id===E2E_JOB_ID?structuredClone(syntheticJob):null}}
+type Review={id:string;decisionId:string;reviewerId:string;outcome:'approved'|'rejected';rationale:string};
+type E2EState={decisions:Map<string,OwnedDecision>;reviews:Review[];interviews:Map<string,InterviewRecord>;applications:Map<string,ApplicationRecord>;events:Array<Record<string,string>>;nextDecision:number;nextReview:number;nextConsent:number;nextInterview:number;nextApplication:number;nextEvent:number};
+const globalState=globalThis as typeof globalThis&{__afriaRecruitE2EState?:E2EState};const state:E2EState=globalState.__afriaRecruitE2EState??{decisions:new Map(),reviews:[],interviews:new Map(),applications:new Map(),events:[],nextDecision:1,nextReview:1,nextConsent:1,nextInterview:1,nextApplication:1,nextEvent:1};globalState.__afriaRecruitE2EState=state;
+class MemoryDecisionStore implements DecisionStore{async persist(input:ValidatedDecisionInput){const id=`e2e-decision-${state.nextDecision++}`;state.decisions.set(id,{id,candidateId:input.candidateId,jobId:input.jobId??null,decisionType:input.decisionType,output:input.output});return id}async findOwned(id:string,candidateId:string){const d=state.decisions.get(id);return d?.candidateId===candidateId?d:null}}
+class MemoryReviewStore implements HumanReviewStore{async persist(input:{decisionId:string;reviewerId:string;outcome:'approved'|'rejected';rationale:string}){const id=`e2e-review-${state.nextReview++}`;state.reviews.push({id,...input});return id}}
+class MemoryConsentStore implements ConsentStore{async createProcessingConsent(){return`e2e-consent-${state.nextConsent++}`}}
+class MemoryInterviewStore implements InterviewStore{async create(input:{candidateId:string;jobId:string}){const id=`e2e-interview-${state.nextInterview++}`;state.interviews.set(id,{id,candidateId:input.candidateId,jobId:input.jobId,status:'in_progress'});return id}async findOwned(id:string,candidateId:string){const i=state.interviews.get(id);return i?.candidateId===candidateId?i:null}async markEvaluationPending(id:string){const i=state.interviews.get(id);if(i)state.interviews.set(id,{...i,status:'evaluation_pending'})}}
+function artifactKind(output:unknown){return output&&typeof output==='object'&&!Array.isArray(output)&&typeof(output as{artifactKind?:unknown}).artifactKind==='string'?(output as{artifactKind:string}).artifactKind:null}
+class MemoryReviewGate implements ReviewGateStore{async isConfirmedVariantReview(decisionId:string,candidateId:string,jobId:string){const d=state.decisions.get(decisionId);return Boolean(d&&d.candidateId===candidateId&&d.jobId===jobId&&artifactKind(d.output)==='candidate_cv_variants_v1'&&state.reviews.some(r=>r.decisionId===decisionId&&r.outcome==='approved'))}}
+class MemoryApplicationStore implements ApplicationStore{async createStarted(input:{candidateId:string;jobId:string}){const existing=[...state.applications.values()].find(a=>a.candidateId===input.candidateId&&a.jobId===input.jobId);if(existing)return existing;const a={id:`e2e-application-${state.nextApplication++}`,candidateId:input.candidateId,jobId:input.jobId,status:'started'};state.applications.set(a.id,a);return a}async findOwned(id:string,candidateId:string){const a=state.applications.get(id);return a?.candidateId===candidateId?a:null}}
+class MemoryEventStore implements ApplicationEventStore{async recordUnconfirmedOutcome(input:{applicationId:string;currentStatus:string;actorUserId:string;reportedOutcome:string}){const id=`e2e-event-${state.nextEvent++}`;state.events.push({id,...input});return id}}
+function flags(){return process.env.CI==='true'&&process.env.GITHUB_ACTIONS==='true'&&process.env.AFRIA_RECRUIT_E2E_MODE==='1'}export function isCandidateE2ERequest(request:Request){return flags()&&request.headers.get('authorization')===`Bearer ${E2E_ACCESS_TOKEN}`}
+export function createCandidateE2ERuntime(){if(!flags())throw new Error('E2E runtime is disabled');const candidateRepository=new FixtureCandidateRepository();const jobRepository=new FixtureJobRepository();const aiAdapter=new DeterministicCandidateAiAdapter();const decisionStore=new MemoryDecisionStore();const service=new CandidateOptimizerService({candidateRepository,jobRepository,aiAdapter,decisionStore,reviewStore:new MemoryReviewStore(),modelId:'candidate-os-deterministic-e2e-v1',modelProvider:'deterministic'});const interviewService=new InterviewService({candidateRepository,jobRepository,aiAdapter,decisionStore,consentStore:new MemoryConsentStore(),interviewStore:new MemoryInterviewStore(),modelId:'candidate-os-deterministic-e2e-v1',modelProvider:'deterministic'});const applicationService=new ApplicationService({candidateRepository,jobRepository,reviewGateStore:new MemoryReviewGate(),applicationStore:new MemoryApplicationStore(),eventStore:new MemoryEventStore()});return{auth:{accessToken:E2E_ACCESS_TOKEN,user:{id:E2E_USER_ID},candidate:{id:SYNTHETIC_CANDIDATE_ID,userId:E2E_USER_ID},adminClient:null},service,interviewService,applicationService}}
