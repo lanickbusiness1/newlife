@@ -121,16 +121,17 @@ export class OpenAICandidateAiAdapter implements CandidateAiAdapter {
   ) {}
 
   diagnose(input: Parameters<CandidateAiAdapter['diagnose']>[0]) {
-    // Truth classification remains deterministic; model prose is not allowed to change findings.
     return this.deterministic.diagnose(input);
   }
 
   analyzeJob(input: Parameters<CandidateAiAdapter['analyzeJob']>[0]) {
-    // Requirement coverage remains deterministic and evidence-bound.
     return this.deterministic.analyzeJob(input);
   }
 
   async rewrite(input: RewriteInput) {
+    if (!input.externalProcessingConsentId?.trim()) {
+      return this.deterministic.rewrite(input);
+    }
     const raw = await requestStructured(this.apiKey, {
       model: this.model,
       schemaName: 'candidate_rewrite',
