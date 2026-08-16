@@ -1,18 +1,25 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Json } from '../supabase/database.types.js';
 
-const allowedDecisionTypes = new Set([
-  'candidate_cv_diagnostic_v1',
-  'candidate_job_gap_analysis_v1',
-  'candidate_achievement_rewrite_v1',
-  'candidate_cv_variants_v1',
-  'candidate_interview_feedback_v1',
+export type CanonicalDecisionType =
+  | 'cv_parse'
+  | 'assessment_score'
+  | 'interview_score'
+  | 'match_recommendation'
+  | 'eligibility_gate';
+
+const allowedDecisionTypes = new Set<CanonicalDecisionType>([
+  'cv_parse',
+  'assessment_score',
+  'interview_score',
+  'match_recommendation',
+  'eligibility_gate',
 ]);
 
 export interface ValidatedDecisionInput {
   candidateId: string;
   jobId?: string | null;
-  decisionType: string;
+  decisionType: CanonicalDecisionType;
   inputHash: string;
   output: Json;
   promptVersion: string;
