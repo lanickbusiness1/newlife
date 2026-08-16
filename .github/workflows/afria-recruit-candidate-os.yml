@@ -22,7 +22,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: apps/afria-recruit
@@ -45,5 +45,9 @@ jobs:
         run: npm run typecheck
       - name: Build production artifact
         run: npm run build
+      - name: Install Chromium for browser proof
+        run: npx playwright install --with-deps chromium
+      - name: Run Candidate OS browser proof
+        run: npm run test:e2e
       - name: Scan browser artifact
         run: npm run scan:build
