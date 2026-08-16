@@ -12,13 +12,38 @@ export function LoginForm() {
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setError(null); setBusy(true);
+    event.preventDefault();
+    setError(null);
+    setBusy(true);
+
     const client = createBrowserSupabaseClient();
-    if (!client) { setError('La connexion n’est pas configurée sur cet environnement.'); setBusy(false); return; }
+    if (!client) {
+      setError('La connexion n’est pas configurée sur cet environnement.');
+      setBusy(false);
+      return;
+    }
+
     const { data, error: authError } = await client.auth.signInWithPassword({ email, password });
-    if (authError || !data.session?.access_token) { setError('Email ou mot de passe invalide.'); setBusy(false); return; }
-    window.localStorage.setItem('afria_recruit_access_token', data.session.access_token);
+    if (authError || !data.session?.access_token) {
+      setError('Email ou mot de passe invalide.');
+      setBusy(false);
+      return;
+    }
+
+    const sessionResponse = await fetch('/api/auth/session', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken: data.session.access_token }),
+    });
+    if (!sessionResponse.ok) {
+      setError('La session sécurisée n’a pas pu être créée.');
+      setBusy(false);
+      return;
+    }
+
     router.push('/candidate/dashboard');
+    router.refresh();
   }
 
   return (
