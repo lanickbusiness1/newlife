@@ -20,9 +20,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  red-green:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/afria-recruit
@@ -33,7 +33,24 @@ jobs:
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24.x'
-      - name: Install dependencies for TDD bootstrap
+      - name: Install dependencies for bootstrap
         run: npm install --ignore-scripts
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
       - name: Run unit tests
         run: npm run test:unit
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build production artifact
+        run: npm run build
+      - name: Scan browser artifact
+        run: npm run scan:build
+      - name: Emit generated lockfile for canonicalization
+        if: always()
+        run: |
+          if [ -f package-lock.json ]; then
+            echo 'AFRIA_LOCKFILE_BEGIN'
+            base64 -w0 package-lock.json
+            echo
+            echo 'AFRIA_LOCKFILE_END'
+          fi
