@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { FixtureCandidateRepository, SYNTHETIC_CANDIDATE_ID } from '../../lib/repositories/fixture-candidate-repository.js';
 import { getCandidateAiAdapter } from '../../lib/ai/index.js';
 import { validateRewriteOutput, validateJobAnalysisOutput } from '../../lib/ai/validators.js';
-import { buildOpenAIRequest } from '../../lib/ai/openai-adapter.js';
+import { buildOpenAIRequest, OpenAICandidateAiAdapter } from '../../lib/ai/openai-adapter.js';
 import { buildDecisionInsert } from '../../lib/ai/persist-decision.js';
 import type { JobSpec } from '../../lib/domain/types.js';
 
@@ -47,6 +47,34 @@ test('rewrite validator accepts only an explicitly supplied metric', () => {
   assert.match(output.text, /12 équipes/);
 });
 
+test('OpenAI rewrite never sends candidate text externally without explicit processing consent', async () => {
+  let calls = 0;
+  const adapter = new OpenAICandidateAiAdapter('test-key', 'test-model', async () => {
+    calls += 1;
+    throw new Error('fetch must not be called without consent');
+  });
+  const output = await adapter.rewrite({ sourceStatement: 'Coordination des équipes terrain.', verifiedMetrics: [] });
+  assert.equal(calls, 0);
+  assert.equal(output.text, 'Coordination des équipes terrain.');
+});
+
+test('OpenAI rewrite may call the provider only when an explicit consent id is attached', async () => {
+  let calls = 0;
+  const adapter = new OpenAICandidateAiAdapter('test-key', 'test-model', async () => {
+    calls += 1;
+    return new Response(JSON.stringify({
+      output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: 'Coordination des équipes terrain.', usedMetrics: [] }) }] }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  });
+  const output = await adapter.rewrite({
+    sourceStatement: 'Coordination des équipes terrain.',
+    verifiedMetrics: [],
+    externalProcessingConsentId: 'consent-synthetic-1',
+  });
+  assert.equal(calls, 1);
+  assert.equal(output.text, 'Coordination des équipes terrain.');
+});
+
 test('job analysis validator rejects evidence attached to a GAP', () => {
   assert.throws(
     () => validateJobAnalysisOutput({
@@ -64,7 +92,6 @@ test('OpenAI request is non-stored and uses strict structured output', () => {
     instructions: 'Return only evidence-safe content.',
     input: 'Synthetic test input',
   });
-
   assert.equal(request.store, false);
   assert.equal(request.model, 'model-from-env');
   assert.equal(request.text.format.type, 'json_schema');
@@ -82,17 +109,8 @@ test('decision persistence payload matches the canonical ai_decisions schema and
     modelId: 'model-from-env',
     modelProvider: 'openai',
   });
-
   assert.deepEqual(Object.keys(payload).sort(), [
-    'candidate_id',
-    'decision_type',
-    'human_review_required',
-    'input_hash',
-    'job_id',
-    'model_id',
-    'model_provider',
-    'output',
-    'prompt_version',
+    'candidate_id', 'decision_type', 'human_review_required', 'input_hash', 'job_id', 'model_id', 'model_provider', 'output', 'prompt_version',
   ].sort());
   assert.equal(payload.decision_type, 'assessment_score');
   assert.equal(payload.candidate_id, SYNTHETIC_CANDIDATE_ID);

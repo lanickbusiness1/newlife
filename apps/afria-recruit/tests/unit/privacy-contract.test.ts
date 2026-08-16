@@ -37,6 +37,16 @@ test('client modules never reference privileged server secrets or admin boundari
   }
 });
 
+test('candidate access tokens are never persisted by client modules', async () => {
+  const roots = [resolve(root, 'components'), resolve(root, 'app'), resolve(root, 'lib/http')];
+  const files = (await Promise.all(roots.map(walk))).flat().filter((file) => /\.(ts|tsx)$/.test(file));
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+    assert.doesNotMatch(source, /localStorage\.(?:setItem|getItem)\([^\n]*afria_recruit_access_token/i, `${relative(root, file)} persists or reads a bearer token from localStorage`);
+    assert.doesNotMatch(source, /sessionStorage\.(?:setItem|getItem)\([^\n]*(?:access_token|afria_recruit_access_token)/i, `${relative(root, file)} persists or reads a bearer token from sessionStorage`);
+  }
+});
+
 test('server privileged client and secret config cannot be client modules', async () => {
   const adminSource = await readFile(resolve(root, 'lib/supabase/admin-client.ts'), 'utf8');
   const configSource = await readFile(resolve(root, 'lib/supabase/config.ts'), 'utf8');

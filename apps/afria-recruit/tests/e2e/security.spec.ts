@@ -31,3 +31,18 @@ test('unknown synthetic job is a safe 404 rather than a raw backend error', asyn
   expect(body.error).toBe('Job not found');
   expect(body.error).not.toMatch(/supabase|postgres|stack|service.?role|openai/i);
 });
+
+test('candidate rewrite refuses external processing without explicit consent', async ({ request }) => {
+  const response = await request.post('/api/candidate/rewrite', {
+    headers: { Authorization: `Bearer ${SYNTHETIC_TOKEN}`, 'Content-Type': 'application/json' },
+    data: {
+      sourceRef: 'exp-synth-1',
+      sourceStatement: 'Coordination d’équipes et de programmes multisectoriels.',
+      jobId: '00000000-0000-4000-8000-000000000202',
+      verifiedMetrics: [],
+    },
+  });
+  expect(response.status()).toBe(400);
+  const body = await response.json() as { error: string };
+  expect(body.error).toMatch(/consent/i);
+});
