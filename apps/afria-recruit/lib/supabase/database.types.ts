@@ -140,6 +140,22 @@ type SkillCatalogRow = {
   name_fr: string;
 };
 
+type AiDecisionRow = {
+  candidate_id: string | null;
+  confidence: number | null;
+  created_at: string;
+  decision_status: string;
+  decision_type: string;
+  human_review_required: boolean;
+  id: string;
+  input_hash: string;
+  job_id: string | null;
+  model_id: string;
+  model_provider: string;
+  output: Json;
+  prompt_version: string;
+};
+
 type TableDef<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -160,6 +176,7 @@ export type Database = {
       verifications: TableDef<VerificationRow>;
       candidate_documents: TableDef<DocumentRow>;
       skills: TableDef<SkillCatalogRow>;
+      ai_decisions: TableDef<AiDecisionRow>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -177,3 +194,4 @@ export type CandidateCertificationDbRow = CertificationRow;
 export type CandidatePreferencesDbRow = PreferencesRow;
 export type CandidateVerificationDbRow = VerificationRow;
 export type CandidateDocumentDbRow = DocumentRow;
+export type AiDecisionDbRow = AiDecisionRow;

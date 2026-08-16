@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database, Json } from '../supabase/database.types.js';
 
 const allowedDecisionTypes = new Set([
   'candidate_cv_diagnostic_v1',
@@ -10,32 +11,46 @@ const allowedDecisionTypes = new Set([
 
 export interface ValidatedDecisionInput {
   candidateId: string;
+  jobId?: string | null;
   decisionType: string;
   inputHash: string;
-  output: unknown;
+  output: Json;
   promptVersion: string;
-  modelName: string;
-  modelVersion?: string | null;
+  modelId: string;
+  modelProvider: string;
 }
 
-export async function persistValidatedDecision(client: SupabaseClient, input: ValidatedDecisionInput): Promise<string> {
+export type AiDecisionInsert = Database['public']['Tables']['ai_decisions']['Insert'];
+
+export function buildDecisionInsert(input: ValidatedDecisionInput): AiDecisionInsert {
   if (!allowedDecisionTypes.has(input.decisionType)) throw new Error('Unsupported decision type');
   if (!/^[a-f0-9]{64}$/i.test(input.inputHash)) throw new Error('Input hash must be SHA-256');
+  if (!input.modelId.trim()) throw new Error('Model id is required');
+  if (!input.modelProvider.trim()) throw new Error('Model provider is required');
+
+  return {
+    candidate_id: input.candidateId,
+    job_id: input.jobId ?? null,
+    decision_type: input.decisionType,
+    input_hash: input.inputHash,
+    output: input.output,
+    prompt_version: input.promptVersion,
+    model_id: input.modelId,
+    model_provider: input.modelProvider,
+    human_review_required: true,
+  };
+}
+
+export async function persistValidatedDecision(
+  client: SupabaseClient<Database>,
+  input: ValidatedDecisionInput,
+): Promise<string> {
+  const payload = buildDecisionInsert(input);
   const { data, error } = await client
     .from('ai_decisions')
-    .insert({
-      subject_type: 'candidate',
-      subject_id: input.candidateId,
-      decision_type: input.decisionType,
-      input_hash: input.inputHash,
-      output: input.output,
-      prompt_version: input.promptVersion,
-      model_name: input.modelName,
-      model_version: input.modelVersion ?? null,
-      human_review_required: true,
-    })
+    .insert(payload)
     .select('id')
     .single();
   if (error || !data) throw new Error('Decision persistence failed safely');
-  return String(data.id);
+  return data.id;
 }
