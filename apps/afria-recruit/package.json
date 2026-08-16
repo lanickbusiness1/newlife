@@ -12,8 +12,9 @@
     "test:compile": "rm -rf .test-dist && tsc -p tsconfig.test.json",
     "test:unit": "npm run test:compile && node --test .test-dist/tests/unit/*.test.js",
     "test:e2e": "playwright test",
+    "scan:source": "node scripts/scan-source.mjs",
     "scan:build": "node scripts/scan-build.mjs .next/static",
-    "check": "npm run test:unit && npm run typecheck && npm run build && npm run scan:build"
+    "check": "npm run test:unit && npm run typecheck && npm run build && npm run scan:source && npm run scan:build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",

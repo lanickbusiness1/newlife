@@ -1,5 +1,6 @@
 import { createAdminClient as createLiveAdminClient } from '../supabase/admin-client.js';
 import { createPublicClient, createUserTokenClient } from '../supabase/user-client.js';
+import { CandidateHttpError } from '../http/errors.js';
 
 export interface AuthenticatedUser {
   id: string;
@@ -49,13 +50,13 @@ export async function requireAuthenticatedCandidate<TAdmin = unknown>(
   dependencies: AuthBoundaryDependencies<TAdmin> = createLiveAuthBoundaryDependencies() as AuthBoundaryDependencies<TAdmin>,
 ) {
   const accessToken = extractBearer(request);
-  if (!accessToken) throw new Error('Authentication required');
+  if (!accessToken) throw new CandidateHttpError(401, 'Authentication required');
 
   const user = await dependencies.getUser(accessToken);
-  if (!user) throw new Error('Authentication required');
+  if (!user) throw new CandidateHttpError(401, 'Authentication required');
 
   const candidate = await dependencies.findCandidateForUser(accessToken, user.id);
-  if (!candidate || candidate.userId !== user.id) throw new Error('Candidate profile required');
+  if (!candidate || candidate.userId !== user.id) throw new CandidateHttpError(403, 'Candidate profile required');
 
   // Privilege elevation is deliberately last. No service-role client exists before
   // the caller and candidate ownership have both been proven through the user path.

@@ -49,5 +49,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run Candidate OS browser proof
         run: npm run test:e2e
+      - name: Scan source and synthetic fixtures
+        run: npm run scan:source
       - name: Scan browser artifact
         run: npm run scan:build

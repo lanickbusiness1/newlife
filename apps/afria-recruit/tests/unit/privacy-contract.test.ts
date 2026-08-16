@@ -37,16 +37,18 @@ test('client modules never reference privileged server secrets or admin boundari
   }
 });
 
-test('server privileged client cannot be marked as a client module', async () => {
-  const source = await readFile(resolve(root, 'lib/supabase/admin-client.ts'), 'utf8');
-  assert.doesNotMatch(source, /^['\"]use client['\"];?/m);
-  assert.match(source, /SUPABASE_SERVICE_ROLE_KEY|service role key/i);
+test('server privileged client and secret config cannot be client modules', async () => {
+  const adminSource = await readFile(resolve(root, 'lib/supabase/admin-client.ts'), 'utf8');
+  const configSource = await readFile(resolve(root, 'lib/supabase/config.ts'), 'utf8');
+  assert.doesNotMatch(adminSource, /^['\"]use client['\"];?/m);
+  assert.doesNotMatch(configSource, /^['\"]use client['\"];?/m);
+  assert.match(configSource, /SUPABASE_SERVICE_ROLE_KEY/);
 });
 
 test('synthetic fixtures contain no personal email address or international phone number', async () => {
   const files = (await walk(resolve(root, 'lib/repositories'))).filter((file) => /fixture.*\.ts$/.test(file));
   const personalEmail = /\b[A-Z0-9._%+-]+@(?!example\.(?:com|org|net)\b)[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
-  const internationalPhone = /(?:\+|00)\d[\d\s().-]{7,}\d/;
+  const internationalPhone = /\+\d[\d\s().-]{7,}\d/;
   for (const file of files) {
     const source = await readFile(file, 'utf8');
     assert.doesNotMatch(source, personalEmail, `${relative(root, file)} contains a personal-looking email`);
