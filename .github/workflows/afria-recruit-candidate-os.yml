@@ -1,0 +1,39 @@
+name: AfrIA Recruit Candidate OS
+
+on:
+  push:
+    branches:
+      - feat/afria-recruit-candidate-os-v1
+    paths:
+      - 'apps/afria-recruit/**'
+      - '.github/workflows/afria-recruit-candidate-os.yml'
+  pull_request:
+    paths:
+      - 'apps/afria-recruit/**'
+      - '.github/workflows/afria-recruit-candidate-os.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: afria-recruit-candidate-os-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  red-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/afria-recruit
+    steps:
+      - name: Checkout immutable revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Use Node.js 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24.x'
+      - name: Install dependencies for TDD bootstrap
+        run: npm install --ignore-scripts
+      - name: Run unit tests
+        run: npm run test:unit

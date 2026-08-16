@@ -1,0 +1,26 @@
+{
+  "name": "afria-recruit",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "test:compile": "rm -rf .test-dist && tsc -p tsconfig.test.json",
+    "test:unit": "npm run test:compile && node --test .test-dist/tests/unit/*.test.js",
+    "typecheck": "next typegen && tsc --noEmit",
+    "build": "next build",
+    "check": "npm run test:unit && npm run typecheck && npm run build"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.2",
+    "next": "16.3.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^22.10.1",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "typescript": "^5.7.2"
+  }
+}
