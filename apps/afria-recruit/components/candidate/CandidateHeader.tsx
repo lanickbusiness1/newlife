@@ -1,0 +1,16 @@
+import Link from 'next/link';
+
+export function CandidateHeader() {
+  return (
+    <header className="candidate-header candidate-shell">
+      <Link className="candidate-brand" href="/candidate/dashboard" aria-label="AfrIA Recruit Candidate OS">
+        <span className="candidate-brand-mark">A</span>
+        <span><strong>AfrIA</strong>genesis® <small>AfrIA Recruit™</small></span>
+      </Link>
+      <nav aria-label="Navigation candidat">
+        <Link href="/candidate/dashboard">Tableau de bord</Link>
+        <Link href="/candidate/cv-optimizer">CV Optimizer</Link>
+      </nav>
+    </header>
+  );
+}
