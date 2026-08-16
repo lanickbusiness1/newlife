@@ -29,12 +29,17 @@ export interface JobRepository {
   getJobSpec(id: string): Promise<JobSpec | null>;
 }
 
+export interface ExternalProcessingConsentStore {
+  createCvRewriteConsent(input: { candidateId: string; jobId: string; policyVersion: string }): Promise<string>;
+}
+
 export interface CandidateOptimizerDependencies {
   candidateRepository: CandidateRepository;
   jobRepository: JobRepository;
   aiAdapter: CandidateAiAdapter;
   decisionStore: DecisionStore;
   reviewStore: HumanReviewStore;
+  externalProcessingConsentStore?: ExternalProcessingConsentStore;
   modelId: string;
   modelProvider: string;
 }
@@ -142,22 +147,48 @@ export class CandidateOptimizerService {
     return { decisionId, jobSpec, analysis };
   }
 
-  async rewrite(candidateId: string, sourceRef: string, sourceStatement: string, verifiedMetrics: Array<{ value: string; sourceRef: string }>) {
-    const context = await this.deps.candidateRepository.loadContext(candidateId);
+  async rewrite(
+    candidateId: string,
+    jobId: string,
+    sourceRef: string,
+    sourceStatement: string,
+    verifiedMetrics: Array<{ value: string; sourceRef: string }>,
+    externalProcessingConsent: boolean,
+  ) {
+    if (!externalProcessingConsent) throw new CandidateHttpError(400, 'Explicit external processing consent required');
+    const [context, jobSpec] = await Promise.all([
+      this.deps.candidateRepository.loadContext(candidateId),
+      this.deps.jobRepository.getJobSpec(jobId),
+    ]);
+    if (!jobSpec) throw new CandidateHttpError(404, 'Job not found');
+
     const experience = context.experiences.find((item) => `experience:${item.id}` === sourceRef || item.id === sourceRef);
     if (!experience) throw new CandidateHttpError(400, 'Unknown source reference');
     const sourceCorpus = [experience.title, experience.description ?? ''].join(' ');
     if (!sourceCorpus.includes(sourceStatement.trim())) throw new CandidateHttpError(400, 'Source statement is not supported by the selected experience');
-    const rewrite = await this.deps.aiAdapter.rewrite({ sourceStatement, verifiedMetrics });
+
+    let consentId: string | null = null;
+    if (this.deps.aiAdapter.providerName === 'openai') {
+      const consentStore = this.deps.externalProcessingConsentStore;
+      if (!consentStore) throw new CandidateHttpError(503, 'External processing is unavailable');
+      consentId = await consentStore.createCvRewriteConsent({ candidateId, jobId, policyVersion: 'candidate-os-v1' });
+    }
+
+    const rewrite = await this.deps.aiAdapter.rewrite({
+      sourceStatement,
+      verifiedMetrics,
+      externalProcessingConsentId: consentId ?? undefined,
+    });
     const decisionId = await this.persistArtifact({
       candidateId,
+      jobId,
       decisionType: 'assessment_score',
       artifactKind: 'candidate_achievement_rewrite_v1',
-      payload: { sourceRef, rewrite },
+      payload: { sourceRef, rewrite, externalProcessingConsentId: consentId },
       promptVersion: 'candidate-achievement-rewrite-v1',
-      hashSource: { candidateId, sourceRef, sourceStatement, verifiedMetrics },
+      hashSource: { candidateId, jobId, sourceRef, sourceStatement, verifiedMetrics, externalProcessingConsentId: consentId },
     });
-    return { decisionId, rewrite };
+    return { decisionId, rewrite, consentId };
   }
 
   async buildVariants(candidateId: string, jobId: string) {
