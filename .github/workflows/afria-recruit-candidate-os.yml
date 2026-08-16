@@ -13,7 +13,7 @@ on:
       - '.github/workflows/afria-recruit-candidate-os.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: afria-recruit-candidate-os-${{ github.ref }}
@@ -33,20 +33,10 @@ jobs:
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24.x'
-      - name: Install dependencies for bootstrap
-        run: npm install --ignore-scripts
-      - name: Canonicalize generated lockfile once
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/afria-recruit-candidate-os-v1'
-        working-directory: .
-        run: |
-          if git diff --quiet -- apps/afria-recruit/package-lock.json && git ls-files --error-unmatch apps/afria-recruit/package-lock.json >/dev/null 2>&1; then
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apps/afria-recruit/package-lock.json
-          git commit -m 'build(afria-recruit): lock Candidate OS dependencies'
-          git push origin HEAD:feat/afria-recruit-candidate-os-v1
+          cache: npm
+          cache-dependency-path: apps/afria-recruit/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
       - name: Audit dependencies
         run: npm audit --audit-level=high
       - name: Run unit tests
