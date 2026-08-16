@@ -2,6 +2,7 @@
   "name": "afria-recruit",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "engines": { "node": ">=24 <25" },
   "scripts": {
     "test:compile": "rm -rf .test-dist && tsc -p tsconfig.test.json",
