@@ -1,6 +1,7 @@
 import { createAdminClient as createLiveAdminClient } from '../supabase/admin-client.js';
 import { createPublicClient, createUserTokenClient } from '../supabase/user-client.js';
 import { CandidateHttpError } from '../http/errors.js';
+import { readAccessTokenFromRequest } from './session-cookie.js';
 
 export interface AuthenticatedUser {
   id: string;
@@ -15,12 +16,6 @@ export interface AuthBoundaryDependencies<TAdmin = unknown> {
   getUser(accessToken: string): Promise<AuthenticatedUser | null>;
   findCandidateForUser(accessToken: string, userId: string): Promise<OwnedCandidate | null>;
   createAdminClient(): TAdmin;
-}
-
-function extractBearer(request: Request): string | null {
-  const authorization = request.headers.get('authorization');
-  const match = authorization?.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() || null;
 }
 
 export function createLiveAuthBoundaryDependencies(): AuthBoundaryDependencies {
@@ -49,7 +44,7 @@ export async function requireAuthenticatedCandidate<TAdmin = unknown>(
   request: Request,
   dependencies: AuthBoundaryDependencies<TAdmin> = createLiveAuthBoundaryDependencies() as AuthBoundaryDependencies<TAdmin>,
 ) {
-  const accessToken = extractBearer(request);
+  const accessToken = readAccessTokenFromRequest(request);
   if (!accessToken) throw new CandidateHttpError(401, 'Authentication required');
 
   const user = await dependencies.getUser(accessToken);
