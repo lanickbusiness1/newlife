@@ -4,6 +4,7 @@ import { FixtureCandidateRepository, SYNTHETIC_CANDIDATE_ID } from '../../lib/re
 import { getCandidateAiAdapter } from '../../lib/ai/index.js';
 import { validateRewriteOutput, validateJobAnalysisOutput } from '../../lib/ai/validators.js';
 import { buildOpenAIRequest } from '../../lib/ai/openai-adapter.js';
+import { buildDecisionInsert } from '../../lib/ai/persist-decision.js';
 import type { JobSpec } from '../../lib/domain/types.js';
 
 const job: JobSpec = {
@@ -68,4 +69,36 @@ test('OpenAI request is non-stored and uses strict structured output', () => {
   assert.equal(request.model, 'model-from-env');
   assert.equal(request.text.format.type, 'json_schema');
   assert.equal(request.text.format.strict, true);
+});
+
+test('decision persistence payload matches the canonical ai_decisions schema', () => {
+  const payload = buildDecisionInsert({
+    candidateId: SYNTHETIC_CANDIDATE_ID,
+    jobId: '00000000-0000-4000-8000-000000000202',
+    decisionType: 'candidate_achievement_rewrite_v1',
+    inputHash: 'a'.repeat(64),
+    output: { text: 'Synthetic' },
+    promptVersion: 'candidate-rewrite-v1',
+    modelId: 'model-from-env',
+    modelProvider: 'openai',
+  });
+
+  assert.deepEqual(Object.keys(payload).sort(), [
+    'candidate_id',
+    'decision_type',
+    'human_review_required',
+    'input_hash',
+    'job_id',
+    'model_id',
+    'model_provider',
+    'output',
+    'prompt_version',
+  ].sort());
+  assert.equal(payload.candidate_id, SYNTHETIC_CANDIDATE_ID);
+  assert.equal(payload.model_id, 'model-from-env');
+  assert.equal(payload.model_provider, 'openai');
+  assert.equal(payload.human_review_required, true);
+  assert.equal('subject_type' in payload, false);
+  assert.equal('subject_id' in payload, false);
+  assert.equal('model_name' in payload, false);
 });
