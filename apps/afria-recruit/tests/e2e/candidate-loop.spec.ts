@@ -3,7 +3,13 @@ import { test, expect } from '@playwright/test';
 const SYNTHETIC_TOKEN = 'e2e-synthetic-token';
 
 async function authenticate(page: import('@playwright/test').Page) {
-  await page.addInitScript((token) => window.localStorage.setItem('afria_recruit_access_token', token), SYNTHETIC_TOKEN);
+  await page.context().addCookies([{
+    name: 'afria_recruit_session',
+    value: SYNTHETIC_TOKEN,
+    url: 'http://127.0.0.1:4174',
+    httpOnly: true,
+    sameSite: 'Strict',
+  }]);
 }
 
 async function completeOptimizer(page: import('@playwright/test').Page) {
