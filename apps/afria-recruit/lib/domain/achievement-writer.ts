@@ -6,6 +6,7 @@ export interface VerifiedMetric {
 export interface RewriteAchievementInput {
   sourceStatement: string;
   verifiedMetrics: VerifiedMetric[];
+  externalProcessingConsentId?: string;
 }
 
 export interface RewriteAchievementOutput {
