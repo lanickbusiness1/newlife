@@ -31,6 +31,14 @@ export function CvOptimizerFlow() {
       .catch((reason: unknown) => setError(reason instanceof CandidateApiError ? reason.message : 'Impossible de charger le Talent Passport™.'));
   }, []);
 
+  useEffect(() => {
+    if (gap) window.localStorage.setItem('afria_recruit_selected_job_id', gap.jobSpec.id);
+  }, [gap]);
+
+  useEffect(() => {
+    if (variants) window.localStorage.setItem('afria_recruit_latest_variants_decision_id', variants.decisionId);
+  }, [variants]);
+
   const firstExperience = context?.experiences.find((experience) => Boolean(experience.description)) ?? null;
   const blocking = diagnostic?.diagnostic.findings.some((finding) => finding.blocking) ?? false;
   const progress = useMemo(() => {
