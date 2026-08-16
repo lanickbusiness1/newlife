@@ -69,29 +69,32 @@ function service(candidateRepository = new FixtureCandidateRepository()) {
   };
 }
 
-test('diagnostic persists a versioned human-review-required decision input', async () => {
+test('diagnostic persists an assessment_score with a Candidate OS artifact kind', async () => {
   const fixture = service();
   const result = await fixture.service.diagnose(SYNTHETIC_CANDIDATE_ID);
   assert.equal(result.decisionId, 'decision-1');
-  assert.equal(fixture.decisionStore.writes[0]?.decisionType, 'candidate_cv_diagnostic_v1');
+  assert.equal(fixture.decisionStore.writes[0]?.decisionType, 'assessment_score');
+  assert.equal((fixture.decisionStore.writes[0]?.output as { artifactKind?: string }).artifactKind, 'candidate_cv_diagnostic_v1');
   assert.equal(fixture.decisionStore.writes[0]?.candidateId, SYNTHETIC_CANDIDATE_ID);
   assert.match(fixture.decisionStore.writes[0]?.inputHash ?? '', /^[a-f0-9]{64}$/);
 });
 
-test('job analysis preserves unsupported requirements as GAP and persists job id', async () => {
+test('job analysis preserves unsupported requirements as GAP and uses match_recommendation', async () => {
   const fixture = service();
   const result = await fixture.service.analyzeJob(SYNTHETIC_CANDIDATE_ID, JOB_ID);
   assert.equal(result.analysis.requirements.find((row) => row.requirementId === 'skill:skill-finance')?.coverage, 'GAP');
   assert.equal(fixture.decisionStore.writes[0]?.jobId, JOB_ID);
-  assert.equal(fixture.decisionStore.writes[0]?.decisionType, 'candidate_job_gap_analysis_v1');
+  assert.equal(fixture.decisionStore.writes[0]?.decisionType, 'match_recommendation');
+  assert.equal((fixture.decisionStore.writes[0]?.output as { artifactKind?: string }).artifactKind, 'candidate_job_gap_analysis_v1');
 });
 
-test('dual CV variants have identical fact fingerprints', async () => {
+test('dual CV variants have identical fact fingerprints and use canonical assessment_score storage', async () => {
   const fixture = service();
   const result = await fixture.service.buildVariants(SYNTHETIC_CANDIDATE_ID, JOB_ID);
   assert.equal(result.variants.ats.factsFingerprint, result.variants.human.factsFingerprint);
   assert.equal(result.variants.ats.factsFingerprint, createHash('sha256').update(result.variants.factsCanonicalJson).digest('hex'));
-  assert.equal(fixture.decisionStore.writes[0]?.decisionType, 'candidate_cv_variants_v1');
+  assert.equal(fixture.decisionStore.writes[0]?.decisionType, 'assessment_score');
+  assert.equal((fixture.decisionStore.writes[0]?.output as { artifactKind?: string }).artifactKind, 'candidate_cv_variants_v1');
 });
 
 test('approval is blocked when a blocking truth conflict exists', async () => {
@@ -114,7 +117,7 @@ test('approval is blocked when a blocking truth conflict exists', async () => {
 
 test('review cannot approve a decision owned by another candidate', async () => {
   const fixture = service();
-  fixture.decisionStore.decisions.set('foreign', { id: 'foreign', candidateId: 'other', jobId: null, decisionType: 'candidate_cv_diagnostic_v1', output: {} });
+  fixture.decisionStore.decisions.set('foreign', { id: 'foreign', candidateId: 'other', jobId: null, decisionType: 'assessment_score', output: {} });
   await assert.rejects(
     () => fixture.service.review(SYNTHETIC_CANDIDATE_ID, 'user-synth', 'foreign', 'approved', 'Validation'),
     /decision not found/i,

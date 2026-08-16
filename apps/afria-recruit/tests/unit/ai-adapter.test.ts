@@ -71,13 +71,13 @@ test('OpenAI request is non-stored and uses strict structured output', () => {
   assert.equal(request.text.format.strict, true);
 });
 
-test('decision persistence payload matches the canonical ai_decisions schema', () => {
+test('decision persistence payload matches the canonical ai_decisions schema and vocabulary', () => {
   const payload = buildDecisionInsert({
     candidateId: SYNTHETIC_CANDIDATE_ID,
     jobId: '00000000-0000-4000-8000-000000000202',
-    decisionType: 'candidate_achievement_rewrite_v1',
+    decisionType: 'assessment_score',
     inputHash: 'a'.repeat(64),
-    output: { text: 'Synthetic' },
+    output: { artifactKind: 'candidate_achievement_rewrite_v1', text: 'Synthetic' },
     promptVersion: 'candidate-rewrite-v1',
     modelId: 'model-from-env',
     modelProvider: 'openai',
@@ -94,6 +94,7 @@ test('decision persistence payload matches the canonical ai_decisions schema', (
     'output',
     'prompt_version',
   ].sort());
+  assert.equal(payload.decision_type, 'assessment_score');
   assert.equal(payload.candidate_id, SYNTHETIC_CANDIDATE_ID);
   assert.equal(payload.model_id, 'model-from-env');
   assert.equal(payload.model_provider, 'openai');
@@ -101,4 +102,16 @@ test('decision persistence payload matches the canonical ai_decisions schema', (
   assert.equal('subject_type' in payload, false);
   assert.equal('subject_id' in payload, false);
   assert.equal('model_name' in payload, false);
+});
+
+test('decision persistence rejects non-canonical decision types', () => {
+  assert.throws(() => buildDecisionInsert({
+    candidateId: SYNTHETIC_CANDIDATE_ID,
+    decisionType: 'candidate_cv_diagnostic_v1' as never,
+    inputHash: 'a'.repeat(64),
+    output: { artifactKind: 'candidate_cv_diagnostic_v1' },
+    promptVersion: 'candidate-diagnostic-v1',
+    modelId: 'candidate-os-deterministic-v1',
+    modelProvider: 'deterministic',
+  }), /unsupported decision type/i);
 });
