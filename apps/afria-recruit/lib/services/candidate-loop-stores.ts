@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Json } from '../supabase/database.types.js';
 import { buildStartedApplicationInsert, type ApplicationEventStore, type ApplicationRecord, type ApplicationStore, type ReviewGateStore } from './application-service.js';
+import type { ExternalProcessingConsentStore } from './candidate-optimizer-service.js';
 import type { ConsentStore, InterviewRecord, InterviewStore } from './interview-service.js';
 
 export class LiveConsentStore implements ConsentStore {
@@ -14,6 +15,27 @@ export class LiveConsentStore implements ConsentStore {
       policy_version: input.policyVersion,
       status: 'granted',
       evidence: { scope: 'interview_practice_only', raw_answer_retention: 'none' } as Json,
+    }).select('id').single();
+    if (error || !data) throw new Error('Consent persistence failed safely');
+    return data.id;
+  }
+}
+
+export class LiveExternalProcessingConsentStore implements ExternalProcessingConsentStore {
+  constructor(private readonly admin: SupabaseClient<Database>) {}
+  async createCvRewriteConsent(input: { candidateId: string; jobId: string; policyVersion: string }) {
+    const { data, error } = await this.admin.from('consents').insert({
+      candidate_id: input.candidateId,
+      job_id: input.jobId,
+      purpose: 'platform_processing',
+      data_categories: ['cv_rewrite_text'],
+      policy_version: input.policyVersion,
+      status: 'granted',
+      evidence: {
+        scope: 'candidate_cv_rewrite_only',
+        external_processing: true,
+        provider_payload_retention: 'store_false',
+      } as Json,
     }).select('id').single();
     if (error || !data) throw new Error('Consent persistence failed safely');
     return data.id;
