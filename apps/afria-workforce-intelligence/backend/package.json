@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
+    "test": "node scripts/run-tests-serial.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
