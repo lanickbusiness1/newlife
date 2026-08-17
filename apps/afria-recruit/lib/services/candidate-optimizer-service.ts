@@ -4,6 +4,7 @@ import type { CanonicalDecisionType, ValidatedDecisionInput } from '../ai/persis
 import type { Json } from '../supabase/database.types.js';
 import type { CandidateContext, CandidateRepository } from '../repositories/candidate-context.js';
 import type { JobSpec } from '../domain/types.js';
+import { buildRecruiterLens } from '../domain/recruiter-lens.js';
 import { findTruthConflicts } from '../domain/truth-consistency.js';
 import { CandidateHttpError } from '../http/errors.js';
 
@@ -135,16 +136,17 @@ export class CandidateOptimizerService {
     ]);
     if (!jobSpec) throw new CandidateHttpError(404, 'Job not found');
     const analysis = await this.deps.aiAdapter.analyzeJob({ context, jobSpec });
+    const recruiterLens = buildRecruiterLens(jobSpec, analysis.requirements);
     const decisionId = await this.persistArtifact({
       candidateId,
       jobId,
       decisionType: 'match_recommendation',
-      artifactKind: 'candidate_job_gap_analysis_v1',
-      payload: analysis,
-      promptVersion: 'candidate-job-gap-analysis-v1',
-      hashSource: { candidateId, jobSpec, context },
+      artifactKind: 'candidate_job_gap_analysis_v2',
+      payload: { analysis, recruiterLens },
+      promptVersion: 'candidate-job-gap-analysis-v2',
+      hashSource: { candidateId, jobSpec, context, recruiterLens },
     });
-    return { decisionId, jobSpec, analysis };
+    return { decisionId, jobSpec, analysis, recruiterLens };
   }
 
   async rewrite(
