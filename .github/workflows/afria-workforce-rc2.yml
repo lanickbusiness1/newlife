@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'apps/afria-workforce-intelligence/backend/**'
+      - 'apps/afria-workforce-intelligence/simandou.html'
+      - 'apps/afria-workforce-intelligence/simandou.js'
       - '.github/workflows/afria-workforce-rc2.yml'
   push:
     branches:
@@ -12,6 +14,8 @@ on:
       - feature/simandou-value-capture-v1
     paths:
       - 'apps/afria-workforce-intelligence/backend/**'
+      - 'apps/afria-workforce-intelligence/simandou.html'
+      - 'apps/afria-workforce-intelligence/simandou.js'
       - '.github/workflows/afria-workforce-rc2.yml'
 
 permissions:
@@ -49,6 +53,8 @@ jobs:
       - run: npm install
       - run: npm audit --audit-level=high
       - run: npm run typecheck
+      - name: Check Mission Control JavaScript
+        run: node --check ../simandou.js
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Apply sovereign database migrations
@@ -75,17 +81,7 @@ jobs:
           SQL
       - name: Test Simandou schema and RLS contract
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/004_simandou_value_capture_test.sql
-      - name: Diagnose test files serially
-        run: |
-          set -euo pipefail
-          for f in tests/*.test.ts; do
-            echo "=== SERIAL TEST: $f ==="
-            if ! npx tsx --test "$f"; then
-              echo "::error file=$f,line=1::Serial test failed: $f"
-              exit 1
-            fi
-          done
-      - name: Run full test suite
+      - name: Run deterministic test suite
         run: npm test
       - name: Test sovereign database controls
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations_test.sql
