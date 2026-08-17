@@ -56,6 +56,9 @@ export class ValueCaptureMethodology {
       if (!ECONOMIC_BUCKETS.has(bucket)) throw new Error(`Unsupported economic value bucket: ${bucket}`);
     }
     validateEvidence(evidence);
+    if (state === "VALIDATED" && (!validatedByIdentityId?.trim() || evidence.length < 2)) {
+      throw new Error("Validated value capture methodology requires recorded human approver and approval evidence");
+    }
     this.evidence = Object.freeze([...evidence]);
     this.objectVersion = objectVersion;
   }
@@ -67,6 +70,9 @@ export class ValueCaptureMethodology {
     }
     if (this.state !== "DRAFT") throw new ControlError("Only draft value capture methodologies can be validated");
     validateEvidence([approvalEvidence]);
+    if (approvalEvidence.truthClass !== "FACT") {
+      throw new ControlError("Value capture methodology approval evidence must be FACT");
+    }
     return new ValueCaptureMethodology(
       this.id,
       this.tenantId,
