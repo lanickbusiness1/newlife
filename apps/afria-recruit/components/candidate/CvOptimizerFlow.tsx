@@ -9,6 +9,7 @@ import { EvidenceBadge } from '../evidence/EvidenceBadge';
 import { CandidateHeader } from './CandidateHeader';
 import { DiagnosticPanel } from './DiagnosticPanel';
 import { GapMatrix } from './GapMatrix';
+import { RecruiterLensPanel } from './RecruiterLensPanel';
 import { VariantComparison } from './VariantComparison';
 
 export function CvOptimizerFlow() {
@@ -68,8 +69,8 @@ export function CvOptimizerFlow() {
       <section className="candidate-shell optimizer-hero">
         <Link className="back-link" href="/candidate/dashboard">← Retour au tableau de bord</Link>
         <p className="eyebrow">Candidate Career Intelligence Flow™</p>
-        <h1>Optimiser mon CV</h1>
-        <p className="candidate-lead">Nous améliorons la présentation de vos faits. Nous n’inventons ni compétence, ni diplôme, ni pourcentage.</p>
+        <h1>Je veux décrocher ce poste</h1>
+        <p className="candidate-lead">AfrIA Recruit™ part de vos faits réels, lit l’offre comme un recruteur, montre les preuves manquantes et prépare un dossier que vous validez vous-même.</p>
         <div className="flow-progress" aria-label={`Étape ${progress} sur 6`}>
           {Array.from({ length: 6 }, (_, index) => <span key={index} className={index < progress ? 'done' : ''} />)}
         </div>
@@ -121,6 +122,7 @@ export function CvOptimizerFlow() {
               <section className="flow-panel" aria-labelledby="gap-heading">
                 <div className="flow-panel-head"><span className="step-number">04</span><div><h2 id="gap-heading">Matrice exigences ↔ preuves</h2><p>Un GAP reste visible : AfrIA Recruit™ ne le transforme jamais en compétence du candidat.</p></div></div>
                 <GapMatrix rows={gap.analysis.requirements} />
+                <RecruiterLensPanel items={gap.recruiterLens} />
                 {firstExperience ? (
                   <div className="rewrite-box">
                     <div><strong>Achievement Writer™</strong><p>{firstExperience.description}</p></div>
