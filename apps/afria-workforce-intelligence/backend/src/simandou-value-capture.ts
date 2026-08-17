@@ -204,6 +204,12 @@ export class FiscalRule extends BaseSimandouObject {
       if (effectiveTo < effectiveFrom) throw new Error("Fiscal rule expiry date cannot precede effective date");
     }
     validateFiscalFormula(formula);
+    if (evidence.length === 0 || evidence.some((link) => link.truthClass !== "FACT")) {
+      throw new Error("Fiscal rule source evidence must be FACT");
+    }
+    if (state === "VALIDATED" && (!validatedByIdentityId?.trim() || evidence.length < 2)) {
+      throw new Error("Validated fiscal rule requires recorded human approver and approval evidence");
+    }
   }
 
   validate(actor: Identity, approvalEvidence: EvidenceLink): FiscalRule {
@@ -213,6 +219,9 @@ export class FiscalRule extends BaseSimandouObject {
     }
     if (this.state !== "DRAFT") throw new ControlError("Only draft fiscal rules can be validated");
     validateEvidenceLinks([approvalEvidence]);
+    if (approvalEvidence.truthClass !== "FACT") {
+      throw new ControlError("Fiscal rule approval evidence must be FACT");
+    }
     return new FiscalRule(
       this.id,
       this.tenantId,
@@ -392,6 +401,9 @@ export class ValueCaptureComponent extends BaseSimandouObject {
     assertCurrency(currency);
     assertRequired(sourceTransactionId, "Value capture source transaction id");
     if (evidence.length === 0) throw new Error("Value capture component requires evidence");
+    if (truthClass === "FACT" && evidence.some((link) => link.truthClass !== "FACT")) {
+      throw new Error("FACT value capture requires FACT evidence");
+    }
   }
 }
 
