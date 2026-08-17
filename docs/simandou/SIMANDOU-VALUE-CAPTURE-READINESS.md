@@ -5,8 +5,9 @@
 **Implementation branch:** `feature/simandou-value-capture-v1`  
 **Parent branch:** `feature/mining-local-content-module-06`  
 **Parent baseline SHA:** `7c28a2f93540c68c934e295e93e56c738673cc78`  
-**Last code-verified SHA:** `b0682481d5c19828afa4bc660e53e666159793a2`  
-**Last code-verification run:** GitHub Actions `32059899316` — **SUCCESS**
+**Final code-verified SHA:** `851a111afec6eaf1b81f249e593385d13767e605`  
+**Final push verification:** GitHub Actions `32060704275` — **SUCCESS**  
+**Final Draft PR verification:** GitHub Actions `32060709740` — **SUCCESS**
 
 ## Decision
 
@@ -40,6 +41,8 @@ Every critical object keeps tenant, project, version, evidence and explicit trut
 - no default Guinean fiscal rate is coded;
 - fiscal formula is typed and explicit;
 - source/version/effectivity/jurisdiction are required;
+- fiscal source evidence must be `FACT`;
+- a `VALIDATED` fiscal rule cannot be constructed without recorded approval evidence and human approver identity;
 - a `HUMAN` with `LEGAL_APPROVER` is required before computation;
 - expected versus received states are explicit: `PENDING`, `UNDER`, `MATCHED`, `OVER`, `CONTESTED`.
 
@@ -57,6 +60,8 @@ Mismatches create `ReconciliationException` semantics. The system never classifi
 - source reuse across economic buckets is blocked;
 - `FX_RETENTION` remains visible but is excluded from overlapping retained-economic-value aggregation;
 - no Value Capture Ratio is emitted before a human-approved `ValueCaptureMethodology`;
+- a `VALIDATED` methodology cannot be constructed without recorded human approver and approval evidence;
+- a `FACT` Value Capture component cannot rely on non-factual evidence;
 - missing approval returns `METHOD_NOT_APPROVED`.
 
 ### Bankability
@@ -72,7 +77,9 @@ The deterministic scenario engine supports:
 - industrial energy;
 - logistics hub.
 
-Outputs include EBITDA, NPV, IRR when mathematically resolvable, DSCR when debt service exists and sovereign ROI when public cost exists. Stress cases cover price -20%, price +20%, CAPEX +20% and OPEX +20%. All stress outputs are `SIMULATION`.
+Outputs include EBITDA, NPV, IRR when mathematically resolvable, DSCR when debt service exists and sovereign ROI when public cost exists. Stress cases cover price -20%, price +20%, CAPEX +20% and OPEX +20%.
+
+Scenario assumptions may be `HYPOTHESIS` or `SIMULATION`, never `FACT`. Every calculated scenario result is force-labelled `SIMULATION` so no forecast can be promoted as an observed fact.
 
 ### Persistence & security
 
@@ -132,9 +139,12 @@ It now rejects multiple roots, forks, orphan links, cycles, disconnected chains 
 - Governed service/audit: earlier run `32058211885` succeeded; later stress exposed the equal-timestamp ordering defect, which was reproduced and fixed rather than hidden.
 - API: run `32058536125` — SUCCESS.
 - Mission Control contract: RED confirmed on run `32059542603` before the UI files existed.
-- Final code head + synthetic sovereign E2E: run `32059899316` — **SUCCESS**.
+- Full synthetic sovereign E2E: run `32059899316` — SUCCESS.
+- M6 governance-hardening RED: run `32060300198` failed at typecheck as designed before truth/approval invariants were implemented.
+- Final hardened push head `851a111afec6eaf1b81f249e593385d13767e605`: run `32060704275` — **SUCCESS**.
+- Final hardened Draft PR context on the same SHA: run `32060709740` — **SUCCESS**.
 
-Final run gates all passed:
+Final head gates all passed:
 
 1. dependency audit;
 2. TypeScript typecheck;
@@ -142,7 +152,7 @@ Final run gates all passed:
 4. PostgreSQL migrations 001–004;
 5. non-owner application role;
 6. Simandou schema/RLS contract;
-7. deterministic full test suite;
+7. deterministic full test suite including governance-hardening and sovereign E2E;
 8. sovereign security SQL controls;
 9. migration 004 rollback + re-apply;
 10. security migration 003 rollback + re-apply.
@@ -153,7 +163,15 @@ Final run gates all passed:
 
 **Sandbox engineering assessment: PASS WITH PRODUCTION CONDITIONS.**
 
-Evidence: domain invariants, typed fiscal rules, deterministic reconciliation, anti-double-counting, scenario calculations, API gates, synthetic E2E and regression suite.
+Evidence: domain invariants, typed fiscal rules, factual-source gates, explicit human approval identity, deterministic reconciliation, anti-double-counting, scenario truth controls, API gates, synthetic E2E and regression suite.
+
+The final M6 hardening specifically blocks:
+
+- forged `VALIDATED` fiscal rules without human approver evidence;
+- non-factual evidence presented as a fiscal source;
+- forged `VALIDATED` Value Capture methodologies without human approver evidence;
+- `FACT` Value Capture components backed by simulation/hypothesis evidence;
+- Scenario Lab forecasts presented as `FACT`.
 
 ### S7+ — security/resilience
 
@@ -171,7 +189,7 @@ Evidence: RLS, tenant isolation, RBAC, idempotency, emergency stop, append-only 
 
 ## P0 blockers before real institutional pilot
 
-1. **Atomic mutation + audit unit of work:** business mutation and audit append are currently separate transactions. A crash between them could create an audit gap. Production requires one transactional unit of work or an outbox/equivalent proven pattern.
+1. **Atomic mutation + audit/idempotency unit of work:** business mutation, audit append and idempotency completion are not yet one atomic transaction. A crash between them could create an audit gap or retry ambiguity. Production requires one transactional unit of work, durable outbox or equivalent proven pattern.
 2. **Institutional OIDC/JWKS/MFA:** test/sandbox identity resolution is not an institutional identity provider.
 3. **Primary Guinean legal sources:** verified laws, regulations, conventions, amendments and project-specific obligations must replace synthetic rule fixtures.
 4. **KPI methodology approval:** formulas for all seven sovereign KPIs must be formally approved and versioned; the system must remain fail-closed otherwise.
