@@ -1,4 +1,5 @@
-import type { EnterpriseObject } from "./domain.js";
+import type { EnterpriseObject, Identity } from "./domain.js";
+import { ControlError } from "./living-core.js";
 
 export type TruthClass = "FACT" | "HYPOTHESIS" | "SIMULATION";
 
@@ -171,6 +172,12 @@ export class Payment extends BaseSimandouObject {
 
 export type FiscalRuleState = "DRAFT" | "VALIDATED" | "RETIRED";
 
+export type FiscalFormula = Readonly<{
+  kind: "AD_VALOREM_PERCENT";
+  ratePercent: number;
+  base: "GROSS_SALE_VALUE";
+}>;
+
 export class FiscalRule extends BaseSimandouObject {
   constructor(
     id: string,
@@ -181,9 +188,11 @@ export class FiscalRule extends BaseSimandouObject {
     readonly jurisdiction: string,
     readonly effectiveFrom: string,
     readonly effectiveTo: string | null,
+    readonly formula: FiscalFormula,
     readonly state: FiscalRuleState,
     evidence: readonly EvidenceLink[],
     version = 1,
+    readonly validatedByIdentityId: string | null = null,
   ) {
     super("FiscalRule", id, tenantId, projectId, evidence, state, version);
     assertRequired(sourceId, "Fiscal rule source id");
@@ -194,6 +203,31 @@ export class FiscalRule extends BaseSimandouObject {
       assertIsoDate(effectiveTo, "Fiscal rule expiry date");
       if (effectiveTo < effectiveFrom) throw new Error("Fiscal rule expiry date cannot precede effective date");
     }
+    validateFiscalFormula(formula);
+  }
+
+  validate(actor: Identity, approvalEvidence: EvidenceLink): FiscalRule {
+    if (actor.tenantId !== this.tenantId) throw new ControlError("Tenant isolation violation");
+    if (actor.kind !== "HUMAN" || !actor.roles.includes("LEGAL_APPROVER")) {
+      throw new ControlError("A human legal approver is required");
+    }
+    if (this.state !== "DRAFT") throw new ControlError("Only draft fiscal rules can be validated");
+    validateEvidenceLinks([approvalEvidence]);
+    return new FiscalRule(
+      this.id,
+      this.tenantId,
+      this.projectId,
+      this.sourceId,
+      this.sourceVersion,
+      this.jurisdiction,
+      this.effectiveFrom,
+      this.effectiveTo,
+      this.formula,
+      "VALIDATED",
+      [...this.evidence, approvalEvidence],
+      this.version + 1,
+      actor.id,
+    );
   }
 }
 
@@ -218,6 +252,44 @@ export class FiscalObligation extends BaseSimandouObject {
     assertCurrency(currency);
     assertIsoDate(dueDate, "Fiscal obligation due date");
   }
+}
+
+export function computeFiscalObligation(input: {
+  rule: FiscalRule;
+  sale: SaleContract;
+  asOf: string;
+  jurisdiction: string;
+  obligationId: string;
+  dueDate: string;
+}): FiscalObligation {
+  assertIsoDate(input.asOf, "Fiscal assessment date");
+  assertIsoDate(input.dueDate, "Fiscal obligation due date");
+  if (input.rule.state !== "VALIDATED") throw new ControlError("Fiscal computation requires a validated fiscal rule");
+  if (input.rule.tenantId !== input.sale.tenantId) throw new ControlError("Tenant isolation violation");
+  if (input.rule.projectId !== input.sale.projectId) throw new ControlError("Project isolation violation");
+  if (input.rule.jurisdiction !== input.jurisdiction) throw new ControlError("Fiscal rule jurisdiction mismatch");
+  if (input.asOf < input.rule.effectiveFrom) throw new ControlError("Fiscal rule is not yet effective");
+  if (input.rule.effectiveTo !== null && input.asOf > input.rule.effectiveTo) throw new ControlError("Fiscal rule is expired");
+
+  let expectedAmount: number;
+  switch (input.rule.formula.kind) {
+    case "AD_VALOREM_PERCENT":
+      expectedAmount = roundMoney(input.sale.grossSaleValue * (input.rule.formula.ratePercent / 100));
+      break;
+  }
+
+  return new FiscalObligation(
+    input.obligationId,
+    input.sale.tenantId,
+    input.sale.projectId,
+    input.rule.id,
+    input.sale.id,
+    expectedAmount,
+    input.sale.currency,
+    input.dueDate,
+    input.sale.truthClass,
+    [...input.rule.evidence, ...input.sale.evidence],
+  );
 }
 
 export class GovernmentReceipt extends BaseSimandouObject {
@@ -332,6 +404,15 @@ function validateEvidenceLinks(evidence: readonly EvidenceLink[]): void {
   }
 }
 
+function validateFiscalFormula(formula: FiscalFormula): void {
+  if (formula.kind !== "AD_VALOREM_PERCENT" || formula.base !== "GROSS_SALE_VALUE") {
+    throw new Error("Unsupported fiscal formula");
+  }
+  if (!Number.isFinite(formula.ratePercent) || formula.ratePercent < 0 || formula.ratePercent > 100) {
+    throw new Error("Fiscal formula rate must be between 0 and 100");
+  }
+}
+
 function assertRequired(value: string, label: string): void {
   if (!value.trim()) throw new Error(`${label} is required`);
 }
@@ -354,4 +435,8 @@ function assertIsoDate(value: string, label: string): void {
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
     throw new Error(`${label} must be a valid calendar date`);
   }
+}
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
