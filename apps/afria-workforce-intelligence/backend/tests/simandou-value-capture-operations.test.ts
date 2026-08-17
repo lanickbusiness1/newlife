@@ -127,7 +127,7 @@ async function seedAuditProject(admin: Pool): Promise<{ tenantId: string; projec
   return { tenantId, projectId, actorId };
 }
 
-test("persists a hash-chained append-only audit trail under RLS", { skip: !integrationEnabled }, async () => {
+test("persists a hash-chained append-only audit trail under RLS even when timestamps collide and UUID order reverses insertion", { skip: !integrationEnabled }, async () => {
   const admin = new Pool({ connectionString: adminDatabaseUrl });
   const app = new Pool({ connectionString: appDatabaseUrl });
   try {
@@ -141,14 +141,16 @@ test("persists a hash-chained append-only audit trail under RLS", { skip: !integ
       correlationId: "corr-audit",
       occurredAt: "2026-08-17T00:00:00.000Z",
     };
-    const first = await sink.append({ ...base, id: randomUUID(), action: "REGISTER_ORE_LOT", aggregateId: "lot-1", payload: { tonnage: 100 } });
-    const second = await sink.append({ ...base, id: randomUUID(), action: "RECORD_VALUE_CAPTURE_COMPONENT", aggregateId: "vc-1", payload: { amount: 10 } });
+    const first = await sink.append({ ...base, id: "ffffffff-ffff-4fff-8fff-ffffffffffff", action: "REGISTER_ORE_LOT", aggregateId: "lot-1", payload: { tonnage: 100 } });
+    const second = await sink.append({ ...base, id: "00000000-0000-4000-8000-000000000001", action: "RECORD_VALUE_CAPTURE_COMPONENT", aggregateId: "vc-1", payload: { amount: 10 } });
     assert.equal(first.previousHash, null);
     assert.equal(first.eventHash.length, 64);
     assert.equal(second.previousHash, first.eventHash);
 
     const events = await sink.list(seeded.tenantId, seeded.projectId);
     assert.equal(events.length, 2);
+    assert.equal(events[0]?.id, first.id);
+    assert.equal(events[1]?.id, second.id);
     assert.equal(events[1]?.previousHash, events[0]?.eventHash);
 
     await assert.rejects(
