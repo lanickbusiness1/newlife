@@ -12,7 +12,7 @@ async function authenticate(page: import('@playwright/test').Page) {
   }]);
 }
 
-test('candidate completes the evidence-safe mission with recruiter lens', async ({ page }) => {
+test('candidate completes the evidence-safe mission with recruiter lens and elicitation', async ({ page }) => {
   await authenticate(page);
   await page.goto('/candidate/dashboard');
 
@@ -51,6 +51,17 @@ test('candidate completes the evidence-safe mission with recruiter lens', async 
   await expect(financeLens).toContainText(/HIGH|BLOCKING/);
   await expect(financeLens).toContainText(/preuve|mise en situation|work sample/i);
   await expect(financeLens).toContainText(/ne pas revendiquer/i);
+
+  await expect(page.getByRole('heading', { name: /Evidence Elicitation/i })).toBeVisible();
+  const factInput = page.getByLabel('Fait complémentaire confirmé');
+  await expect(factInput).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Proposer une reformulation' })).toBeDisabled();
+  await factInput.fill('Coordination de plusieurs équipes terrain sur plusieurs sites.');
+  await page.getByRole('checkbox', { name: /J’autorise le traitement/i }).check();
+  await page.getByRole('button', { name: 'Proposer une reformulation' }).click();
+  await expect(page.getByText(/Détail déclaré et confirmé par le candidat/i)).toBeVisible();
+  await expect(page.getByText(/plusieurs équipes terrain sur plusieurs sites/i)).toBeVisible();
+  await expect(page.getByText(/VERIFIED.*plusieurs équipes terrain/i)).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Générer les deux versions' }).click();
   await expect(page.getByRole('heading', { name: 'CV ATS' })).toBeVisible();
