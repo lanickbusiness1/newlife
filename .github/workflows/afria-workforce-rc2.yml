@@ -4,13 +4,18 @@ on:
   pull_request:
     paths:
       - 'apps/afria-workforce-intelligence/backend/**'
+      - 'apps/afria-workforce-intelligence/simandou.html'
+      - 'apps/afria-workforce-intelligence/simandou.js'
       - '.github/workflows/afria-workforce-rc2.yml'
   push:
     branches:
       - feature/afria-workforce-intelligence-rc2
       - feature/mining-local-content-module-06
+      - feature/simandou-value-capture-v1
     paths:
       - 'apps/afria-workforce-intelligence/backend/**'
+      - 'apps/afria-workforce-intelligence/simandou.html'
+      - 'apps/afria-workforce-intelligence/simandou.js'
       - '.github/workflows/afria-workforce-rc2.yml'
 
 permissions:
@@ -48,6 +53,8 @@ jobs:
       - run: npm install
       - run: npm audit --audit-level=high
       - run: npm run typecheck
+      - name: Check Mission Control JavaScript
+        run: node --check ../simandou.js
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Apply sovereign database migrations
@@ -55,6 +62,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/001_living_core.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/002_mining_local_content.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/004_simandou_value_capture.sql
       - name: Configure non-owner application role
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -71,9 +79,19 @@ jobs:
           grant select, insert, update, delete on all tables in schema public to workforce_app;
           grant usage, select on all sequences in schema public to workforce_app;
           SQL
-      - run: npm test
+      - name: Test Simandou schema and RLS contract
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/004_simandou_value_capture_test.sql
+      - name: Run deterministic test suite
+        run: npm test
       - name: Test sovereign database controls
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations_test.sql
+      - name: Prove Simandou migration rollback and re-apply
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/004_simandou_value_capture_down.sql
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.simandou_ore_lots') is null")" = "t"
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.simandou_value_capture_components') is null")" = "t"
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.simandou_reconciliation_exceptions') is null")" = "t"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/004_simandou_value_capture.sql
       - name: Prove security migration rollback and re-apply
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/003_security_operations_down.sql
