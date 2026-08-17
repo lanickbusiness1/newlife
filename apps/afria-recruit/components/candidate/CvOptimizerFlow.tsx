@@ -137,7 +137,7 @@ export function CvOptimizerFlow() {
                 <RecruiterLensPanel items={gap.recruiterLens} />
                 {firstExperience ? (
                   <div className="rewrite-box">
-                    <div className="elicitation-box">
+                    <div className="review-box elicitation-box" style={{ gridColumn: '1 / -1' }}>
                       <h3>Evidence Elicitation™</h3>
                       <p>Avant de reformuler, vous pouvez préciser un fait réel que le CV n’exprime pas encore clairement. Il reste <strong>DECLARED</strong> tant qu’aucune preuve distincte ne le fait évoluer.</p>
                       <label htmlFor="elicited-fact">Fait complémentaire confirmé</label>
