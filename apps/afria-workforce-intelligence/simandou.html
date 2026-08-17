@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#17120f">
+  <title>AfrIAgenesis® — Simandou Value Capture Mission Control</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:#100d0b;
+      --panel:#1a1512;
+      --panel-2:#231b16;
+      --line:#3f3026;
+      --text:#f6eee5;
+      --muted:#bfae9f;
+      --gold:#f0b45f;
+      --orange:#df7b3a;
+      --green:#7dc69b;
+      --red:#e58a84;
+      --blue:#8eb7d8;
+      --radius:18px;
+      --shadow:0 18px 46px rgba(0,0,0,.26);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:radial-gradient(circle at 15% 0%, #2d1c12 0, var(--bg) 38rem); color:var(--text); min-height:100vh; }
+    button,input { font:inherit; }
+    button { color:inherit; }
+    a { color:var(--gold); }
+    .skip { position:absolute; left:-10000px; top:auto; }
+    .skip:focus { left:1rem; top:1rem; z-index:50; padding:.75rem 1rem; background:var(--gold); color:#1b120b; border-radius:10px; }
+    .sandbox-banner { position:sticky; top:0; z-index:30; display:flex; gap:.7rem; justify-content:center; align-items:center; padding:.7rem 1rem; background:#4b2417; border-bottom:1px solid #8e4e2d; font-weight:800; letter-spacing:.04em; text-align:center; }
+    .sandbox-banner small { font-weight:600; color:#f6d8c5; letter-spacing:0; }
+    .shell { max-width:1440px; margin:0 auto; padding:1.3rem clamp(1rem,3vw,2.3rem) 3rem; }
+    header { display:flex; justify-content:space-between; gap:1.5rem; align-items:flex-start; margin-bottom:1.4rem; }
+    .brand { display:flex; gap:.9rem; align-items:center; }
+    .mark { width:46px; height:46px; border-radius:14px; display:grid; place-items:center; background:linear-gradient(145deg,var(--gold),var(--orange)); color:#21140b; font-weight:950; box-shadow:var(--shadow); }
+    .eyebrow { margin:0 0 .25rem; color:var(--gold); font-weight:800; font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; }
+    h1 { margin:0; font-size:clamp(1.45rem,3.2vw,2.35rem); line-height:1.08; }
+    .subtitle { margin:.5rem 0 0; color:var(--muted); max-width:78ch; }
+    .status-cluster { display:flex; gap:.55rem; flex-wrap:wrap; justify-content:flex-end; }
+    .pill { display:inline-flex; align-items:center; gap:.4rem; border:1px solid var(--line); border-radius:999px; padding:.42rem .72rem; background:rgba(34,27,22,.84); font-size:.77rem; font-weight:800; }
+    .pill.fact { color:var(--green); }
+    .pill.hypothesis { color:var(--gold); }
+    .pill.simulation { color:var(--blue); }
+    .pill.blocked { color:var(--red); }
+    nav { display:flex; gap:.5rem; overflow:auto; padding:.25rem 0 1rem; scrollbar-width:thin; }
+    nav button { white-space:nowrap; border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:.65rem .9rem; cursor:pointer; }
+    nav button[aria-selected="true"] { background:var(--gold); color:#22160d; border-color:var(--gold); font-weight:900; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(7,minmax(150px,1fr)); gap:.75rem; margin-bottom:1.2rem; }
+    .kpi { min-height:142px; background:linear-gradient(160deg,var(--panel-2),var(--panel)); border:1px solid var(--line); border-radius:var(--radius); padding:1rem; box-shadow:var(--shadow); }
+    .kpi-label { color:var(--muted); font-size:.79rem; line-height:1.25; min-height:2.1em; }
+    .kpi-value { margin:.8rem 0 .55rem; font-size:clamp(1.05rem,2vw,1.6rem); font-weight:950; overflow-wrap:anywhere; }
+    .kpi-meta { font-size:.72rem; color:var(--muted); }
+    .workspace { display:none; }
+    .workspace.active { display:block; }
+    .grid-2 { display:grid; grid-template-columns:1.35fr .85fr; gap:1rem; }
+    .grid-3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+    .card { background:rgba(26,21,18,.94); border:1px solid var(--line); border-radius:var(--radius); padding:1rem; box-shadow:var(--shadow); min-width:0; }
+    .card h2,.card h3 { margin:.1rem 0 .65rem; }
+    .card p { color:var(--muted); }
+    .flow { display:grid; grid-template-columns:repeat(6,minmax(110px,1fr)); gap:.55rem; margin-top:1rem; }
+    .flow-step { position:relative; padding:.85rem .75rem; background:#211913; border:1px solid var(--line); border-radius:14px; }
+    .flow-step b { display:block; margin-bottom:.35rem; }
+    .flow-step small { color:var(--muted); }
+    .flow-step:not(:last-child)::after { content:"→"; position:absolute; right:-.48rem; top:50%; color:var(--gold); z-index:2; font-weight:900; }
+    table { width:100%; border-collapse:collapse; font-size:.86rem; }
+    th,td { text-align:left; padding:.7rem .55rem; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; }
+    .variance-under { color:var(--red); font-weight:800; }
+    .variance-match { color:var(--green); font-weight:800; }
+    .alert { border-left:4px solid var(--red); background:#291815; padding:.8rem .9rem; border-radius:0 12px 12px 0; margin:.65rem 0; }
+    .alert strong { display:block; }
+    .alert small { color:var(--muted); }
+    .evidence-row { display:grid; grid-template-columns:1.1fr .7fr .6fr .7fr; gap:.55rem; padding:.7rem 0; border-bottom:1px solid var(--line); font-size:.82rem; }
+    .scenario-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
+    label { display:grid; gap:.35rem; color:var(--muted); font-size:.78rem; }
+    input { width:100%; border:1px solid var(--line); background:#130f0d; color:var(--text); border-radius:10px; padding:.62rem .7rem; }
+    .primary { margin-top:.85rem; border:0; background:linear-gradient(135deg,var(--gold),var(--orange)); color:#25170d; font-weight:950; border-radius:12px; padding:.75rem 1rem; cursor:pointer; }
+    .result-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.6rem; margin-top:.8rem; }
+    .result { background:#17120f; border:1px solid var(--line); border-radius:12px; padding:.7rem; }
+    .result span { display:block; color:var(--muted); font-size:.7rem; }
+    .result strong { display:block; margin-top:.25rem; font-size:1.08rem; }
+    .gate { border:1px dashed var(--orange); background:#2a1c14; border-radius:14px; padding:.9rem; }
+    footer { color:var(--muted); font-size:.76rem; margin-top:1.2rem; padding-top:1rem; border-top:1px solid var(--line); }
+    @media (max-width:1180px) { .kpi-grid { grid-template-columns:repeat(4,minmax(150px,1fr)); } .flow { grid-template-columns:repeat(3,1fr); } }
+    @media (max-width:820px) { header { flex-direction:column; } .status-cluster { justify-content:flex-start; } .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .grid-2,.grid-3 { grid-template-columns:1fr; } .scenario-form { grid-template-columns:repeat(2,1fr); } .result-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:520px) { .shell { padding-inline:.75rem; } .kpi-grid,.scenario-form,.result-grid { grid-template-columns:1fr; } .flow { grid-template-columns:1fr; } .flow-step:not(:last-child)::after { content:"↓"; right:auto; left:50%; top:auto; bottom:-.7rem; } .evidence-row { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Aller au contenu principal</a>
+  <div class="sandbox-banner" data-sandbox-banner="permanent" role="status">
+    SYNTHETIC SANDBOX
+    <small>aucune donnée réelle · aucune certification institutionnelle · démonstration gouvernée</small>
+  </div>
+
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="mark" aria-hidden="true">A</div>
+        <div>
+          <p class="eyebrow">AfrIAgenesis® · Sovereign Mining OS™ Guinée</p>
+          <h1>Simandou Value Capture Mission Control</h1>
+          <p class="subtitle">Suivre la chaîne mine → cash → recettes publiques → valeur retenue, sans confondre fait, hypothèse et simulation.</p>
+        </div>
+      </div>
+      <div class="status-cluster" aria-label="Classes de vérité">
+        <span class="pill fact">FACT</span>
+        <span class="pill hypothesis">HYPOTHESIS</span>
+        <span class="pill simulation">SIMULATION</span>
+        <span class="pill blocked">M8/Big4 NON FINALISÉS</span>
+      </div>
+    </header>
+
+    <nav aria-label="Espaces de travail" role="tablist">
+      <button type="button" data-target="mine-to-cash" aria-selected="true">Mine-to-Cash</button>
+      <button type="button" data-target="expected-received" aria-selected="false">Expected vs Received</button>
+      <button type="button" data-target="exceptions-capa" aria-selected="false">Exceptions & CAPA</button>
+      <button type="button" data-target="evidence-room" aria-selected="false">Evidence Room</button>
+      <button type="button" data-target="scenario-lab" aria-selected="false">Scenario Lab</button>
+    </nav>
+
+    <section class="kpi-grid" aria-label="Indicateurs souverains">
+      <article class="kpi"><div class="kpi-label">Value Capture Ratio</div><div class="kpi-value" id="kpi-value-capture">METHOD_NOT_APPROVED</div><div class="kpi-meta">Bloqué tant que la méthodologie humaine n'est pas approuvée.</div></article>
+      <article class="kpi"><div class="kpi-label">Fiscal Take</div><div class="kpi-value" id="kpi-fiscal">—</div><div class="kpi-meta">Fixture synthétique non chargée</div></article>
+      <article class="kpi"><div class="kpi-label">State Equity Return</div><div class="kpi-value" id="kpi-equity">—</div><div class="kpi-meta">Séparé des taxes et royalties</div></article>
+      <article class="kpi"><div class="kpi-label">FX Retention Ratio</div><div class="kpi-value" id="kpi-fx">—</div><div class="kpi-meta">Visible, mais hors agrégat anti-double-comptage</div></article>
+      <article class="kpi"><div class="kpi-label">Local Procurement Ratio</div><div class="kpi-value" id="kpi-procurement">—</div><div class="kpi-meta">Contrats fournisseurs avec preuve</div></article>
+      <article class="kpi"><div class="kpi-label">Domestic Transformation Ratio</div><div class="kpi-value" id="kpi-transform">—</div><div class="kpi-meta">Valeur industrielle domestique</div></article>
+      <article class="kpi"><div class="kpi-label">Simandou-to-Economy Conversion Ratio</div><div class="kpi-value" id="kpi-conversion">—</div><div class="kpi-meta">Conversion de rente en actifs productifs</div></article>
+    </section>
+
+    <main id="main">
+      <section class="workspace active" data-view="mine-to-cash" role="tabpanel">
+        <div class="card">
+          <p class="eyebrow">Chaîne souveraine</p>
+          <h2>Mine-to-Cash</h2>
+          <p>Chaque maillon conserve identité, tenant, projet, version, preuve et classe de vérité. Les valeurs ci-dessous sont uniquement des états de démonstration.</p>
+          <div class="flow" aria-label="Chaîne de traçabilité">
+            <div class="flow-step"><b>OreLot</b><small>Lot → grade → preuve</small></div>
+            <div class="flow-step"><b>Shipment</b><small>Port → poids → qualité</small></div>
+            <div class="flow-step"><b>Sale</b><small>Contrat → facture</small></div>
+            <div class="flow-step"><b>Payment</b><small>Montant → devise</small></div>
+            <div class="flow-step"><b>Obligation</b><small>Règle validée</small></div>
+            <div class="flow-step"><b>Receipt</b><small>Trésor → preuve</small></div>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:1rem">
+          <article class="card">
+            <h3>Contrôles actifs</h3>
+            <table>
+              <thead><tr><th>Contrôle</th><th>État sandbox</th><th>Autorité</th></tr></thead>
+              <tbody>
+                <tr><td>Isolation tenant/projet</td><td class="variance-match">ENFORCED</td><td>RLS + service</td></tr>
+                <tr><td>Règle fiscale</td><td class="variance-match">HUMAN APPROVAL REQUIRED</td><td>LEGAL_APPROVER</td></tr>
+                <tr><td>Value Capture methodology</td><td class="variance-under">METHOD_NOT_APPROVED</td><td>METHODOLOGY_APPROVER</td></tr>
+                <tr><td>Audit</td><td class="variance-match">APPEND-ONLY + HASH CHAIN</td><td>S7+</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="card">
+            <h3>Principe de décision</h3>
+            <div class="gate"><strong>Aucune accusation automatique.</strong><p>Un écart produit une <code>ReconciliationException</code>, jamais une qualification de fraude. L'investigation et la décision restent humaines.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="workspace" data-view="expected-received" role="tabpanel">
+        <div class="card">
+          <p class="eyebrow">Fixture synthétique</p>
+          <h2>Expected vs Received</h2>
+          <table>
+            <thead><tr><th>Objet</th><th>Expected</th><th>Received</th><th>Variance</th><th>Truth</th></tr></thead>
+            <tbody>
+              <tr><td>Fiscal obligation S-001</td><td>500 USD</td><td>400 USD</td><td class="variance-under">UNDER · -100</td><td><span class="pill simulation">SIMULATION</span></td></tr>
+              <tr><td>Fiscal obligation S-002</td><td>350 USD</td><td>350 USD</td><td class="variance-match">MATCHED</td><td><span class="pill simulation">SIMULATION</span></td></tr>
+            </tbody>
+          </table>
+          <p>Ces nombres sont des fixtures de test et ne représentent aucun taux, paiement ou obligation réel de Simandou.</p>
+        </div>
+      </section>
+
+      <section class="workspace" data-view="exceptions-capa" role="tabpanel">
+        <div class="grid-2">
+          <article class="card">
+            <p class="eyebrow">Exceptions</p>
+            <h2>Reconciliation Exceptions</h2>
+            <div class="alert"><strong>PAYMENT_MISMATCH</strong><small>Fixture synthétique · invoice-demo-01 ↔ payment-demo-01 · statut OPEN</small></div>
+            <div class="alert"><strong>MISSING_SALE_LINK</strong><small>Fixture synthétique · shipment-demo-02 · statut ACKNOWLEDGED</small></div>
+          </article>
+          <article class="card">
+            <p class="eyebrow">Loop Engineering™</p>
+            <h2>CAPA</h2>
+            <p>Observer → mesurer → diagnostiquer → proposer → simuler → tester → contrôler → déployer → vérifier → apprendre.</p>
+            <div class="gate"><strong>Gate humain</strong><p>Résolution, classement ou rejet d'une exception exigent une identité et une preuve autorisées.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="workspace" data-view="evidence-room" role="tabpanel">
+        <div class="card">
+          <p class="eyebrow">Evidence First</p>
+          <h2>Evidence Room</h2>
+          <div class="evidence-row"><strong>synthetic://ore/lot-01</strong><span>SHA-256 · démonstration</span><span class="pill fact">FACT</span><span>VALIDATED TEST</span></div>
+          <div class="evidence-row"><strong>synthetic://legal/rule-s-001</strong><span>Version S1</span><span class="pill hypothesis">HYPOTHESIS</span><span>NON JURIDIQUE</span></div>
+          <div class="evidence-row"><strong>synthetic://scenario/pellets</strong><span>Scenario Lab</span><span class="pill simulation">SIMULATION</span><span>LOCAL ONLY</span></div>
+          <p>Aucune source synthétique n'est présentée comme texte juridique, donnée opérateur, donnée GDB ou preuve institutionnelle.</p>
+        </div>
+      </section>
+
+      <section class="workspace" data-view="scenario-lab" role="tabpanel">
+        <div class="grid-2">
+          <article class="card">
+            <p class="eyebrow">Deterministic Finance</p>
+            <h2>Scenario Lab — Pellets DR</h2>
+            <form id="scenario-form">
+              <div class="scenario-form">
+                <label>CAPEX (USD)<input name="capex" type="number" min="0" step="1" value="1000"></label>
+                <label>Revenus annuels (USD)<input name="revenue" type="number" min="0" step="1" value="500"></label>
+                <label>OPEX annuel (USD)<input name="opex" type="number" min="0" step="1" value="200"></label>
+                <label>Dette annuelle (USD)<input name="debt" type="number" min="0" step="1" value="100"></label>
+                <label>Taux actualisation (%)<input name="discount" type="number" min="0" max="100" step="0.1" value="10"></label>
+                <label>Durée (années)<input name="years" type="number" min="1" max="100" step="1" value="5"></label>
+              </div>
+              <button class="primary" type="submit">Simuler localement</button>
+            </form>
+          </article>
+          <article class="card">
+            <p class="eyebrow">SIMULATION</p>
+            <h2>Résultats indicatifs</h2>
+            <div class="result-grid" aria-live="polite" id="scenario-results">
+              <div class="result"><span>EBITDA</span><strong id="res-ebitda">—</strong></div>
+              <div class="result"><span>NPV</span><strong id="res-npv">—</strong></div>
+              <div class="result"><span>DSCR</span><strong id="res-dscr">—</strong></div>
+              <div class="result"><span>Truth</span><strong>SIMULATION</strong></div>
+            </div>
+            <div class="gate" style="margin-top:1rem"><strong>Value Capture Ratio</strong><p id="method-status">METHOD_NOT_APPROVED — aucune agrégation souveraine publiée.</p></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>Prototype de sandbox contrôlée · AfrIAgenesis® · aucune donnée réelle · aucune décision fiscale, contractuelle ou d'investissement automatisée.</footer>
+  </div>
+  <script src="simandou.js" defer></script>
+</body>
+</html>
