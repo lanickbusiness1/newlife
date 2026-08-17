@@ -33,6 +33,7 @@ export type IndustrialScenarioResult = Readonly<{
   scenarioId: string;
   kind: IndustrialScenarioKind;
   currency: string;
+  truthClass: "SIMULATION";
   assumptions: IndustrialScenarioInput;
   ebitda: number;
   npv: number;
@@ -65,6 +66,7 @@ export function evaluateIndustrialScenario(input: IndustrialScenarioInput): Indu
     scenarioId: input.id,
     kind: input.kind,
     currency: input.currency,
+    truthClass: "SIMULATION",
     assumptions: normalized,
     ebitda,
     npv,
@@ -106,7 +108,8 @@ function validateScenario(input: IndustrialScenarioInput): void {
   if (!input.id.trim()) throw new Error("Scenario id is required");
   if (!/^[A-Z]{3}$/.test(input.currency)) throw new Error("Scenario currency must be a three-letter uppercase code");
   if (!isScenarioKind(input.kind)) throw new Error("Scenario kind is invalid");
-  if (input.truthClass !== "HYPOTHESIS" && input.truthClass !== "SIMULATION" && input.truthClass !== "FACT") {
+  if (input.truthClass === "FACT") throw new Error("Scenario assumptions cannot be FACT");
+  if (input.truthClass !== "HYPOTHESIS" && input.truthClass !== "SIMULATION") {
     throw new Error("Scenario truth class is invalid");
   }
   assertNonNegative(input.capex, "CAPEX");
