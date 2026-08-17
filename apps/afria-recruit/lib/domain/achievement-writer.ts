@@ -15,7 +15,7 @@ export interface RewriteAchievementInput {
 export interface RewriteAchievementOutput {
   text: string;
   usedMetrics: string[];
-  usedConfirmedFacts: string[];
+  usedConfirmedFacts?: string[];
 }
 
 function validateConfirmedFacts(facts: ConfirmedFact[]): ConfirmedFact[] {
