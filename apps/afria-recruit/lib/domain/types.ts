@@ -1,4 +1,12 @@
 export type RequirementKind = 'skill' | 'language' | 'experience' | 'education' | 'other';
+export type RequirementPriority = 'BLOCKING' | 'HIGH' | 'MEDIUM';
+export type EvidenceExpectation = 'DECLARED' | 'EVIDENCED' | 'VERIFIED';
+
+export interface RequirementCalibration {
+  blocking: boolean;
+  priority: RequirementPriority;
+  minimumEvidence: EvidenceExpectation;
+}
 
 export interface JobRequirement {
   id: string;
@@ -9,6 +17,7 @@ export interface JobRequirement {
   languageCode?: string;
   minimumYears?: number;
   minimumLevel?: string;
+  calibration?: RequirementCalibration;
 }
 
 export interface JobSpec {

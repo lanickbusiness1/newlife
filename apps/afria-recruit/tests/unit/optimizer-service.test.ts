@@ -19,7 +19,15 @@ const job: JobSpec = {
   countryCode: 'SN',
   requirements: [
     { id: 'skill:skill-project', kind: 'skill', label: 'Gestion de projets', required: true, skillId: 'skill-project', minimumYears: 5 },
-    { id: 'skill:skill-finance', kind: 'skill', label: 'Conformité financière', required: true, skillId: 'skill-finance', minimumYears: 2 },
+    {
+      id: 'skill:skill-finance',
+      kind: 'skill',
+      label: 'Conformité financière',
+      required: true,
+      skillId: 'skill-finance',
+      minimumYears: 2,
+      calibration: { blocking: true, priority: 'BLOCKING', minimumEvidence: 'EVIDENCED' },
+    },
   ],
 };
 
@@ -79,13 +87,18 @@ test('diagnostic persists an assessment_score with a Candidate OS artifact kind'
   assert.match(fixture.decisionStore.writes[0]?.inputHash ?? '', /^[a-f0-9]{64}$/);
 });
 
-test('job analysis preserves unsupported requirements as GAP and uses match_recommendation', async () => {
+test('job analysis preserves unsupported requirements as GAP and exposes recruiter lens', async () => {
   const fixture = service();
   const result = await fixture.service.analyzeJob(SYNTHETIC_CANDIDATE_ID, JOB_ID);
   assert.equal(result.analysis.requirements.find((row) => row.requirementId === 'skill:skill-finance')?.coverage, 'GAP');
+  const financeLens = result.recruiterLens.find((item) => item.requirementId === 'skill:skill-finance');
+  assert.equal(financeLens?.coverage, 'GAP');
+  assert.equal(financeLens?.priority, 'BLOCKING');
+  assert.ok(financeLens?.doNotClaim.includes('Conformité financière'));
+  assert.equal(financeLens?.proofChallenge?.promotesEvidence, false);
   assert.equal(fixture.decisionStore.writes[0]?.jobId, JOB_ID);
   assert.equal(fixture.decisionStore.writes[0]?.decisionType, 'match_recommendation');
-  assert.equal((fixture.decisionStore.writes[0]?.output as { artifactKind?: string }).artifactKind, 'candidate_job_gap_analysis_v1');
+  assert.equal((fixture.decisionStore.writes[0]?.output as { artifactKind?: string }).artifactKind, 'candidate_job_gap_analysis_v2');
 });
 
 test('dual CV variants have identical fact fingerprints and use canonical assessment_score storage', async () => {

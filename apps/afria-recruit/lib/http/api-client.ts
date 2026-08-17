@@ -1,8 +1,15 @@
 import type { CandidateContext } from '../repositories/candidate-context.js';
 import type { DiagnosticFinding, JobSpec, RequirementCoverage } from '../domain/types.js';
+import type { ConfirmedFact } from '../domain/evidence-elicitation.js';
+import type { RecruiterLensItem } from '../domain/recruiter-lens.js';
 
 export type DiagnosticResponse = { decisionId: string; diagnostic: { findings: DiagnosticFinding[] } };
-export type GapAnalysisResponse = { decisionId: string; jobSpec: JobSpec; analysis: { requirements: RequirementCoverage[] } };
+export type GapAnalysisResponse = {
+  decisionId: string;
+  jobSpec: JobSpec;
+  analysis: { requirements: RequirementCoverage[] };
+  recruiterLens: RecruiterLensItem[];
+};
 export type VariantSections = {
   headline: string | null;
   summary: string | null;
@@ -47,9 +54,9 @@ export const candidateApi = {
   diagnostic: () => requestJson<DiagnosticResponse>('/api/candidate/diagnostic', { method: 'POST' }),
   jobs: () => requestJson<{ jobs: JobSpec[] }>('/api/candidate/jobs'),
   gapAnalysis: (jobId: string) => requestJson<GapAnalysisResponse>('/api/candidate/gap-analysis', { method: 'POST', body: JSON.stringify({ jobId }) }),
-  rewrite: (sourceRef: string, sourceStatement: string, jobId: string, consent: boolean) => requestJson<{ decisionId: string; rewrite: { text: string; usedMetrics: string[] }; consentId: string | null }>('/api/candidate/rewrite', {
+  rewrite: (sourceRef: string, sourceStatement: string, jobId: string, consent: boolean, confirmedFacts: ConfirmedFact[] = []) => requestJson<{ decisionId: string; rewrite: { text: string; usedMetrics: string[]; usedConfirmedFacts?: string[] }; consentId: string | null }>('/api/candidate/rewrite', {
     method: 'POST',
-    body: JSON.stringify({ sourceRef, sourceStatement, jobId, consent, verifiedMetrics: [] }),
+    body: JSON.stringify({ sourceRef, sourceStatement, jobId, consent, verifiedMetrics: [], confirmedFacts }),
   }),
   variants: (jobId: string) => requestJson<VariantsResponse>('/api/candidate/variants', { method: 'POST', body: JSON.stringify({ jobId }) }),
   review: (decisionId: string, rationale: string) => requestJson<{ reviewId: string; outcome: string }>('/api/candidate/review', { method: 'POST', body: JSON.stringify({ decisionId, rationale, outcome: 'approved' }) }),

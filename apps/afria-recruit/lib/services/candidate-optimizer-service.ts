@@ -3,7 +3,9 @@ import type { CandidateAiAdapter } from '../ai/contracts.js';
 import type { CanonicalDecisionType, ValidatedDecisionInput } from '../ai/persist-decision.js';
 import type { Json } from '../supabase/database.types.js';
 import type { CandidateContext, CandidateRepository } from '../repositories/candidate-context.js';
+import type { ConfirmedFact } from '../domain/evidence-elicitation.js';
 import type { JobSpec } from '../domain/types.js';
+import { buildRecruiterLens } from '../domain/recruiter-lens.js';
 import { findTruthConflicts } from '../domain/truth-consistency.js';
 import { CandidateHttpError } from '../http/errors.js';
 
@@ -135,16 +137,17 @@ export class CandidateOptimizerService {
     ]);
     if (!jobSpec) throw new CandidateHttpError(404, 'Job not found');
     const analysis = await this.deps.aiAdapter.analyzeJob({ context, jobSpec });
+    const recruiterLens = buildRecruiterLens(jobSpec, analysis.requirements);
     const decisionId = await this.persistArtifact({
       candidateId,
       jobId,
       decisionType: 'match_recommendation',
-      artifactKind: 'candidate_job_gap_analysis_v1',
-      payload: analysis,
-      promptVersion: 'candidate-job-gap-analysis-v1',
-      hashSource: { candidateId, jobSpec, context },
+      artifactKind: 'candidate_job_gap_analysis_v2',
+      payload: { analysis, recruiterLens },
+      promptVersion: 'candidate-job-gap-analysis-v2',
+      hashSource: { candidateId, jobSpec, context, recruiterLens },
     });
-    return { decisionId, jobSpec, analysis };
+    return { decisionId, jobSpec, analysis, recruiterLens };
   }
 
   async rewrite(
@@ -154,6 +157,7 @@ export class CandidateOptimizerService {
     sourceStatement: string,
     verifiedMetrics: Array<{ value: string; sourceRef: string }>,
     externalProcessingConsent: boolean,
+    confirmedFacts: ConfirmedFact[] = [],
   ) {
     if (!externalProcessingConsent) throw new CandidateHttpError(400, 'Explicit external processing consent required');
     const [context, jobSpec] = await Promise.all([
@@ -166,6 +170,9 @@ export class CandidateOptimizerService {
     if (!experience) throw new CandidateHttpError(400, 'Unknown source reference');
     const sourceCorpus = [experience.title, experience.description ?? ''].join(' ');
     if (!sourceCorpus.includes(sourceStatement.trim())) throw new CandidateHttpError(400, 'Source statement is not supported by the selected experience');
+    if (confirmedFacts.some((fact) => fact.sourceRef !== `experience:${experience.id}` && fact.sourceRef !== experience.id)) {
+      throw new CandidateHttpError(400, 'Confirmed fact source does not match the selected experience');
+    }
 
     let consentId: string | null = null;
     if (this.deps.aiAdapter.providerName === 'openai') {
@@ -177,16 +184,17 @@ export class CandidateOptimizerService {
     const rewrite = await this.deps.aiAdapter.rewrite({
       sourceStatement,
       verifiedMetrics,
+      confirmedFacts,
       externalProcessingConsentId: consentId ?? undefined,
     });
     const decisionId = await this.persistArtifact({
       candidateId,
       jobId,
       decisionType: 'assessment_score',
-      artifactKind: 'candidate_achievement_rewrite_v1',
-      payload: { sourceRef, rewrite, externalProcessingConsentId: consentId },
-      promptVersion: 'candidate-achievement-rewrite-v1',
-      hashSource: { candidateId, jobId, sourceRef, sourceStatement, verifiedMetrics, externalProcessingConsentId: consentId },
+      artifactKind: 'candidate_achievement_rewrite_v2',
+      payload: { sourceRef, rewrite, confirmedFactRefs: confirmedFacts.map((fact) => `${fact.sourceRef}:${fact.key}`), externalProcessingConsentId: consentId },
+      promptVersion: 'candidate-achievement-rewrite-v2',
+      hashSource: { candidateId, jobId, sourceRef, sourceStatement, verifiedMetrics, confirmedFacts, externalProcessingConsentId: consentId },
     });
     return { decisionId, rewrite, consentId };
   }

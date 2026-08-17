@@ -26,7 +26,16 @@ const job: JobSpec = {
   countryCode: 'SN',
   requirements: [
     { id: 'skill:skill-project', kind: 'skill', label: 'Gestion de projets', required: true, skillId: 'skill-project', minimumYears: 5 },
-    { id: 'skill:skill-finance', kind: 'skill', label: 'Conformité financière', required: true, skillId: 'skill-finance', minimumYears: 2 },
+    { id: 'skill:skill-legal', kind: 'skill', label: 'Droit des contrats', required: true, skillId: 'skill-legal', minimumYears: 2 },
+    {
+      id: 'skill:skill-finance',
+      kind: 'skill',
+      label: 'Conformité financière',
+      required: true,
+      skillId: 'skill-finance',
+      minimumYears: 2,
+      calibration: { blocking: true, priority: 'BLOCKING', minimumEvidence: 'EVIDENCED' },
+    },
   ],
 };
 
@@ -88,14 +97,15 @@ function interviewFixture() {
   return { service, decisionStore, consentStore, interviewStore };
 }
 
-test('interview start creates explicit platform-processing consent before the session', async () => {
+test('interview start creates consent and prioritizes the blocking evidence gap', async () => {
   const fixture = interviewFixture();
   const result = await fixture.service.start(SYNTHETIC_CANDIDATE_ID, JOB_ID);
   assert.equal(result.consentId, 'consent-1');
   assert.equal(fixture.consentStore.writes.length, 1);
   assert.equal(fixture.consentStore.writes[0]?.policyVersion, 'candidate-os-v1');
   assert.equal(fixture.interviewStore.created[0]?.consentId, 'consent-1');
-  assert.match(result.turn.question, /situation concrète|réalisation pertinente/i);
+  assert.match(result.turn.question, /Conformité financière/);
+  assert.deepEqual(result.turn.focusRequirementIds, ['skill:skill-finance']);
 });
 
 test('interview answer is transient and is not copied into persisted feedback', async () => {

@@ -1,7 +1,18 @@
 import { diagnoseCv } from '../domain/cv-diagnostic.js';
 import { classifyRequirementCoverage } from '../domain/gap-matching.js';
 import { rewriteAchievement } from '../domain/achievement-writer.js';
+import { buildRecruiterLens, type RecruiterLensItem } from '../domain/recruiter-lens.js';
 import type { CandidateAiAdapter } from './contracts.js';
+
+function interviewRiskRank(item: RecruiterLensItem): number {
+  if (item.priority === 'BLOCKING' && item.coverage === 'GAP') return 0;
+  if (item.priority === 'BLOCKING' && item.coverage === 'PARTIAL') return 1;
+  if (item.priority === 'HIGH' && item.coverage === 'GAP') return 2;
+  if (item.priority === 'HIGH' && item.coverage === 'PARTIAL') return 3;
+  if (item.coverage === 'GAP') return 4;
+  if (item.coverage === 'PARTIAL') return 5;
+  return 6;
+}
 
 export class DeterministicCandidateAiAdapter implements CandidateAiAdapter {
   readonly providerName = 'deterministic' as const;
@@ -20,9 +31,11 @@ export class DeterministicCandidateAiAdapter implements CandidateAiAdapter {
 
   async interviewTurn(input: Parameters<CandidateAiAdapter['interviewTurn']>[0]) {
     const analysis = classifyRequirementCoverage(input.context, input.jobSpec);
-    const focus = analysis.find((row) => row.coverage === 'GAP')
-      ?? analysis.find((row) => row.coverage === 'PARTIAL')
-      ?? analysis[0];
+    const lens = buildRecruiterLens(input.jobSpec, analysis);
+    const focus = [...lens]
+      .sort((left, right) => interviewRiskRank(left) - interviewRiskRank(right))
+      .find((item) => item.coverage === 'GAP' || item.coverage === 'PARTIAL')
+      ?? lens[0];
     const question = focus
       ? `Pouvez-vous décrire une situation concrète liée à « ${focus.requirement} » en distinguant clairement ce que vous avez fait personnellement et le résultat observé ?`
       : `Présentez une réalisation pertinente pour le poste de ${input.jobSpec.title}, en citant uniquement des faits que vous pouvez soutenir.`;

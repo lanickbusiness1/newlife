@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { FixtureCandidateRepository, SYNTHETIC_CANDIDATE_ID } from '../../lib/repositories/fixture-candidate-repository.js';
 import type { CandidateAiAdapter } from '../../lib/ai/contracts.js';
 import type { JobSpec } from '../../lib/domain/types.js';
+import type { ConfirmedFact } from '../../lib/domain/evidence-elicitation.js';
 import type { ValidatedDecisionInput } from '../../lib/ai/persist-decision.js';
 import {
   CandidateOptimizerService,
@@ -39,16 +40,18 @@ class FakeConsentStore implements ExternalProcessingConsentStore {
   }
 }
 
-test('external rewrite creates auditable consent before provider invocation', async () => {
+test('external rewrite creates auditable consent and forwards confirmed facts with provenance', async () => {
   const consentStore = new FakeConsentStore();
   let providerConsentId: string | undefined;
+  let providerConfirmedFacts: ConfirmedFact[] | undefined;
   const adapter: CandidateAiAdapter = {
     providerName: 'openai',
     async diagnose() { return { findings: [] }; },
     async analyzeJob() { return { requirements: [] }; },
     async rewrite(input) {
       providerConsentId = input.externalProcessingConsentId;
-      return { text: input.sourceStatement, usedMetrics: [] };
+      providerConfirmedFacts = input.confirmedFacts;
+      return { text: input.sourceStatement, usedMetrics: [], usedConfirmedFacts: input.confirmedFacts?.map((fact) => `${fact.sourceRef}:${fact.key}`) ?? [] };
     },
     async interviewTurn() { return { question: 'Synthetic', feedback: null, focusRequirementIds: [], evidenceRefs: [] }; },
   };
@@ -64,6 +67,12 @@ test('external rewrite creates auditable consent before provider invocation', as
     modelProvider: 'openai',
   });
 
+  const confirmedFacts: ConfirmedFact[] = [{
+    key: 'scope',
+    value: 'Coordination de plusieurs équipes terrain',
+    status: 'DECLARED',
+    sourceRef: 'experience:exp-synth-1',
+  }];
   const result = await service.rewrite(
     SYNTHETIC_CANDIDATE_ID,
     JOB_ID,
@@ -71,10 +80,12 @@ test('external rewrite creates auditable consent before provider invocation', as
     'Coordination d’équipes et de programmes multisectoriels.',
     [],
     true,
+    confirmedFacts,
   );
 
   assert.equal(consentStore.calls.length, 1);
   assert.deepEqual(consentStore.calls[0], { candidateId: SYNTHETIC_CANDIDATE_ID, jobId: JOB_ID, policyVersion: 'candidate-os-v1' });
   assert.equal(providerConsentId, 'consent-synthetic-1');
+  assert.deepEqual(providerConfirmedFacts, confirmedFacts);
   assert.equal(result.consentId, 'consent-synthetic-1');
 });
