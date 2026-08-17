@@ -1,0 +1,15 @@
+drop table if exists simandou_reconciliation_exceptions cascade;
+drop table if exists simandou_value_capture_components cascade;
+drop table if exists simandou_value_capture_methodologies cascade;
+drop table if exists simandou_fx_events cascade;
+drop table if exists simandou_dividend_events cascade;
+drop table if exists simandou_state_equity_interests cascade;
+drop table if exists simandou_government_receipts cascade;
+drop table if exists simandou_fiscal_obligations cascade;
+drop table if exists simandou_fiscal_rules cascade;
+drop table if exists simandou_payments cascade;
+drop table if exists simandou_invoices cascade;
+drop table if exists simandou_sales cascade;
+drop table if exists simandou_shipments cascade;
+drop table if exists simandou_grade_certificates cascade;
+drop table if exists simandou_ore_lots cascade;
