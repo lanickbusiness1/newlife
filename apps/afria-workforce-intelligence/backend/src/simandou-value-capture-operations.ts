@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ControlError } from "./living-core.js";
 import type { SqlClient, SqlPool } from "./mining-local-content-postgres-security.js";
 import type {
   SimandouAuditAction,
@@ -10,6 +11,12 @@ export type PersistedSimandouAuditEvent = SimandouAuditEvent & Readonly<{
   previousHash: string | null;
   eventHash: string;
 }>;
+
+const SIMANDOU_AUDIT_ACTIONS: readonly SimandouAuditAction[] = Object.freeze([
+  "REGISTER_ORE_LOT",
+  "RECORD_VALUE_CAPTURE_COMPONENT",
+  "RECORD_RECONCILIATION_EXCEPTION",
+]);
 
 type AuditRow = Readonly<{
   id: unknown;
@@ -26,6 +33,11 @@ type AuditRow = Readonly<{
   occurred_at: unknown;
 }>;
 
+type AuditLinkRow = Readonly<{
+  previous_hash: unknown;
+  event_hash: unknown;
+}>;
+
 export class PostgresSimandouAuditSink implements SimandouAuditSink {
   constructor(private readonly pool: SqlPool) {}
 
@@ -36,17 +48,18 @@ export class PostgresSimandouAuditSink implements SimandouAuditSink {
         "select pg_advisory_xact_lock(hashtext($1), hashtext($2))",
         [event.tenantId, event.projectId],
       );
-      const previous = await client.query(
-        `select event_hash
+
+      const existing = await client.query(
+        `select previous_hash, event_hash
          from local_content_audit_events
-         where tenant_id = $1 and project_id = $2
-         order by occurred_at desc, id desc
-         limit 1`,
-        [event.tenantId, event.projectId],
+         where tenant_id = $1
+           and project_id = $2
+           and action = any($3::text[])`,
+        [event.tenantId, event.projectId, SIMANDOU_AUDIT_ACTIONS],
       );
-      const previousHash = previous.rows[0] === undefined
-        ? null
-        : requireHash(previous.rows[0].event_hash, "previous event hash");
+      const previousHash = resolveChainHead(
+        existing.rows.map((row) => mapAuditLinkRow(row as AuditLinkRow)),
+      );
       const eventHash = hashEvent(event, previousHash);
 
       await client.query(
@@ -80,11 +93,12 @@ export class PostgresSimandouAuditSink implements SimandouAuditSink {
         `select id, tenant_id, project_id, actor_identity_id, actor_kind, action,
                 aggregate_id, correlation_id, payload, previous_hash, event_hash, occurred_at
          from local_content_audit_events
-         where tenant_id = $1 and project_id = $2
-         order by occurred_at, id`,
-        [tenantId, projectId],
+         where tenant_id = $1
+           and project_id = $2
+           and action = any($3::text[])`,
+        [tenantId, projectId, SIMANDOU_AUDIT_ACTIONS],
       );
-      return Object.freeze(result.rows.map((row) => mapAuditRow(row as AuditRow)));
+      return Object.freeze(orderAuditChain(result.rows.map((row) => mapAuditRow(row as AuditRow))));
     });
   }
 }
@@ -115,6 +129,91 @@ async function withTenantTransaction<T>(
   } finally {
     client.release();
   }
+}
+
+function resolveChainHead(links: readonly Readonly<{ previousHash: string | null; eventHash: string }>[]): string | null {
+  if (links.length === 0) return null;
+
+  const byHash = new Map<string, string | null>();
+  const childByPreviousHash = new Map<string, string>();
+  let rootHash: string | null = null;
+
+  for (const link of links) {
+    if (byHash.has(link.eventHash)) throw new ControlError("Simandou audit chain contains duplicate event hashes");
+    byHash.set(link.eventHash, link.previousHash);
+    if (link.previousHash === null) {
+      if (rootHash !== null) throw new ControlError("Simandou audit chain contains multiple roots");
+      rootHash = link.eventHash;
+    } else {
+      if (childByPreviousHash.has(link.previousHash)) {
+        throw new ControlError("Simandou audit chain contains a fork");
+      }
+      childByPreviousHash.set(link.previousHash, link.eventHash);
+    }
+  }
+
+  if (rootHash === null) throw new ControlError("Simandou audit chain has no root");
+  for (const link of links) {
+    if (link.previousHash !== null && !byHash.has(link.previousHash)) {
+      throw new ControlError("Simandou audit chain contains an orphaned previous hash");
+    }
+  }
+
+  const visited = new Set<string>();
+  let current = rootHash;
+  while (true) {
+    if (visited.has(current)) throw new ControlError("Simandou audit chain contains a cycle");
+    visited.add(current);
+    const child = childByPreviousHash.get(current);
+    if (child === undefined) break;
+    current = child;
+  }
+
+  if (visited.size !== links.length) throw new ControlError("Simandou audit chain is disconnected");
+  return current;
+}
+
+function orderAuditChain(events: readonly PersistedSimandouAuditEvent[]): PersistedSimandouAuditEvent[] {
+  if (events.length === 0) return [];
+
+  const links = events.map((event) => ({ previousHash: event.previousHash, eventHash: event.eventHash }));
+  resolveChainHead(links);
+
+  const eventByHash = new Map<string, PersistedSimandouAuditEvent>();
+  const childByPreviousHash = new Map<string, PersistedSimandouAuditEvent>();
+  let root: PersistedSimandouAuditEvent | null = null;
+
+  for (const event of events) {
+    const recomputed = hashEvent(event, event.previousHash);
+    if (recomputed !== event.eventHash) throw new ControlError("Simandou audit event hash verification failed");
+    eventByHash.set(event.eventHash, event);
+    if (event.previousHash === null) {
+      root = event;
+    } else {
+      childByPreviousHash.set(event.previousHash, event);
+    }
+  }
+
+  if (root === null) throw new ControlError("Simandou audit chain has no root");
+  const ordered: PersistedSimandouAuditEvent[] = [];
+  const visited = new Set<string>();
+  let current: PersistedSimandouAuditEvent | undefined = root;
+  while (current !== undefined) {
+    if (visited.has(current.eventHash)) throw new ControlError("Simandou audit chain contains a cycle");
+    visited.add(current.eventHash);
+    ordered.push(current);
+    current = childByPreviousHash.get(current.eventHash);
+  }
+
+  if (ordered.length !== eventByHash.size) throw new ControlError("Simandou audit chain is disconnected");
+  return ordered;
+}
+
+function mapAuditLinkRow(row: AuditLinkRow): Readonly<{ previousHash: string | null; eventHash: string }> {
+  return Object.freeze({
+    previousHash: row.previous_hash === null ? null : requireHash(row.previous_hash, "previous hash"),
+    eventHash: requireHash(row.event_hash, "event hash"),
+  });
 }
 
 function hashEvent(event: SimandouAuditEvent, previousHash: string | null): string {
