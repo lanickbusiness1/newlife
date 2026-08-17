@@ -12,7 +12,7 @@ async function authenticate(page: import('@playwright/test').Page) {
   }]);
 }
 
-test('candidate completes the evidence-safe CV optimization flow', async ({ page }) => {
+test('candidate completes the evidence-safe mission with recruiter lens', async ({ page }) => {
   await authenticate(page);
   await page.goto('/candidate/dashboard');
 
@@ -21,7 +21,7 @@ test('candidate completes the evidence-safe CV optimization flow', async ({ page
   await page.getByRole('link', { name: 'Optimiser mon CV' }).click();
 
   await expect(page).toHaveURL(/\/candidate\/cv-optimizer/);
-  await expect(page.getByRole('heading', { name: /Optimiser mon CV/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Je veux décrocher ce poste/i })).toBeVisible();
   await expect(page.getByText('Gestion de projets')).toBeVisible();
   await expect(page.getByText('EVIDENCED').first()).toBeVisible();
   await expect(page.getByText('Logistique humanitaire')).toBeVisible();
@@ -44,6 +44,14 @@ test('candidate completes the evidence-safe CV optimization flow', async ({ page
   await expect(financeRow).toContainText(/Aucune compétence correspondante/i);
   await expect(page.getByText(/Conformité financière.*VERIFIED/i)).toHaveCount(0);
 
+  await expect(page.getByRole('heading', { name: /Recruiter Lens/i })).toBeVisible();
+  const financeLens = page.getByTestId('recruiter-lens-skill:skill-finance');
+  await expect(financeLens).toContainText('Conformité financière');
+  await expect(financeLens).toContainText('GAP');
+  await expect(financeLens).toContainText(/HIGH|BLOCKING/);
+  await expect(financeLens).toContainText(/preuve|mise en situation|work sample/i);
+  await expect(financeLens).toContainText(/ne pas revendiquer/i);
+
   await page.getByRole('button', { name: 'Générer les deux versions' }).click();
   await expect(page.getByRole('heading', { name: 'CV ATS' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'CV humain' })).toBeVisible();
@@ -56,6 +64,7 @@ test('candidate completes the evidence-safe CV optimization flow', async ({ page
   await page.getByRole('button', { name: 'Valider humainement' }).click();
   await expect(page.getByText('Validation humaine enregistrée')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Préparer mon entretien' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /envoyer|soumettre|postuler automatiquement/i })).toHaveCount(0);
 });
 
 test('optimizer remains usable at 390x844 without horizontal overflow', async ({ browser }) => {
@@ -63,7 +72,7 @@ test('optimizer remains usable at 390x844 without horizontal overflow', async ({
   const page = await context.newPage();
   await authenticate(page);
   await page.goto('/candidate/cv-optimizer');
-  await expect(page.getByRole('heading', { name: /Optimiser mon CV/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Je veux décrocher ce poste/i })).toBeVisible();
   const sizes = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
