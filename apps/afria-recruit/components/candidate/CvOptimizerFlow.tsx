@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { CandidateContext } from '../../lib/repositories/candidate-context.js';
+import type { ConfirmedFact } from '../../lib/domain/evidence-elicitation.js';
 import type { JobSpec } from '../../lib/domain/types.js';
 import { candidateApi, CandidateApiError, type DiagnosticResponse, type GapAnalysisResponse, type VariantsResponse } from '../../lib/http/api-client.js';
 import { EvidenceBadge } from '../evidence/EvidenceBadge';
@@ -19,6 +20,7 @@ export function CvOptimizerFlow() {
   const [showJobs, setShowJobs] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [gap, setGap] = useState<GapAnalysisResponse | null>(null);
+  const [elicitedFact, setElicitedFact] = useState('');
   const [rewrite, setRewrite] = useState<string | null>(null);
   const [rewriteConsent, setRewriteConsent] = useState(false);
   const [variants, setVariants] = useState<VariantsResponse | null>(null);
@@ -61,6 +63,16 @@ export function CvOptimizerFlow() {
 
   async function chooseJob() {
     await act('jobs', candidateApi.jobs, ({ jobs: values }) => { setJobs(values); setShowJobs(true); });
+  }
+
+  function confirmedFactsForRewrite(): ConfirmedFact[] {
+    if (!firstExperience || !elicitedFact.trim()) return [];
+    return [{
+      key: 'scope',
+      value: elicitedFact.trim(),
+      status: 'DECLARED',
+      sourceRef: `experience:${firstExperience.id}`,
+    }];
   }
 
   return (
@@ -114,7 +126,7 @@ export function CvOptimizerFlow() {
                     <span><strong>{job.title}</strong><small>{job.countryCode ?? 'Pays à préciser'} · {job.requirements.length} exigences structurées</small></span>
                   </label>
                 ))}</div>}
-                <button className="candidate-button primary" disabled={!selectedJobId || busy !== null} onClick={() => act('gap', () => candidateApi.gapAnalysis(selectedJobId), (value) => { setGap(value); setRewriteConsent(false); setRewrite(null); })}>{busy === 'gap' ? 'Comparaison…' : 'Analyser les écarts'}</button>
+                <button className="candidate-button primary" disabled={!selectedJobId || busy !== null} onClick={() => act('gap', () => candidateApi.gapAnalysis(selectedJobId), (value) => { setGap(value); setElicitedFact(''); setRewriteConsent(false); setRewrite(null); })}>{busy === 'gap' ? 'Comparaison…' : 'Analyser les écarts'}</button>
               </section>
             ) : null}
 
@@ -125,13 +137,25 @@ export function CvOptimizerFlow() {
                 <RecruiterLensPanel items={gap.recruiterLens} />
                 {firstExperience ? (
                   <div className="rewrite-box">
+                    <div className="elicitation-box">
+                      <h3>Evidence Elicitation™</h3>
+                      <p>Avant de reformuler, vous pouvez préciser un fait réel que le CV n’exprime pas encore clairement. Il reste <strong>DECLARED</strong> tant qu’aucune preuve distincte ne le fait évoluer.</p>
+                      <label htmlFor="elicited-fact">Fait complémentaire confirmé</label>
+                      <textarea
+                        id="elicited-fact"
+                        value={elicitedFact}
+                        maxLength={500}
+                        onChange={(event) => setElicitedFact(event.target.value)}
+                        placeholder="Ex. Coordination de plusieurs équipes terrain sur plusieurs sites. N’ajoutez aucun chiffre que vous ne pouvez pas soutenir."
+                      />
+                    </div>
                     <div><strong>Achievement Writer™</strong><p>{firstExperience.description}</p></div>
                     <label className="consent-check">
                       <input type="checkbox" checked={rewriteConsent} onChange={(event) => setRewriteConsent(event.target.checked)} />
                       <span>J’autorise le traitement de cet extrait de CV pour cette reformulation. Si un fournisseur IA externe est activé, ce consentement est enregistré avant tout envoi.</span>
                     </label>
-                    <button className="candidate-button secondary" disabled={busy !== null || !rewriteConsent} onClick={() => act('rewrite', () => candidateApi.rewrite(firstExperience.id, firstExperience.description ?? '', gap.jobSpec.id, rewriteConsent), (value) => setRewrite(value.rewrite.text))}>{busy === 'rewrite' ? 'Réécriture…' : 'Proposer une reformulation'}</button>
-                    {rewrite ? <div className="rewrite-result"><span>Proposition vérifiée</span><p>{rewrite}</p><small>Aucun chiffre ajouté sans métrique explicitement prouvée.</small></div> : null}
+                    <button className="candidate-button secondary" disabled={busy !== null || !rewriteConsent} onClick={() => act('rewrite', () => candidateApi.rewrite(firstExperience.id, firstExperience.description ?? '', gap.jobSpec.id, rewriteConsent, confirmedFactsForRewrite()), (value) => setRewrite(value.rewrite.text))}>{busy === 'rewrite' ? 'Réécriture…' : 'Proposer une reformulation'}</button>
+                    {rewrite ? <div className="rewrite-result"><span>Proposition contrôlée</span><p>{rewrite}</p><small>Un fait saisi ici reste DECLARED. Aucun chiffre n’est promu en métrique vérifiée sans preuve distincte.</small></div> : null}
                   </div>
                 ) : null}
                 {!variants ? <button className="candidate-button primary" disabled={busy !== null} onClick={() => act('variants', () => candidateApi.variants(gap.jobSpec.id), setVariants)}>{busy === 'variants' ? 'Génération…' : 'Générer les deux versions'}</button> : null}
