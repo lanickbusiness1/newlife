@@ -184,6 +184,55 @@ export function reconcileShipmentCashFlow(input: {
   });
 }
 
+export type FiscalReceiptStatus = "PENDING" | "UNDER" | "MATCHED" | "OVER" | "CONTESTED";
+
+export type FiscalReceiptClassification = Readonly<{
+  status: FiscalReceiptStatus;
+  expectedAmount: number;
+  receivedAmount: number;
+  varianceAmount: number;
+  currency: string;
+  receiptIds: readonly string[];
+}>;
+
+export function classifyFiscalReceipt(input: {
+  obligation: FiscalObligation;
+  receipts: readonly GovernmentReceipt[];
+  tolerance: number;
+  contested?: boolean;
+}): FiscalReceiptClassification {
+  assertTolerance(input.tolerance, "Fiscal receipt tolerance");
+  let receivedAmount = 0;
+  for (const receipt of input.receipts) {
+    if (receipt.tenantId !== input.obligation.tenantId) throw new ControlError("Tenant isolation violation");
+    if (receipt.projectId !== input.obligation.projectId) throw new ControlError("Project isolation violation");
+    if (receipt.obligationId !== input.obligation.id) throw new ControlError("Government receipt obligation linkage mismatch");
+    if (receipt.currency !== input.obligation.currency) throw new ControlError("Government receipt currency mismatch");
+    receivedAmount += receipt.amount;
+  }
+
+  const varianceAmount = roundMoney(receivedAmount - input.obligation.expectedAmount);
+  let status: FiscalReceiptStatus;
+  if (input.contested === true) status = "CONTESTED";
+  else if (input.receipts.length === 0) status = "PENDING";
+  else if (Math.abs(varianceAmount) <= input.tolerance) status = "MATCHED";
+  else if (varianceAmount < 0) status = "UNDER";
+  else status = "OVER";
+
+  return Object.freeze({
+    status,
+    expectedAmount: input.obligation.expectedAmount,
+    receivedAmount: roundMoney(receivedAmount),
+    varianceAmount,
+    currency: input.obligation.currency,
+    receiptIds: Object.freeze(input.receipts.map((receipt) => receipt.id)),
+  });
+}
+
 function assertTolerance(value: number, label: string): void {
   if (!Number.isFinite(value) || value < 0) throw new Error(`${label} must be a non-negative finite number`);
+}
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
