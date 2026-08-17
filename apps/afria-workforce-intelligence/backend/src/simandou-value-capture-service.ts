@@ -1,8 +1,10 @@
-import type { Identity } from "./domain.js";
+import { randomUUID } from "node:crypto";
+import type { Identity, Tenant } from "./domain.js";
 import { ControlError } from "./living-core.js";
 import {
   type EconomicValueBucket,
   type EvidenceLink,
+  OreLot,
   ValueCaptureComponent,
 } from "./simandou-value-capture.js";
 
@@ -188,6 +190,179 @@ export class ValueCaptureLedger {
       methodologyVersion: input.methodology.methodologyVersion,
     });
   }
+}
+
+export type SimandouAuditAction =
+  | "REGISTER_ORE_LOT"
+  | "RECORD_VALUE_CAPTURE_COMPONENT"
+  | "RECORD_RECONCILIATION_EXCEPTION";
+
+export type SimandouAuditEvent = Readonly<{
+  id: string;
+  tenantId: string;
+  projectId: string;
+  actorId: string;
+  actorKind: Identity["kind"];
+  action: SimandouAuditAction;
+  aggregateId: string;
+  correlationId: string;
+  payload: Readonly<Record<string, unknown>>;
+  occurredAt: string;
+}>;
+
+export interface SimandouAuditSink {
+  append(event: SimandouAuditEvent): Promise<SimandouAuditEvent>;
+}
+
+export type SimandouReconciliationExceptionRecord = Readonly<{
+  id: string;
+  tenantId: string;
+  projectId: string;
+  shipmentId: string | null;
+  code: string;
+  message: string;
+  sourceObjectIds: readonly string[];
+  evidenceIds: readonly string[];
+  state: "OPEN" | "ACKNOWLEDGED" | "RESOLVED" | "DISMISSED";
+}>;
+
+export interface SimandouMutationRepository {
+  saveOreLot(lot: OreLot): Promise<OreLot>;
+  saveValueCaptureComponent(component: ValueCaptureComponent): Promise<ValueCaptureComponent>;
+  saveReconciliationException(exception: SimandouReconciliationExceptionRecord): Promise<unknown>;
+}
+
+export type SimandouCommandRuntime = Readonly<{
+  now: () => string;
+  nextId: () => string;
+}>;
+
+const defaultCommandRuntime: SimandouCommandRuntime = Object.freeze({
+  now: () => new Date().toISOString(),
+  nextId: () => randomUUID(),
+});
+
+export class SimandouValueCaptureCommandService {
+  constructor(
+    private readonly repository: SimandouMutationRepository,
+    private readonly audit: SimandouAuditSink,
+    private readonly runtime: SimandouCommandRuntime = defaultCommandRuntime,
+  ) {}
+
+  async registerOreLot(input: {
+    tenant: Tenant;
+    actor: Identity;
+    lot: OreLot;
+    correlationId: string;
+  }): Promise<OreLot> {
+    authorize(input.tenant, input.actor, "DATA_STEWARD");
+    assertTenant(input.tenant.id, input.lot.tenantId);
+    requireCorrelationId(input.correlationId);
+    const saved = await this.repository.saveOreLot(input.lot);
+    await this.audit.append(this.auditEvent({
+      tenant: input.tenant,
+      actor: input.actor,
+      projectId: input.lot.projectId,
+      action: "REGISTER_ORE_LOT",
+      aggregateId: input.lot.id,
+      correlationId: input.correlationId,
+      payload: Object.freeze({
+        tonnage: input.lot.tonnage,
+        gradeFePercent: input.lot.gradeFePercent,
+        evidenceIds: Object.freeze(input.lot.evidence.map((item) => item.evidenceId)),
+      }),
+    }));
+    return saved;
+  }
+
+  async recordValueCaptureComponent(input: {
+    tenant: Tenant;
+    actor: Identity;
+    component: ValueCaptureComponent;
+    correlationId: string;
+  }): Promise<ValueCaptureComponent> {
+    authorize(input.tenant, input.actor, "VALUE_CAPTURE_ANALYST");
+    assertTenant(input.tenant.id, input.component.tenantId);
+    requireCorrelationId(input.correlationId);
+    const saved = await this.repository.saveValueCaptureComponent(input.component);
+    await this.audit.append(this.auditEvent({
+      tenant: input.tenant,
+      actor: input.actor,
+      projectId: input.component.projectId,
+      action: "RECORD_VALUE_CAPTURE_COMPONENT",
+      aggregateId: input.component.id,
+      correlationId: input.correlationId,
+      payload: Object.freeze({
+        bucket: input.component.bucket,
+        amount: input.component.amount,
+        currency: input.component.currency,
+        sourceTransactionId: input.component.sourceTransactionId,
+      }),
+    }));
+    return saved;
+  }
+
+  async recordReconciliationException(input: {
+    tenant: Tenant;
+    actor: Identity;
+    exception: SimandouReconciliationExceptionRecord;
+    correlationId: string;
+  }): Promise<void> {
+    authorize(input.tenant, input.actor, "COMPLIANCE_ANALYST");
+    assertTenant(input.tenant.id, input.exception.tenantId);
+    requireCorrelationId(input.correlationId);
+    await this.repository.saveReconciliationException(input.exception);
+    await this.audit.append(this.auditEvent({
+      tenant: input.tenant,
+      actor: input.actor,
+      projectId: input.exception.projectId,
+      action: "RECORD_RECONCILIATION_EXCEPTION",
+      aggregateId: input.exception.id,
+      correlationId: input.correlationId,
+      payload: Object.freeze({
+        code: input.exception.code,
+        shipmentId: input.exception.shipmentId,
+        sourceObjectIds: Object.freeze([...input.exception.sourceObjectIds]),
+        evidenceIds: Object.freeze([...input.exception.evidenceIds]),
+      }),
+    }));
+  }
+
+  private auditEvent(input: {
+    tenant: Tenant;
+    actor: Identity;
+    projectId: string;
+    action: SimandouAuditAction;
+    aggregateId: string;
+    correlationId: string;
+    payload: Readonly<Record<string, unknown>>;
+  }): SimandouAuditEvent {
+    return Object.freeze({
+      id: this.runtime.nextId(),
+      tenantId: input.tenant.id,
+      projectId: input.projectId,
+      actorId: input.actor.id,
+      actorKind: input.actor.kind,
+      action: input.action,
+      aggregateId: input.aggregateId,
+      correlationId: input.correlationId,
+      payload: input.payload,
+      occurredAt: this.runtime.now(),
+    });
+  }
+}
+
+function authorize(tenant: Tenant, actor: Identity, requiredRole: string): void {
+  assertTenant(tenant.id, actor.tenantId);
+  if (!actor.roles.includes(requiredRole)) throw new ControlError(`Required role missing: ${requiredRole}`);
+}
+
+function assertTenant(expectedTenantId: string, actualTenantId: string): void {
+  if (expectedTenantId !== actualTenantId) throw new ControlError("Tenant isolation violation");
+}
+
+function requireCorrelationId(value: string): void {
+  if (!value.trim()) throw new ControlError("Correlation id is required");
 }
 
 function zeroBuckets(): Record<EconomicValueBucket, number> {
