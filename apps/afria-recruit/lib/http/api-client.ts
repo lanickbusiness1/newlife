@@ -1,8 +1,14 @@
 import type { CandidateContext } from '../repositories/candidate-context.js';
 import type { DiagnosticFinding, JobSpec, RequirementCoverage } from '../domain/types.js';
+import type { RecruiterLensItem } from '../domain/recruiter-lens.js';
 
 export type DiagnosticResponse = { decisionId: string; diagnostic: { findings: DiagnosticFinding[] } };
-export type GapAnalysisResponse = { decisionId: string; jobSpec: JobSpec; analysis: { requirements: RequirementCoverage[] } };
+export type GapAnalysisResponse = {
+  decisionId: string;
+  jobSpec: JobSpec;
+  analysis: { requirements: RequirementCoverage[] };
+  recruiterLens: RecruiterLensItem[];
+};
 export type VariantSections = {
   headline: string | null;
   summary: string | null;
