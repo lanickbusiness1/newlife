@@ -4,9 +4,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { compileRevenueEngine } from "./revenueEngine.js";
+import {
+  compileRevenueEngine,
+  GENESIS_V4_REVENUE_ENGINE_ANCHOR,
+  GENESIS_V4_TODAY_INNOVATIONS
+} from "./revenueEngine.js";
 
-const SERVICE_VERSION = "0.2.0";
+const SERVICE_VERSION = "0.3.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -46,12 +50,12 @@ function governed(ctx: Context, tool: string, data: unknown) {
   return {
     data,
     provenance: [],
-    confidence: 0.72,
+    confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 revenue engine active." },
+    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 revenue engine v0.3.0 active." },
     auditId,
-    limitations: ["MCP v0.2.0: revenue engine deterministic; CRM/payment providers not yet connected to live external systems."]
+    limitations: ["MCP v0.3.0: revenue engine deterministic; CRM/payment providers not yet connected to live external systems."]
   };
 }
 
@@ -153,8 +157,10 @@ if (mode === "stdio") {
       status: "ok",
       service: "afriagenesis-intelligence-mcp",
       version: SERVICE_VERSION,
-      genome: "GENESIS_V4",
-      revenueEngine: "GEN-V4-REV-ENGINE-001"
+      genome: GENESIS_V4_REVENUE_ENGINE_ANCHOR.genome,
+      revenueEngine: GENESIS_V4_REVENUE_ENGINE_ANCHOR.assetId,
+      revenueEngineVersion: GENESIS_V4_REVENUE_ENGINE_ANCHOR.version,
+      innovations: GENESIS_V4_TODAY_INNOVATIONS
     });
   });
 
