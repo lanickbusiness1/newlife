@@ -9,7 +9,7 @@
 
 Current proven state: **TEST_PROVEN**.
 
-This evidence pack does not claim staging SQL migration, provider production deployment, real customer conversion, real GTM revenue uplift, or autonomous production outreach.
+This evidence pack does not claim staging SQL migration, provider production deployment, real customer conversion, real GTM revenue uplift, autonomous production outreach, canonical M8 final approval, full S7+ deployment certification or Big4 certification.
 
 ## Canonical reuse
 
@@ -55,25 +55,47 @@ The end-to-end proof failed because the AfrIA Recruit Auto-GTM synthetic fixture
 
 ### GREEN #144 — complete vertical slice
 
-Fresh CI proved:
-
-- locked install: PASS
-- dependency audit: **0 vulnerabilities**
-- typecheck: PASS
-- test files: **4/4 PASS**
-- tests: **18/18 PASS**
-- production TypeScript build: PASS
+Fresh CI proved 4/4 test files and 18/18 tests, with locked install, zero dependency vulnerabilities, typecheck and production TypeScript build passing.
 
 The proof chain executed:
 
 `explicit observations → evidence-preserving state → 3 counterfactual simulations → reversible selected decision → sandbox action contract → explicit actual outcome → prediction error → bounded learning candidate`.
 
+### RED #148 — independent trust-boundary review findings reproduced
+
+Pre-merge review identified two important issues and converted both into failing tests:
+
+1. a malformed `null` observation produced a generic JavaScript error rather than a controlled World Model domain rejection;
+2. `world.decide` trusted caller ordering of simulation results and could therefore choose the first reversible simulation instead of independently selecting the highest-utility reversible result.
+
+CI #148 reproduced both findings while the other 18 tests remained green.
+
+### GREEN #149 — trust boundary hardened
+
+The runtime was hardened to:
+
+- validate malformed observations, states, scenarios, simulation results and outcomes with controlled domain errors;
+- validate evidence arrays and numeric bounds at runtime;
+- re-rank caller-provided simulation results internally before decision;
+- recompute alternative ranks rather than trusting caller-provided rank metadata.
+
+Fresh CI #149 proved:
+
+- locked install: PASS
+- dependency audit: **0 vulnerabilities**
+- typecheck: PASS
+- test files: **4/4 PASS**
+- tests: **20/20 PASS**
+- production TypeScript build: PASS
+
 ## Runtime invariants proved
 
 - Observation confidence is bounded to `[0,1]`.
+- Malformed observations are rejected with controlled World Model errors.
 - State facts preserve source and evidence lineage.
 - Scenario ranking uses only explicit caller-provided conversion, revenue, cost, risk and confidence values.
 - Missing business metrics are never silently imputed.
+- Caller ordering cannot determine the chosen action; the decision step re-ranks simulations internally.
 - Non-reversible scenarios are excluded from autonomous P0 selection.
 - Selected actions contain idempotency, before/after state, evidence and rollback metadata.
 - Important decisions record `worldModelConsulted=true`.
@@ -86,21 +108,27 @@ Every conversion, revenue, cost, risk and observed outcome value in `afriaRecrui
 
 These values are not customer evidence, market benchmarks, conversion claims, revenue forecasts for investors, or production performance.
 
-## M6 / S7+ / M8 interpretation
+## Control-gate interpretation
 
-### M6 — PASS for P0 test scope
+### M6 — bounded P0 engineering review: PASS
 
-Contract tests cover invalid confidence, evidence lineage, deterministic ranking, reversibility, idempotency/rollback and prediction-error evaluation.
+The implemented proof has fresh tests covering invalid confidence, malformed inputs, evidence lineage, deterministic ranking, caller-order resistance, reversibility, idempotency/rollback and prediction-error evaluation.
 
-### S7+ — PASS for P0 sandbox scope
+This is a P0 engineering-control result. It does not claim completion of every M6 control applicable to a later staging/production release.
 
-The P0 adds no free external write, payment, email/WhatsApp send, legal commitment, institutional communication or irreversible action. Runtime actions are restricted to sandbox CRM contracts or `noop`.
+### S7+ — bounded P0 sandbox controls: PASS; full deployment S7+ not claimed
 
-### M8 — PASS for the bounded proof objective
+The P0 adds no free external write, payment, email/WhatsApp send, legal commitment, institutional communication or irreversible action. Runtime actions are restricted to sandbox CRM contracts or `noop`, with scopes and controlled payload rejection.
 
-The proof demonstrates that GENESIS V4 can connect World Model consultation to a measurable, explainable, reversible business action and then evaluate forecast versus observed outcome.
+A complete S7+ review for staging/production remains required when real connectors, secrets, persistence or external writes are activated.
 
-### Big4 — not required at this moderate-risk synthetic P0
+### M8 — architecture objective aligned; canonical final M8 not run
+
+The proof demonstrates the intended strategic property: World Model consultation leads to a measurable, explainable, reversible business action followed by forecast-versus-outcome learning.
+
+The canonical M8 governance review using its full required profile set is **not claimed complete** by this technical PR and remains a promotion gate before sensitive production claims.
+
+### Big4 — not required for this moderate-risk synthetic P0
 
 Big4/economic-commercial challenge becomes required before sensitive, regulated, high-risk or material commercial-performance claims.
 
@@ -112,7 +140,7 @@ The npm package remains `0.2.0`. The GENESIS control-plane revision is `0.4.0` a
 
 ### TEST_PROVEN — current
 
-Code + synthetic evidence + CI are verified.
+Code + synthetic evidence + CI + trust-boundary hardening are verified.
 
 ### STAGING_PROVEN — not yet claimed
 
@@ -128,8 +156,8 @@ Requires observation of the real provider endpoint, expected health payload/revi
 
 ## Next controlled promotion
 
-1. Fresh CI after this Evidence Pack and README truth update.
-2. Review PR #39 for spec coverage, evidence honesty and safety boundaries.
+1. Fresh CI after this final Evidence Pack correction.
+2. Confirm PR #39 is mergeable with no unresolved review blocker.
 3. Merge only with fresh green CI.
-4. Verify main contains the proof.
+4. Verify `main` contains the proof.
 5. Attempt provider health verification using connected deployment tooling; if provider evidence is unavailable, retain `TEST_PROVEN` and record the exact missing proof rather than fabricating a production URL.
