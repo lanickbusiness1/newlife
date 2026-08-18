@@ -380,9 +380,10 @@ function buildAutoGtmRunbook(input: ProductRevenueEngineInput, releaseStatus: Re
   };
 }
 
-function deriveGates(input: ProductRevenueEngineInput, completionRate: number, releaseStatus: ReleaseStatus): RevenueEngineOutput["gates"] {
+function deriveGates(input: ProductRevenueEngineInput, _completionRate: number, releaseStatus: ReleaseStatus): RevenueEngineOutput["gates"] {
   const hasPaymentOps = Boolean(input.payment && input.crm?.owner);
-  const m6 = completionRate >= 70 && Boolean(input.governance?.m6Reviewed) ? "pass" : "fail";
+  const preRevenueChainReady = releaseStatus !== "blocked";
+  const m6 = preRevenueChainReady && Boolean(input.governance?.m6Reviewed) ? "pass" : "fail";
   const s7plus = hasPaymentOps && Boolean(input.automation?.emergencyStopEnabled && input.automation?.rollbackPlanRef) ? "pass" : "fail";
   const m8 = releaseStatus === "scale_ready" && Boolean(input.governance?.m8Reviewed)
     ? "pass"
