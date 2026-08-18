@@ -83,6 +83,12 @@ describe("GENESIS V4 World Model Runtime", () => {
     ])).toThrow(/WORLD_MODEL_INVALID_CONFIDENCE/);
   });
 
+  test("rejects malformed observations with a controlled domain error", () => {
+    expect(() => reconstructWorldState([
+      null as unknown as WorldObservation
+    ])).toThrow(/WORLD_MODEL_INVALID_OBSERVATION/);
+  });
+
   test("reconstructs state without losing evidence lineage", () => {
     const state = reconstructWorldState(observations);
 
@@ -104,6 +110,15 @@ describe("GENESIS V4 World Model Runtime", () => {
     expect(results.map(result => result.utility)).toEqual(
       [...results.map(result => result.utility)].sort((a, b) => b - a)
     );
+  });
+
+  test("re-ranks caller-supplied simulations before choosing a reversible action", () => {
+    const state = reconstructWorldState(observations);
+    const ranked = simulateScenarios(state, scenarios);
+    const untrustedOrder = [ranked[2]!, ranked[1]!, ranked[0]!];
+
+    const decision = decideNextAction(state, untrustedOrder);
+    expect(decision.selectedScenarioId).toBe("recruiter-partner");
   });
 
   test("will not autonomously select a non-reversible scenario", () => {
