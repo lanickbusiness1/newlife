@@ -142,20 +142,54 @@ export interface OutcomeEvaluation {
   };
 }
 
-function requiredText(value: string, field: string) {
-  if (!value.trim()) throw new Error(`WORLD_MODEL_INVALID_${field.toUpperCase()}`);
+const WORLD_MODEL_LAYERS = new Set<WorldModelLayer>([
+  "internal_state",
+  "external_environment",
+  "causal",
+  "temporal",
+  "counterfactual",
+  "simulation"
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function assertUnitInterval(value: number, code: string) {
-  if (!Number.isFinite(value) || value < 0 || value > 1) {
+function requiredText(value: unknown, field: string): asserts value is string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`WORLD_MODEL_INVALID_${field.toUpperCase()}`);
+  }
+}
+
+function assertUnitInterval(value: unknown, code: string): asserts value is number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
     throw new Error(code);
   }
 }
 
-function assertNonNegative(value: number, field: string) {
-  if (!Number.isFinite(value) || value < 0) {
+function assertNonNegative(value: unknown, field: string): asserts value is number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
     throw new Error(`WORLD_MODEL_INVALID_${field.toUpperCase()}`);
   }
+}
+
+function assertEvidenceRefs(value: unknown, code: string): asserts value is string[] {
+  if (!Array.isArray(value) || value.length === 0 || value.some(ref => typeof ref !== "string" || !ref.trim())) {
+    throw new Error(code);
+  }
+}
+
+function assertWorldState(state: unknown): asserts state is WorldState {
+  if (!isRecord(state) || !Array.isArray(state.facts) || !Array.isArray(state.evidenceRefs)) {
+    throw new Error("WORLD_MODEL_INVALID_STATE");
+  }
+  if (state.facts.length === 0 || state.evidenceRefs.length === 0) {
+    throw new Error("WORLD_MODEL_STATE_EVIDENCE_REQUIRED");
+  }
+  requiredText(state.version, "state_version");
+  requiredText(state.asOf, "state_as_of");
+  assertUnitInterval(state.confidence, "WORLD_MODEL_INVALID_STATE_CONFIDENCE");
+  assertEvidenceRefs(state.evidenceRefs, "WORLD_MODEL_STATE_EVIDENCE_REQUIRED");
 }
 
 function unique(values: string[]) {
@@ -173,6 +207,9 @@ export function reconstructWorldState(observations: WorldObservation[]): WorldSt
   }
 
   const facts = observations.map(observation => {
+    if (!isRecord(observation)) {
+      throw new Error("WORLD_MODEL_INVALID_OBSERVATION");
+    }
     requiredText(observation.id, "observation_id");
     requiredText(observation.entityKey, "entity_key");
     requiredText(observation.metric, "metric");
@@ -180,13 +217,19 @@ export function reconstructWorldState(observations: WorldObservation[]): WorldSt
     requiredText(observation.evidenceRef, "evidence_ref");
     requiredText(observation.observedAt, "observed_at");
     assertUnitInterval(observation.confidence, "WORLD_MODEL_INVALID_CONFIDENCE");
+    if (!WORLD_MODEL_LAYERS.has(observation.layer as WorldModelLayer)) {
+      throw new Error("WORLD_MODEL_INVALID_LAYER");
+    }
+    if (!["string", "number", "boolean"].includes(typeof observation.value)) {
+      throw new Error("WORLD_MODEL_INVALID_VALUE");
+    }
 
     return {
       observationId: observation.id,
       entityKey: observation.entityKey,
-      layer: observation.layer,
+      layer: observation.layer as WorldModelLayer,
       metric: observation.metric,
-      value: observation.value,
+      value: observation.value as WorldObservation["value"],
       confidence: observation.confidence,
       sourceRef: observation.sourceRef,
       evidenceRef: observation.evidenceRef
@@ -211,14 +254,15 @@ export function reconstructWorldState(observations: WorldObservation[]): WorldSt
 }
 
 export function simulateScenarios(state: WorldState, scenarios: StrategyScenario[]): SimulationResult[] {
-  if (!state.facts.length || !state.evidenceRefs.length) {
-    throw new Error("WORLD_MODEL_STATE_EVIDENCE_REQUIRED");
-  }
+  assertWorldState(state);
   if (!Array.isArray(scenarios) || scenarios.length === 0) {
     throw new Error("WORLD_MODEL_SCENARIOS_REQUIRED");
   }
 
   const raw = scenarios.map(scenario => {
+    if (!isRecord(scenario)) {
+      throw new Error("WORLD_MODEL_INVALID_SCENARIO");
+    }
     requiredText(scenario.id, "scenario_id");
     requiredText(scenario.label, "scenario_label");
     requiredText(scenario.channel, "scenario_channel");
@@ -227,9 +271,10 @@ export function simulateScenarios(state: WorldState, scenarios: StrategyScenario
     assertUnitInterval(scenario.confidence, "WORLD_MODEL_INVALID_SCENARIO_CONFIDENCE");
     assertNonNegative(scenario.expectedRevenue, "expected_revenue");
     assertNonNegative(scenario.cost, "cost");
-    if (!scenario.evidenceRefs.length || scenario.evidenceRefs.some(ref => !ref.trim())) {
-      throw new Error("WORLD_MODEL_SCENARIO_EVIDENCE_REQUIRED");
+    if (typeof scenario.reversibility !== "boolean") {
+      throw new Error("WORLD_MODEL_INVALID_REVERSIBILITY");
     }
+    assertEvidenceRefs(scenario.evidenceRefs, "WORLD_MODEL_SCENARIO_EVIDENCE_REQUIRED");
 
     const riskPenalty = scenario.risk * 1000;
     const utility = scenario.confidence * scenario.expectedRevenue * scenario.expectedConversion
@@ -267,11 +312,35 @@ function actionKindForChannel(channel: string): SandboxActionKind {
   return "noop";
 }
 
-export function decideNextAction(state: WorldState, simulations: SimulationResult[]): WorldDecision {
-  if (!state.evidenceRefs.length) throw new Error("WORLD_MODEL_STATE_EVIDENCE_REQUIRED");
-  if (!simulations.length) throw new Error("WORLD_MODEL_SIMULATIONS_REQUIRED");
+function validateSimulationResult(simulation: unknown): asserts simulation is SimulationResult {
+  if (!isRecord(simulation)) {
+    throw new Error("WORLD_MODEL_INVALID_SIMULATION");
+  }
+  requiredText(simulation.scenarioId, "simulation_scenario_id");
+  requiredText(simulation.label, "simulation_label");
+  requiredText(simulation.channel, "simulation_channel");
+  assertUnitInterval(simulation.expectedConversion, "WORLD_MODEL_INVALID_SIMULATION_CONVERSION");
+  assertUnitInterval(simulation.risk, "WORLD_MODEL_INVALID_SIMULATION_RISK");
+  assertUnitInterval(simulation.confidence, "WORLD_MODEL_INVALID_SIMULATION_CONFIDENCE");
+  assertNonNegative(simulation.expectedRevenue, "simulation_expected_revenue");
+  assertNonNegative(simulation.cost, "simulation_cost");
+  if (typeof simulation.reversibility !== "boolean" || typeof simulation.utility !== "number" || !Number.isFinite(simulation.utility)) {
+    throw new Error("WORLD_MODEL_INVALID_SIMULATION");
+  }
+  assertEvidenceRefs(simulation.evidenceRefs, "WORLD_MODEL_SIMULATION_EVIDENCE_REQUIRED");
+}
 
-  const selected = simulations.find(simulation => simulation.reversibility);
+export function decideNextAction(state: WorldState, simulations: SimulationResult[]): WorldDecision {
+  assertWorldState(state);
+  if (!Array.isArray(simulations) || simulations.length === 0) {
+    throw new Error("WORLD_MODEL_SIMULATIONS_REQUIRED");
+  }
+
+  simulations.forEach(validateSimulationResult);
+  const ordered = [...simulations].sort(
+    (a, b) => b.utility - a.utility || a.scenarioId.localeCompare(b.scenarioId)
+  );
+  const selected = ordered.find(simulation => simulation.reversibility);
   if (!selected) {
     throw new Error("WORLD_MODEL_NO_REVERSIBLE_SCENARIO");
   }
@@ -290,9 +359,9 @@ export function decideNextAction(state: WorldState, simulations: SimulationResul
     selectedScenarioId: selected.scenarioId,
     explanation: `${selected.label} is the highest-utility reversible scenario under the explicit P0 inputs.`,
     confidence: round(selected.confidence * state.confidence),
-    alternatives: simulations.map(item => ({
+    alternatives: ordered.map((item, index) => ({
       scenarioId: item.scenarioId,
-      rank: item.rank,
+      rank: index + 1,
       utility: item.utility
     })),
     worldModelConsulted: true,
@@ -319,6 +388,12 @@ export function decideNextAction(state: WorldState, simulations: SimulationResul
 }
 
 export function evaluateOutcome(decision: WorldDecision, actual: ActualOutcome): OutcomeEvaluation {
+  if (!isRecord(decision) || !isRecord(decision.forecast) || !isRecord(decision.action) || !Array.isArray(decision.action.evidenceRefs)) {
+    throw new Error("WORLD_MODEL_INVALID_DECISION");
+  }
+  if (!isRecord(actual)) {
+    throw new Error("WORLD_MODEL_INVALID_OUTCOME");
+  }
   if (actual.metric !== decision.forecast.metric) {
     throw new Error("WORLD_MODEL_OUTCOME_METRIC_MISMATCH");
   }
@@ -328,6 +403,12 @@ export function evaluateOutcome(decision: WorldDecision, actual: ActualOutcome):
   if (Number.isNaN(Date.parse(actual.observedAt))) {
     throw new Error("WORLD_MODEL_INVALID_OUTCOME_OBSERVED_AT");
   }
+  if (decision.forecast.metric !== "conversion_rate") {
+    throw new Error("WORLD_MODEL_INVALID_FORECAST_METRIC");
+  }
+  assertUnitInterval(decision.forecast.value, "WORLD_MODEL_INVALID_FORECAST_VALUE");
+  requiredText(decision.selectedScenarioId, "decision_scenario_id");
+  assertEvidenceRefs(decision.action.evidenceRefs, "WORLD_MODEL_DECISION_EVIDENCE_REQUIRED");
 
   const forecast = decision.forecast.value;
   const absoluteError = Math.abs(actual.actualValue - forecast);
@@ -343,7 +424,7 @@ export function evaluateOutcome(decision: WorldDecision, actual: ActualOutcome):
     actualValue: actual.actualValue,
     absoluteError: round(absoluteError),
     relativeError: relativeError === null ? null : round(relativeError),
-    directionCorrect: actual.actualValue > 0 === forecast > 0,
+    directionCorrect: (actual.actualValue > 0) === (forecast > 0),
     qualityStatus: withinTolerance ? "within_tolerance" : "outside_tolerance",
     evidenceRefs: unique([...decision.action.evidenceRefs, actual.evidenceRef]),
     learning,
