@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AfrIA Marketing Team™ — Revenue Engine MVP</title>
+  <meta name="description" content="AfrIA Marketing Team™ transforme un produit IA en offre, ICP, scripts, CRM, séquence, paiement et premier revenu." />
+  <style>
+    :root {
+      --bg: #1f1208;
+      --panel: #2b190d;
+      --panel-2: #3a2111;
+      --ink: #fff6e8;
+      --muted: #e0b98d;
+      --gold: #f7b733;
+      --orange: #f45d22;
+      --green: #28c76f;
+      --red: #ff5f5f;
+      --line: rgba(255, 214, 150, 0.22);
+      --shadow: 0 28px 70px rgba(0,0,0,.36);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(circle at top left, #6b2f0f 0, var(--bg) 42%, #110904 100%); color: var(--ink); }
+    a { color: inherit; }
+    .wrap { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+    header { padding: 28px 0 18px; position: sticky; top: 0; backdrop-filter: blur(18px); background: rgba(31,18,8,.78); z-index: 5; border-bottom: 1px solid var(--line); }
+    nav { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    .brand { display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.02em; }
+    .logo { width: 42px; height: 42px; border-radius: 14px; background: linear-gradient(135deg, var(--gold), var(--orange)); display:grid; place-items:center; color:#241000; box-shadow: var(--shadow); }
+    .pill { border:1px solid var(--line); border-radius:999px; padding:8px 12px; color:var(--muted); font-size:13px; background: rgba(255,255,255,.04); }
+    .hero { padding: 62px 0 36px; display:grid; grid-template-columns: 1.12fr .88fr; gap:32px; align-items:center; }
+    h1 { font-size: clamp(42px, 6vw, 78px); line-height:.92; margin: 0 0 20px; letter-spacing:-.06em; }
+    h2 { font-size: clamp(28px, 3vw, 42px); margin:0 0 12px; letter-spacing:-.035em; }
+    h3 { margin:0 0 8px; font-size:19px; }
+    p { color: var(--muted); line-height:1.65; }
+    .hero p { font-size:19px; max-width: 720px; }
+    .cta-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:24px; }
+    button, .btn { border:0; border-radius:16px; padding:14px 18px; font-weight:800; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:10px; transition:.16s ease; }
+    .btn-primary { background: linear-gradient(135deg, var(--gold), var(--orange)); color:#261207; box-shadow: 0 14px 34px rgba(244,93,34,.28); }
+    .btn-secondary { background: rgba(255,255,255,.08); border:1px solid var(--line); color:var(--ink); }
+    button:hover, .btn:hover { transform: translateY(-1px); }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.032)); border: 1px solid var(--line); border-radius: 28px; padding: 24px; box-shadow: var(--shadow); }
+    .grid { display:grid; gap:18px; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .stat { background: rgba(255,255,255,.055); border:1px solid var(--line); border-radius:22px; padding:18px; }
+    .stat strong { display:block; font-size:30px; color:var(--gold); }
+    .section { padding: 34px 0; }
+    .pricing { display:grid; grid-template-columns: repeat(3, 1fr); gap:18px; }
+    .price { min-height: 100%; position:relative; overflow:hidden; }
+    .price::after { content:""; position:absolute; inset:auto -80px -80px auto; width:170px; height:170px; border-radius:50%; background:rgba(247,183,51,.12); }
+    .price .amount { font-size:36px; color:var(--gold); font-weight:900; margin:10px 0 6px; }
+    ul { margin: 16px 0 0; padding-left: 19px; color: var(--muted); line-height:1.75; }
+    label { display:block; color:var(--muted); font-weight:700; margin-bottom:8px; }
+    input, select, textarea { width:100%; border:1px solid var(--line); background:#170c05; color:var(--ink); border-radius:14px; padding:13px 14px; outline:none; }
+    textarea { min-height:120px; resize:vertical; }
+    .form-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:14px; }
+    .pipeline { overflow:auto; }
+    table { width:100%; border-collapse:collapse; min-width:760px; }
+    th, td { padding:14px 12px; border-bottom:1px solid var(--line); color:var(--muted); text-align:left; }
+    th { color:var(--ink); font-size:13px; text-transform:uppercase; letter-spacing:.08em; }
+    .badge { display:inline-flex; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:900; }
+    .ready { background:rgba(40,199,111,.14); color:#76f0aa; }
+    .hold { background:rgba(247,183,51,.14); color:#ffd781; }
+    .danger { background:rgba(255,95,95,.14); color:#ff9d9d; }
+    .script-box { white-space:pre-wrap; background:#150902; border:1px solid var(--line); border-radius:18px; padding:18px; color:#ffe7c2; min-height:170px; }
+    footer { border-top:1px solid var(--line); padding:28px 0 44px; color:var(--muted); }
+    .small { font-size:13px; color:var(--muted); }
+    .notice { border-left:4px solid var(--gold); padding:14px 16px; background:rgba(247,183,51,.09); border-radius:12px; }
+    @media (max-width: 880px) { .hero, .grid-2, .grid-3, .pricing, .form-grid { grid-template-columns:1fr; } header { position:static; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <nav>
+        <div class="brand"><div class="logo">A</div><div>AfrIA Marketing Team™<br><span class="small">PRD-MKT-TEAM-001 · GEN-V4-REV-ENGINE-001</span></div></div>
+        <div class="pill">MVP cash rapide · Bénin → Mali → Guinée → Sénégal</div>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="wrap hero">
+      <div>
+        <div class="pill">Offre → ICP → Canal → Script → CRM → Séquence → Paiement → Revenu</div>
+        <h1>Votre équipe marketing IA qui transforme une idée en ventes.</h1>
+        <p>AfrIA Marketing Team™ installe le moteur commercial complet de votre produit : offre claire, cible, messages, séquence WhatsApp/LinkedIn/email, CRM, preuve, paiement et relance jusqu’au premier revenu.</p>
+        <div class="cta-row">
+          <a id="primaryWhatsapp" class="btn btn-primary" href="#diagnostic">Réserver un diagnostic</a>
+          <a class="btn btn-secondary" href="#scripts">Voir les scripts prêts à envoyer</a>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Revenue Math — loi des moyennes</h3>
+        <p>Le système ne force pas chaque prospect. Il calcule, cible, relance et convertit.</p>
+        <div class="grid grid-2">
+          <div class="stat"><strong id="presentationsOut">10 000</strong><span>présentations ciblées</span></div>
+          <div class="stat"><strong id="salesOut">400</strong><span>ventes attendues à 4%</span></div>
+          <div class="stat"><strong id="priceOut">49 900</strong><span>FCFA / Starter</span></div>
+          <div class="stat"><strong id="revenueOut">19 960 000</strong><span>FCFA attendu</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <div class="grid grid-3">
+        <div class="card"><h3>1. Offre</h3><p>Pack monétisable, promesse claire, livrable, prix, CTA et délai de livraison.</p></div>
+        <div class="card"><h3>2. Prospection</h3><p>Canaux WhatsApp, LinkedIn et email avec séquence J+0, J+1, J+3, J+5, J+7, J+14.</p></div>
+        <div class="card"><h3>3. Cash</h3><p>Facture, preuve de paiement, statut CRM, cas client, upsell et décision Scale / Correct / Kill.</p></div>
+      </div>
+    </section>
+
+    <section id="pricing" class="wrap section">
+      <h2>Offres prêtes à vendre</h2>
+      <p>Le MVP commence volontairement simple : trois offres, paiement manuel contrôlé, preuve client rapide.</p>
+      <div class="pricing">
+        <div class="card price"><h3>Starter</h3><div class="amount">49 900 FCFA</div><p>Pour entrepreneur solo ou petite PME.</p><ul><li>1 offre clarifiée</li><li>7 scripts WhatsApp/LinkedIn</li><li>1 mini CRM</li><li>1 séquence 14 jours</li></ul><button class="btn-primary" onclick="selectOffer('Starter',49900)">Choisir Starter</button></div>
+        <div class="card price"><h3>Business</h3><div class="amount">89 900 FCFA</div><p>Pour PME active qui veut prospecter chaque semaine.</p><ul><li>3 offres et 3 ICP</li><li>Calendrier contenu 30 jours</li><li>CRM pipeline complet</li><li>Dashboard conversion</li></ul><button class="btn-primary" onclick="selectOffer('Business',89900)">Choisir Business</button></div>
+        <div class="card price"><h3>Agence</h3><div class="amount">199 000 FCFA</div><p>Pour agence, cabinet, consultant senior ou équipe commerciale.</p><ul><li>5 campagnes sectorielles</li><li>Playbook objections</li><li>Suivi cash collection</li><li>Upsell/referral engine</li></ul><button class="btn-primary" onclick="selectOffer('Agence',199000)">Choisir Agence</button></div>
+      </div>
+    </section>
+
+    <section id="diagnostic" class="wrap section">
+      <div class="card">
+        <h2>Diagnostic commercial 10 minutes</h2>
+        <p>Remplissez le formulaire. Le message est généré automatiquement pour WhatsApp ou copie manuelle.</p>
+        <div class="form-grid">
+          <div><label>Produit / activité</label><input id="product" value="AfrIA Marketing Team™" /></div>
+          <div><label>Pays prioritaire</label><select id="country"><option>Bénin</option><option>Mali</option><option>Guinée</option><option>Sénégal</option><option>Côte d’Ivoire</option></select></div>
+          <div><label>Offre choisie</label><input id="offer" value="Starter" /></div>
+          <div><label>Prix</label><input id="price" value="49900" /></div>
+          <div><label>ICP</label><input id="icp" value="PME et entrepreneurs WhatsApp-first" /></div>
+          <div><label>Canal principal</label><select id="channel"><option>WhatsApp</option><option>LinkedIn</option><option>Email</option><option>Partenaire</option></select></div>
+        </div>
+        <div style="margin-top:14px"><label>Message généré</label><textarea id="generatedMessage"></textarea></div>
+        <div class="cta-row">
+          <button class="btn-primary" onclick="generateMessage()">Générer le message</button>
+          <button class="btn-secondary" onclick="copyMessage()">Copier</button>
+          <a id="whatsappLink" class="btn btn-secondary" href="#" target="_blank" rel="noreferrer">Ouvrir WhatsApp</a>
+        </div>
+        <p class="small">Configuration requise avant production : remplacer <code>WHATSAPP_NUMBER</code> dans le script par le numéro commercial réel.</p>
+      </div>
+    </section>
+
+    <section id="scripts" class="wrap section">
+      <h2>Scripts commerciaux prêts à envoyer</h2>
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>Script DM initial</h3>
+          <div id="scriptInitial" class="script-box">Bonjour [Prénom], j’ai lancé AfrIA Marketing Team™, une équipe marketing IA conçue pour les entrepreneurs et PME africaines.
+
+Elle produit en quelques minutes : offre claire, scripts WhatsApp/LinkedIn/email, mini CRM, séquence de relance et tableau de conversion.
+
+Offre pilote : 49 900 FCFA. Tu veux que je te montre ce que ça peut produire pour ton activité en 10 minutes ?</div>
+          <button class="btn-secondary" onclick="copyText('scriptInitial')">Copier le script</button>
+        </div>
+        <div class="card">
+          <h3>Script relance J+3</h3>
+          <div id="scriptFollowup" class="script-box">Je reviens vers toi rapidement.
+
+Le vrai sujet n’est pas seulement de publier plus. C’est d’avoir une offre claire, une cible précise, une preuve, une séquence de relance et un suivi jusqu’au paiement.
+
+Je peux te préparer ton mini moteur commercial pilote cette semaine. On démarre ?</div>
+          <button class="btn-secondary" onclick="copyText('scriptFollowup')">Copier la relance</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <h2>CRM de conversion — pipeline MVP</h2>
+      <div class="card pipeline">
+        <table>
+          <thead><tr><th>Étape</th><th>Objectif</th><th>SLA</th><th>Preuve</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr><td>Signal</td><td>Identifier prospect</td><td>J+0</td><td>Nom + canal</td><td><span class="badge ready">ready</span></td></tr>
+            <tr><td>Lead qualifié</td><td>ICP + douleur</td><td>24h</td><td>Réponse DM/WA</td><td><span class="badge ready">ready</span></td></tr>
+            <tr><td>Diagnostic réservé</td><td>10 min</td><td>48h</td><td>Créneau confirmé</td><td><span class="badge hold">pilote</span></td></tr>
+            <tr><td>Proposition envoyée</td><td>Pack Starter/Business/Agence</td><td>24h</td><td>Devis/facture</td><td><span class="badge hold">pilote</span></td></tr>
+            <tr><td>Paiement encaissé</td><td>Mobile Money / virement</td><td>72h</td><td>Reçu paiement</td><td><span class="badge danger">à connecter</span></td></tr>
+            <tr><td>Cas client</td><td>Preuve + métrique</td><td>7 jours</td><td>Capture / témoignage</td><td><span class="badge danger">après vente</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <div class="card notice">
+        <h3>Gate production honnête</h3>
+        <p>Ce MVP rend le produit vendable et démontrable. Pour passer en production commerciale réelle, il reste à configurer le numéro WhatsApp commercial, le compte de paiement, le CRM persistant et le suivi d’encaissement.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">AfrIAgenesis® · AfrIA Marketing Team™ · Revenue Engine GENESIS V4 · Release-to-Revenue.</div>
+  </footer>
+
+  <script>
+    const WHATSAPP_NUMBER = ""; // Production: mettre le numéro commercial au format international, ex: 229XXXXXXXX.
+    const format = n => new Intl.NumberFormat('fr-FR').format(Number(n || 0));
+    function generateMessage(){
+      const product = document.getElementById('product').value;
+      const country = document.getElementById('country').value;
+      const offer = document.getElementById('offer').value;
+      const price = Number(document.getElementById('price').value || 0);
+      const icp = document.getElementById('icp').value;
+      const channel = document.getElementById('channel').value;
+      const msg = `Bonjour, je veux lancer un diagnostic AfrIA Marketing Team™.\n\nProduit/activité : ${product}\nPays : ${country}\nOffre : ${offer} — ${format(price)} FCFA\nICP : ${icp}\nCanal prioritaire : ${channel}\n\nObjectif : installer offre + scripts + CRM + séquence + paiement pour générer le premier revenu.`;
+      document.getElementById('generatedMessage').value = msg;
+      const href = WHATSAPP_NUMBER ? `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      document.getElementById('whatsappLink').href = href;
+      return msg;
+    }
+    function copyMessage(){ navigator.clipboard.writeText(generateMessage()); }
+    function copyText(id){ navigator.clipboard.writeText(document.getElementById(id).innerText); }
+    function selectOffer(name, price){
+      document.getElementById('offer').value = name;
+      document.getElementById('price').value = price;
+      document.getElementById('priceOut').innerText = format(price);
+      document.getElementById('revenueOut').innerText = format(price * 400);
+      generateMessage();
+      location.hash = '#diagnostic';
+    }
+    generateMessage();
+  </script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+name: AfrIA Marketing Team MVP
+
+on:
+  pull_request:
+    paths:
+      - 'apps/afria-marketing-team/**'
+      - '.github/workflows/afria-marketing-team-mvp.yml'
+  push:
+    branches:
+      - afria-marketing-team-mvp-cash
+    paths:
+      - 'apps/afria-marketing-team/**'
+      - '.github/workflows/afria-marketing-team-mvp.yml'
+
+jobs:
+  verify-static-mvp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Verify required MVP anchors
+        run: |
+          test -s apps/afria-marketing-team/index.html
+          test -s apps/afria-marketing-team/README.md
+          grep -q 'PRD-MKT-TEAM-001' apps/afria-marketing-team/index.html
+          grep -q 'GEN-V4-REV-ENGINE-001' apps/afria-marketing-team/index.html
+          grep -q '49 900 FCFA' apps/afria-marketing-team/index.html
+          grep -q 'WhatsApp' apps/afria-marketing-team/index.html
+          grep -q 'Pipeline' apps/afria-marketing-team/index.html || grep -q 'pipeline' apps/afria-marketing-team/index.html
+          grep -q 'WHATSAPP_NUMBER' apps/afria-marketing-team/index.html
+          grep -q 'Produit' apps/afria-marketing-team/README.md
+          grep -q 'Premier revenu' apps/afria-marketing-team/README.md
