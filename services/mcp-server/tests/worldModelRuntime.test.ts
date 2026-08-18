@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
   decideNextAction,
@@ -156,5 +157,18 @@ describe("GENESIS V4 World Model Runtime", () => {
     expect(evaluation.learning.length).toBeGreaterThan(0);
     expect(evaluation.improvementCandidate.status).toBe("candidate_only");
     expect(evaluation.evidenceRefs).toContain("synthetic:evidence:actual-conversion");
+  });
+
+  test("exposes the governed world model tools with distinct scopes", () => {
+    const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+
+    expect(indexSource).toContain('register("world.reconstruct_state"');
+    expect(indexSource).toContain('"world:read"');
+    expect(indexSource).toContain('register("world.simulate"');
+    expect(indexSource).toContain('"world:simulate"');
+    expect(indexSource).toContain('register("world.decide"');
+    expect(indexSource).toContain('"world:decide"');
+    expect(indexSource).toContain('register("world.evaluate_outcome"');
+    expect(indexSource).toContain('"world:evaluate"');
   });
 });
