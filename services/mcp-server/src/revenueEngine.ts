@@ -1,6 +1,7 @@
 export const GENESIS_V4_REVENUE_ENGINE_ANCHOR = {
   genome: "GENESIS_V4",
   assetId: "GEN-V4-REV-ENGINE-001",
+  version: "0.3.0",
   canonicalOwner: "AfrIAgenesis®",
   linkedProduct: "AfrIA Marketing Team™",
   doctrine: "Release-to-Revenue Control Plane",
@@ -26,12 +27,33 @@ export const REVENUE_STAGES = [
   "scale_correct_kill"
 ] as const;
 
+export const GENESIS_V4_TODAY_INNOVATIONS = [
+  "abundance_math",
+  "qualified_volume",
+  "proof_first_selling",
+  "auto_gtm_takeover",
+  "release_to_revenue_gate",
+  "reme_learning_loop",
+  "m6_s7plus_m8_big4_controls",
+  "afria_marketing_team_as_revenue_operator"
+] as const;
+
 export type RevenueStage = (typeof REVENUE_STAGES)[number];
+export type TodayInnovation = (typeof GENESIS_V4_TODAY_INNOVATIONS)[number];
 export type StageStatus = "ready" | "partial" | "missing" | "blocked";
 export type ScaleDecision = "scale" | "correct" | "kill" | "hold";
+export type ReleaseStatus = "blocked" | "sellable" | "revenue_proven" | "scale_ready";
 
 export interface ProductRevenueEngineInput {
-  product?: { id?: string; name: string; owner?: string; parentGenome?: string; market?: string };
+  product?: {
+    id?: string;
+    name: string;
+    owner?: string;
+    parentGenome?: string;
+    market?: string;
+    validatedByCeo?: boolean;
+    targetCountries?: string[];
+  };
   offer?: { name: string; promise: string; deliverable: string; price: number; currency: string; cta: string };
   icp?: { segment: string; buyerRole: string; geography: string[]; pains: string[]; urgency?: "low" | "medium" | "high" };
   proof?: { assets: string[]; evidenceLevel: "claim" | "demo" | "pilot" | "client_proof" | "auditable_pack" };
@@ -44,6 +66,28 @@ export interface ProductRevenueEngineInput {
   caseStudy?: { title: string; customerSegment: string; metric: string; consent: boolean };
   upsell?: { offers: string[]; trigger: string };
   scaleDecision?: ScaleDecision;
+  governance?: {
+    m6Reviewed?: boolean;
+    s7plusReviewed?: boolean;
+    m8Reviewed?: boolean;
+    big4Required?: boolean;
+    big4Reviewed?: boolean;
+    humanApprovalRef?: string;
+  };
+  automation?: {
+    autoTakeoverEnabled?: boolean;
+    crmSyncEnabled?: boolean;
+    paymentOpsEnabled?: boolean;
+    remeLoggingEnabled?: boolean;
+    emergencyStopEnabled?: boolean;
+    rollbackPlanRef?: string;
+  };
+  metrics?: {
+    presentationsTarget?: number;
+    expectedSalesPerHundred?: number;
+    targetRevenue?: number;
+    maxCAC?: number;
+  };
 }
 
 export interface CrmDefinition {
@@ -69,19 +113,46 @@ export interface StageAssessment {
   nextAction: string;
 }
 
+export interface RevenueMath {
+  presentationsTarget: number;
+  expectedSalesPerHundred: number;
+  expectedSales: number;
+  averagePrice: number;
+  currency: string;
+  expectedRevenue: number;
+  law: "law_of_averages_x_law_of_large_numbers";
+}
+
+export interface AutoGtmRunbook {
+  takeoverStatus: "armed" | "not_armed";
+  operator: "AfrIA Marketing Team™";
+  trigger: string;
+  executionLoop: string[];
+  safeguards: string[];
+}
+
 export interface RevenueEngineOutput {
   anchor: typeof GENESIS_V4_REVENUE_ENGINE_ANCHOR;
+  innovations: TodayInnovation[];
   productName: string;
-  releaseStatus: "blocked" | "sellable" | "revenue_proven" | "scale_ready";
+  releaseStatus: ReleaseStatus;
   currentStage: RevenueStage;
   completionRate: number;
   stages: StageAssessment[];
-  gates: { m6: "pass" | "fail"; s7plus: "pass" | "fail"; m8: "pass" | "conditional" | "fail" };
+  gates: {
+    m6: "pass" | "fail";
+    s7plus: "pass" | "fail";
+    m8: "pass" | "conditional" | "fail";
+    big4: "pass" | "required" | "not_required";
+  };
   crmBlueprint: CrmDefinition;
   defaultSequence: SequenceStep[];
+  revenueMath: RevenueMath;
+  autoGtmRunbook: AutoGtmRunbook;
   blockers: string[];
   nextActions: string[];
   scaleDecision: ScaleDecision;
+  remeEvents: string[];
 }
 
 const LABELS: Record<RevenueStage, string> = {
@@ -258,11 +329,81 @@ function readyThrough(stages: StageAssessment[], stage: RevenueStage) {
   return stages.slice(0, REVENUE_STAGES.indexOf(stage) + 1).every(item => item.status === "ready");
 }
 
-function deriveReleaseStatus(stages: StageAssessment[]): RevenueEngineOutput["releaseStatus"] {
+function deriveReleaseStatus(stages: StageAssessment[]): ReleaseStatus {
   if (stages.every(item => item.status === "ready") && stages.at(-1)?.evidence.includes("scale")) return "scale_ready";
   if (readyThrough(stages, "first_revenue")) return "revenue_proven";
   if (readyThrough(stages, "payment")) return "sellable";
   return "blocked";
+}
+
+function buildRevenueMath(input: ProductRevenueEngineInput): RevenueMath {
+  const presentationsTarget = input.metrics?.presentationsTarget ?? input.channels?.reduce((sum, channel) => sum + Math.max(channel.targetVolume, 0), 0) ?? 100;
+  const expectedSalesPerHundred = input.metrics?.expectedSalesPerHundred ?? 4;
+  const expectedSales = Math.round((presentationsTarget * expectedSalesPerHundred) / 100);
+  const averagePrice = input.offer?.price ?? 0;
+  const currency = input.offer?.currency ?? "UNSET";
+  return {
+    presentationsTarget,
+    expectedSalesPerHundred,
+    expectedSales,
+    averagePrice,
+    currency,
+    expectedRevenue: expectedSales * averagePrice,
+    law: "law_of_averages_x_law_of_large_numbers"
+  };
+}
+
+function buildAutoGtmRunbook(input: ProductRevenueEngineInput, releaseStatus: ReleaseStatus): AutoGtmRunbook {
+  const armed = Boolean(input.product?.validatedByCeo && input.automation?.autoTakeoverEnabled && releaseStatus !== "blocked");
+  return {
+    takeoverStatus: armed ? "armed" : "not_armed",
+    operator: "AfrIA Marketing Team™",
+    trigger: armed
+      ? "CEO validation + sellable/revenue_proven/scale_ready status"
+      : "Await CEO validation, autoTakeoverEnabled=true and non-blocked Release-to-Revenue status",
+    executionLoop: [
+      "generate_offer_assets",
+      "create_or_update_crm_pipeline",
+      "launch_linkedin_whatsapp_email_sequence",
+      "collect_payment_or_payment_proof",
+      "log_reme_objections_and_winning_messages",
+      "produce_case_study",
+      "propose_upsell_or_scale_correct_kill"
+    ],
+    safeguards: [
+      "least_privilege_scope:revenue:plan",
+      "human_governance_required_for_restricted_data",
+      "emergency_stop_required",
+      "rollback_plan_required",
+      "M6/S7+/M8/Big4 gates before institutional scale"
+    ]
+  };
+}
+
+function deriveGates(input: ProductRevenueEngineInput, completionRate: number, releaseStatus: ReleaseStatus): RevenueEngineOutput["gates"] {
+  const hasPaymentOps = Boolean(input.payment && input.crm?.owner);
+  const m6 = completionRate >= 70 && Boolean(input.governance?.m6Reviewed) ? "pass" : "fail";
+  const s7plus = hasPaymentOps && Boolean(input.automation?.emergencyStopEnabled && input.automation?.rollbackPlanRef) ? "pass" : "fail";
+  const m8 = releaseStatus === "scale_ready" && Boolean(input.governance?.m8Reviewed)
+    ? "pass"
+    : releaseStatus === "revenue_proven" || releaseStatus === "sellable"
+      ? "conditional"
+      : "fail";
+  const big4 = input.governance?.big4Required
+    ? input.governance.big4Reviewed ? "pass" : "required"
+    : "not_required";
+  return { m6, s7plus, m8, big4 };
+}
+
+function deriveRemeEvents(input: ProductRevenueEngineInput, output: Pick<RevenueEngineOutput, "releaseStatus" | "currentStage" | "completionRate">): string[] {
+  const productName = input.product?.name ?? "UNNAMED_PRODUCT";
+  return [
+    `REME.REVENUE_ENGINE.COMPILED:${productName}`,
+    `REME.RELEASE_STATUS:${output.releaseStatus}`,
+    `REME.CURRENT_STAGE:${output.currentStage}`,
+    `REME.COMPLETION_RATE:${output.completionRate}`,
+    ...GENESIS_V4_TODAY_INNOVATIONS.map(innovation => `REME.INNOVATION:${innovation}`)
+  ];
 }
 
 export function compileRevenueEngine(input: ProductRevenueEngineInput): RevenueEngineOutput {
@@ -273,31 +414,42 @@ export function compileRevenueEngine(input: ProductRevenueEngineInput): RevenueE
   const blockers = stages.flatMap(stage => stage.blockers.map(blocker => `${stage.label}: ${blocker}`));
   const releaseStatus = deriveReleaseStatus(stages);
   const primaryChannel = input.channels?.[0]?.name ?? "whatsapp";
+  const crmBlueprint = input.crm ?? createDefaultCrm(input.product?.owner ?? "AfrIA Marketing Team™");
+  const defaultSequence = input.sequence ?? createDefaultSequence(input.product?.name ?? "Produit AfrIAgenesis®", primaryChannel);
+  const revenueMath = buildRevenueMath(input);
+  const autoGtmRunbook = buildAutoGtmRunbook(input, releaseStatus);
+  const gates = deriveGates(input, completionRate, releaseStatus);
+  const minimalOutput = { releaseStatus, currentStage: firstNotReady.stage, completionRate };
 
   return {
     anchor: GENESIS_V4_REVENUE_ENGINE_ANCHOR,
+    innovations: [...GENESIS_V4_TODAY_INNOVATIONS],
     productName: input.product?.name ?? "UNNAMED_PRODUCT",
     releaseStatus,
     currentStage: firstNotReady.stage,
     completionRate,
     stages,
-    gates: {
-      m6: readyThrough(stages, "payment") ? "pass" : "fail",
-      s7plus: input.payment?.methods?.length && input.crm?.owner ? "pass" : "fail",
-      m8: releaseStatus === "scale_ready" ? "pass" : releaseStatus === "revenue_proven" ? "conditional" : "fail"
-    },
-    crmBlueprint: input.crm ?? createDefaultCrm(),
-    defaultSequence: input.sequence ?? createDefaultSequence(input.product?.name ?? "AfrIAgenesis® product", primaryChannel),
+    gates,
+    crmBlueprint,
+    defaultSequence,
+    revenueMath,
+    autoGtmRunbook,
     blockers,
-    nextActions: stages.filter(stage => stage.status !== "ready").slice(0, 5).map(stage => `${stage.label}: ${stage.nextAction}`),
-    scaleDecision: input.scaleDecision ?? "hold"
+    nextActions: blockers.length === 0
+      ? ["Lancer campagne contrôlée", "Collecter preuve de paiement", "Créer cas client", "Décider Scale/Correct/Kill"]
+      : [...new Set(stages.filter(stage => stage.status !== "ready").map(stage => stage.nextAction))],
+    scaleDecision: input.scaleDecision ?? "hold",
+    remeEvents: deriveRemeEvents(input, minimalOutput)
   };
 }
 
-export function assertReleaseToRevenue(input: ProductRevenueEngineInput): RevenueEngineOutput {
-  const compiled = compileRevenueEngine(input);
-  if (compiled.releaseStatus === "blocked") {
-    throw new Error(`GENESIS_V4_REVENUE_ENGINE_BLOCKED: ${compiled.blockers.slice(0, 3).join("; ")}`);
+export function assertReleaseToRevenue(input: ProductRevenueEngineInput, minimumStatus: ReleaseStatus = "sellable") {
+  const output = compileRevenueEngine(input);
+  const order: ReleaseStatus[] = ["blocked", "sellable", "revenue_proven", "scale_ready"];
+  if (order.indexOf(output.releaseStatus) < order.indexOf(minimumStatus)) {
+    const error = new Error(`GENESIS_V4_REVENUE_ENGINE_BLOCKED: ${output.blockers.join(" | ")}`);
+    error.name = "GENESIS_V4_REVENUE_ENGINE_BLOCKED";
+    throw error;
   }
-  return compiled;
+  return output;
 }
