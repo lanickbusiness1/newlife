@@ -6,8 +6,15 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { compileRevenueEngine } from "./revenueEngine.js";
 import { compileValidationRelay, GENESIS_V4_VALIDATION_RELAY_ANCHOR } from "./validationRelay.js";
+import {
+  decideNextAction,
+  evaluateOutcome,
+  GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR,
+  reconstructWorldState,
+  simulateScenarios
+} from "./worldModelRuntime.js";
 
-const SERVICE_VERSION = "0.3.0";
+const SERVICE_VERSION = "0.4.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -52,7 +59,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 governed control plane active." },
     auditId,
-    limitations: ["MCP v0.3.0: control-plane decisions are deterministic; external deployment/CRM/payment providers execute only when separately connected and authorized."]
+    limitations: ["MCP v0.4.0: World Model Runtime is deterministic sandbox proof; external providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
@@ -143,6 +150,38 @@ function buildServer() {
     ...compileValidationRelay(payload)
   }));
 
+  register("world.reconstruct_state", "Reconstruit un World State depuis des observations explicitement sourcées et conserve leur lineage de preuve.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "world:read", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    state: reconstructWorldState((payload as any)?.observations)
+  }));
+
+  register("world.simulate", "Simule et classe des scénarios contrefactuels à partir d’inputs explicites, sans imputation silencieuse.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "world:simulate", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    simulations: simulateScenarios((payload as any)?.state, (payload as any)?.scenarios)
+  }));
+
+  register("world.decide", "Sélectionne la meilleure action réversible autorisée après consultation du World Model.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "world:decide", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    decision: decideNextAction((payload as any)?.state, (payload as any)?.simulations)
+  }));
+
+  register("world.evaluate_outcome", "Compare une prévision à un résultat observé avec preuve et émet un apprentissage borné.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "world:evaluate", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    evaluation: evaluateOutcome((payload as any)?.decision, (payload as any)?.actual)
+  }));
+
   return server;
 }
 
@@ -164,7 +203,8 @@ if (mode === "stdio") {
       version: SERVICE_VERSION,
       genome: "GENESIS_V4",
       revenueEngine: "GEN-V4-REV-ENGINE-001",
-      validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId
+      validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
+      worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode
     });
   });
 
