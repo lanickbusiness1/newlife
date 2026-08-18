@@ -5,8 +5,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { compileRevenueEngine } from "./revenueEngine.js";
+import { compileValidationRelay, GENESIS_V4_VALIDATION_RELAY_ANCHOR } from "./validationRelay.js";
 
-const SERVICE_VERSION = "0.2.0";
+const SERVICE_VERSION = "0.3.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -49,9 +50,9 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.72,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 revenue engine active." },
+    eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 governed control plane active." },
     auditId,
-    limitations: ["MCP v0.2.0: revenue engine deterministic; CRM/payment providers not yet connected to live external systems."]
+    limitations: ["MCP v0.3.0: control-plane decisions are deterministic; external deployment/CRM/payment providers execute only when separately connected and authorized."]
   };
 }
 
@@ -134,6 +135,14 @@ function buildServer() {
     ...compileRevenueEngine(payload)
   }));
 
+  register("deploybot.validation_relay.compile", "Compile une validation CEO en state machine DeployBot A1-A3 jusqu’au livrable final ou veto A4.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    ...compileValidationRelay(payload)
+  }));
+
   return server;
 }
 
@@ -154,7 +163,8 @@ if (mode === "stdio") {
       service: "afriagenesis-intelligence-mcp",
       version: SERVICE_VERSION,
       genome: "GENESIS_V4",
-      revenueEngine: "GEN-V4-REV-ENGINE-001"
+      revenueEngine: "GEN-V4-REV-ENGINE-001",
+      validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId
     });
   });
 
