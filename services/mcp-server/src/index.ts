@@ -4,7 +4,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { compileRevenueEngine } from "./revenueEngine.js";
+import {
+  compileRevenueEngine,
+  GENESIS_V4_REVENUE_ENGINE_ANCHOR,
+  GENESIS_V4_TODAY_INNOVATIONS
+} from "./revenueEngine.js";
 import { compileValidationRelay, GENESIS_V4_VALIDATION_RELAY_ANCHOR } from "./validationRelay.js";
 import {
   decideNextAction,
@@ -14,8 +18,8 @@ import {
   simulateScenarios
 } from "./worldModelRuntime.js";
 
-const PACKAGE_VERSION = "0.2.0";
-const CONTROL_PLANE_REVISION = "0.4.0";
+const PACKAGE_VERSION = "0.3.0";
+const CONTROL_PLANE_REVISION = "0.5.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -55,12 +59,12 @@ function governed(ctx: Context, tool: string, data: unknown) {
   return {
     data,
     provenance: [],
-    confidence: 0.72,
+    confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 governed control plane active." },
+    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.2.0 / control-plane revision 0.4.0: World Model Runtime is deterministic sandbox proof; external providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.5.0: Revenue Engine and World Model Runtime are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
@@ -203,8 +207,10 @@ if (mode === "stdio") {
       service: "afriagenesis-intelligence-mcp",
       version: PACKAGE_VERSION,
       controlPlaneRevision: CONTROL_PLANE_REVISION,
-      genome: "GENESIS_V4",
-      revenueEngine: "GEN-V4-REV-ENGINE-001",
+      genome: GENESIS_V4_REVENUE_ENGINE_ANCHOR.genome,
+      revenueEngine: GENESIS_V4_REVENUE_ENGINE_ANCHOR.assetId,
+      revenueEngineVersion: GENESIS_V4_REVENUE_ENGINE_ANCHOR.version,
+      revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode
     });

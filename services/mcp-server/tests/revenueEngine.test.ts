@@ -5,6 +5,7 @@ import {
   createDefaultCrm,
   createDefaultSequence,
   GENESIS_V4_REVENUE_ENGINE_ANCHOR,
+  GENESIS_V4_TODAY_INNOVATIONS,
   type ProductRevenueEngineInput
 } from "../src/revenueEngine";
 
@@ -13,7 +14,10 @@ const sellableInput: ProductRevenueEngineInput = {
     id: "PRD-MKT-TEAM-001",
     name: "AfrIA Marketing Team™",
     parentGenome: "GENESIS_V4",
-    market: "Pan-Africain"
+    market: "Pan-Africain",
+    owner: "Lanick Mohamed",
+    validatedByCeo: true,
+    targetCountries: ["Bénin", "Mali", "Guinée", "Sénégal"]
   },
   offer: {
     name: "Starter Revenue Engine",
@@ -26,7 +30,7 @@ const sellableInput: ProductRevenueEngineInput = {
   icp: {
     segment: "PME et entrepreneurs africains WhatsApp-first",
     buyerRole: "CEO / Fondateur",
-    geography: ["Bénin", "Guinée", "Sénégal"],
+    geography: ["Bénin", "Mali", "Guinée", "Sénégal"],
     pains: ["prospection irrégulière", "faible conversion", "absence de relance"],
     urgency: "high"
   },
@@ -34,7 +38,11 @@ const sellableInput: ProductRevenueEngineInput = {
     assets: ["démo cockpit", "scripts prêts à envoyer", "pricing validé"],
     evidenceLevel: "demo"
   },
-  channels: [{ name: "whatsapp", targetVolume: 100, owner: "AfrIA Marketing Team™" }],
+  channels: [
+    { name: "whatsapp", targetVolume: 6000, owner: "AfrIA Marketing Team™" },
+    { name: "linkedin", targetVolume: 3000, owner: "AfrIA Marketing Team™" },
+    { name: "email", targetVolume: 1000, owner: "AfrIA Marketing Team™" }
+  ],
   script: {
     opening: "J’ai construit une équipe marketing IA pour entrepreneurs africains.",
     qualification: "Ton besoin prioritaire est vente, contenu, relance ou automatisation ?",
@@ -47,6 +55,25 @@ const sellableInput: ProductRevenueEngineInput = {
     methods: ["Mobile Money", "Virement"],
     invoiceProcess: "facture PDF + preuve paiement",
     collectionOwner: "Lanick Mohamed"
+  },
+  governance: {
+    m6Reviewed: true,
+    s7plusReviewed: true,
+    big4Required: false,
+    humanApprovalRef: "CEO-2026-08-18"
+  },
+  automation: {
+    autoTakeoverEnabled: true,
+    crmSyncEnabled: true,
+    paymentOpsEnabled: true,
+    remeLoggingEnabled: true,
+    emergencyStopEnabled: true,
+    rollbackPlanRef: "ROLLBACK-REV-001"
+  },
+  metrics: {
+    presentationsTarget: 10000,
+    expectedSalesPerHundred: 4,
+    targetRevenue: 19960000
   }
 };
 
@@ -56,20 +83,42 @@ describe("GENESIS V4 Revenue Engine", () => {
       product: { name: "AfrIA PaySwitch™", parentGenome: "GENESIS_V4" }
     });
 
-    expect(output.anchor).toEqual(GENESIS_V4_REVENUE_ENGINE_ANCHOR);
+    expect(output.anchor.assetId).toBe(GENESIS_V4_REVENUE_ENGINE_ANCHOR.assetId);
     expect(output.releaseStatus).toBe("blocked");
     expect(output.currentStage).toBe("offer");
     expect(output.blockers).toContain("Offre: Nom d’offre absent");
   });
 
-  test("marks a complete pre-revenue product as sellable after payment wiring", () => {
+  test("marks a complete pre-revenue product as sellable after CRM, sequence and payment wiring", () => {
     const output = compileRevenueEngine(sellableInput);
 
     expect(output.releaseStatus).toBe("sellable");
     expect(output.currentStage).toBe("first_revenue");
     expect(output.gates.m6).toBe("pass");
     expect(output.gates.s7plus).toBe("pass");
+    expect(output.gates.m8).toBe("conditional");
+    expect(output.gates.big4).toBe("not_required");
     expect(output.defaultSequence).toHaveLength(6);
+  });
+
+  test("encodes the innovations of the day into the executable output", () => {
+    const output = compileRevenueEngine(sellableInput);
+
+    expect(output.innovations).toEqual([...GENESIS_V4_TODAY_INNOVATIONS]);
+    expect(output.innovations).toContain("auto_gtm_takeover");
+    expect(output.autoGtmRunbook.takeoverStatus).toBe("armed");
+    expect(output.autoGtmRunbook.operator).toBe("AfrIA Marketing Team™");
+    expect(output.remeEvents).toContain("REME.INNOVATION:afria_marketing_team_as_revenue_operator");
+  });
+
+  test("applies the law of averages to qualified volume", () => {
+    const output = compileRevenueEngine(sellableInput);
+
+    expect(output.revenueMath.law).toBe("law_of_averages_x_law_of_large_numbers");
+    expect(output.revenueMath.presentationsTarget).toBe(10000);
+    expect(output.revenueMath.expectedSalesPerHundred).toBe(4);
+    expect(output.revenueMath.expectedSales).toBe(400);
+    expect(output.revenueMath.expectedRevenue).toBe(19960000);
   });
 
   test("requires proof of cash collection before revenue_proven", () => {
@@ -79,7 +128,7 @@ describe("GENESIS V4 Revenue Engine", () => {
         amount: 49900,
         currency: "FCFA",
         customer: "Client pilote PME",
-        collectedAt: "2026-08-07",
+        collectedAt: "2026-08-18",
         proofRef: "PAY-RECEIPT-001"
       }
     });
@@ -89,14 +138,18 @@ describe("GENESIS V4 Revenue Engine", () => {
     expect(output.gates.m8).toBe("conditional");
   });
 
-  test("approves scale_ready only when every stage is ready and decision is scale", () => {
+  test("approves scale_ready only when every stage is ready, M8 reviewed and decision is scale", () => {
     const output = compileRevenueEngine({
       ...sellableInput,
+      governance: {
+        ...sellableInput.governance,
+        m8Reviewed: true
+      },
       firstRevenue: {
         amount: 199000,
         currency: "FCFA",
         customer: "Agence pilote",
-        collectedAt: "2026-08-07",
+        collectedAt: "2026-08-18",
         proofRef: "PAY-RECEIPT-002"
       },
       caseStudy: {
@@ -115,6 +168,19 @@ describe("GENESIS V4 Revenue Engine", () => {
     expect(output.releaseStatus).toBe("scale_ready");
     expect(output.currentStage).toBe("scale_correct_kill");
     expect(output.gates.m8).toBe("pass");
+  });
+
+  test("keeps Big4 as required when institutional scale asks for external review", () => {
+    const output = compileRevenueEngine({
+      ...sellableInput,
+      governance: {
+        ...sellableInput.governance,
+        big4Required: true,
+        big4Reviewed: false
+      }
+    });
+
+    expect(output.gates.big4).toBe("required");
   });
 
   test("throws a GENESIS_V4 guardrail error when release is blocked", () => {
