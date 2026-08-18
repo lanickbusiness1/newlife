@@ -14,7 +14,8 @@ import {
   simulateScenarios
 } from "./worldModelRuntime.js";
 
-const SERVICE_VERSION = "0.4.0";
+const PACKAGE_VERSION = "0.2.0";
+const CONTROL_PLANE_REVISION = "0.4.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -59,14 +60,14 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.2", reason: "Scope validated; GENESIS V4 governed control plane active." },
     auditId,
-    limitations: ["MCP v0.4.0: World Model Runtime is deterministic sandbox proof; external providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.2.0 / control-plane revision 0.4.0: World Model Runtime is deterministic sandbox proof; external providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
 function buildServer() {
   const server = new McpServer({
     name: "afriagenesis-intelligence-mcp",
-    version: SERVICE_VERSION
+    version: PACKAGE_VERSION
   });
 
   function register(
@@ -200,7 +201,8 @@ if (mode === "stdio") {
     res.json({
       status: "ok",
       service: "afriagenesis-intelligence-mcp",
-      version: SERVICE_VERSION,
+      version: PACKAGE_VERSION,
+      controlPlaneRevision: CONTROL_PLANE_REVISION,
       genome: "GENESIS_V4",
       revenueEngine: "GEN-V4-REV-ENGINE-001",
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
