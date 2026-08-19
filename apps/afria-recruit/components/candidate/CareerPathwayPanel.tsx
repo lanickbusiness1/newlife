@@ -32,6 +32,7 @@ const COMPONENT_LABELS: Record<string, string> = {
 };
 
 type CardContext = 'recommended' | 'review' | 'ineligible';
+type ActionGroups = { eligible: CareerNextAction[]; review: CareerNextAction[]; ineligible: CareerNextAction[] };
 
 function formatMissingData(action: CareerNextAction): string[] {
   return action.missingData.map((key) => MISSING_LABELS[key] ?? key);
@@ -130,8 +131,8 @@ export function CareerPathwayPanel() {
     return [...new Set(result.actions.flatMap(formatMissingData))];
   }, [result]);
 
-  const grouped = useMemo(() => {
-    if (!result) return { eligible: [], review: [], ineligible: [] } as const;
+  const grouped = useMemo<ActionGroups>(() => {
+    if (!result) return { eligible: [], review: [], ineligible: [] };
     return {
       eligible: result.actions.filter((action) => action.eligibility.status === 'ELIGIBLE'),
       review: result.actions.filter((action) => action.eligibility.status === 'REVIEW_REQUIRED'),
