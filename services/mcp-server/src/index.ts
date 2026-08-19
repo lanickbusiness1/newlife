@@ -17,9 +17,15 @@ import {
   reconstructWorldState,
   simulateScenarios
 } from "./worldModelRuntime.js";
+import {
+  compileControlTransition,
+  compileGenesisContext,
+  evaluateKnowledgePromotion,
+  GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
+} from "./chatgptControlPlane.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.5.0";
+const CONTROL_PLANE_REVISION = "0.6.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -64,7 +70,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.5.0: Revenue Engine and World Model Runtime are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
@@ -187,6 +193,30 @@ function buildServer() {
     evaluation: evaluateOutcome((payload as any)?.decision, (payload as any)?.actual)
   }));
 
+  register("genesis.context.compile", "Compile GENOME, R.E.M.E et World Model en Context Packet borné pour une tâche ChatGPT/agentique.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "context:compile", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    packet: compileGenesisContext(payload as any)
+  }));
+
+  register("genesis.control.compile_transition", "Compile une interaction exécutive en contrat de transition d’état GENESIS gouverné et fail-closed.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "control:compile", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    transition: compileControlTransition(payload as any)
+  }));
+
+  register("genesis.knowledge.evaluate_promotion", "Évalue la promotion d’un candidat ChatGPT/Research vers Project Context, World Model, R.E.M.E ou GENOME sans contourner les gates.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "knowledge:promote", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    promotion: evaluateKnowledgePromotion(payload as any)
+  }));
+
   return server;
 }
 
@@ -212,7 +242,8 @@ if (mode === "stdio") {
       revenueEngineVersion: GENESIS_V4_REVENUE_ENGINE_ANCHOR.version,
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
-      worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode
+      worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
+      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
     });
   });
 
