@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: rank-device
+    env: python
+    plan: starter
+    rootDir: rank-device
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: DEFAULT_WHATSAPP_NUMBER
+        sync: false

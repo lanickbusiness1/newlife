@@ -1,0 +1,1 @@
+"""Rank Device application."""
