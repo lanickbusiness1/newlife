@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import type { CandidateContext } from '../../lib/repositories/candidate-context.js';
 import { candidateApi, CandidateApiError } from '../../lib/http/api-client.js';
 import { CandidateHeader } from './CandidateHeader';
+import { CareerPathwayPanel } from './CareerPathwayPanel';
 
 export function CandidateDashboard() {
   const [context, setContext] = useState<CandidateContext | null>(null);
@@ -56,6 +57,7 @@ export function CandidateDashboard() {
           </>
         )}
       </section>
+      {context && !error ? <CareerPathwayPanel /> : null}
     </main>
   );
 }
