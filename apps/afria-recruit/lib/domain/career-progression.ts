@@ -71,9 +71,17 @@ function sameText(left: string | undefined, right: string): boolean {
 }
 
 function effectiveSignals(opportunity: CareerOpportunity, goal: CareerGoal): OpportunityProgressionSignals {
-  let goalAlignment = opportunity.progression.goalAlignment;
-  if (sameText(goal.targetOrganization, opportunity.organization)) goalAlignment += 15;
-  if (goal.targetKind && goal.targetKind === opportunity.kind) goalAlignment += 10;
+  const organizationMatch = sameText(goal.targetOrganization, opportunity.organization);
+  const kindMatch = Boolean(goal.targetKind && goal.targetKind === opportunity.kind);
+  const hasStructuredTarget = Boolean(goal.targetOrganization || goal.targetKind);
+
+  let goalAlignment = 0;
+  if (hasStructuredTarget && (organizationMatch || kindMatch)) {
+    goalAlignment = opportunity.progression.goalAlignment;
+    if (organizationMatch) goalAlignment += 15;
+    if (kindMatch) goalAlignment += 10;
+  }
+
   return { ...opportunity.progression, goalAlignment };
 }
 
