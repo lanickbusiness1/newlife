@@ -31,6 +31,8 @@ const COMPONENT_LABELS: Record<string, string> = {
   immediateFit: 'Adéquation immédiate',
 };
 
+type CardContext = 'recommended' | 'review' | 'ineligible';
+
 function formatMissingData(action: CareerNextAction): string[] {
   return action.missingData.map((key) => MISSING_LABELS[key] ?? key);
 }
@@ -53,13 +55,19 @@ function ScoreBreakdown({ action }: { action: CareerNextAction }) {
   );
 }
 
-function PathwayCard({ action }: { action: CareerNextAction }) {
+function cardPrefix(action: CareerNextAction, context: CardContext): string {
+  if (context === 'recommended') return `#${action.rank}`;
+  if (context === 'review') return 'À vérifier';
+  return 'Écart bloquant';
+}
+
+function PathwayCard({ action, context }: { action: CareerNextAction; context: CardContext }) {
   const missing = formatMissingData(action);
   return (
     <article className={`candidate-card ${styles.card}`}>
       <div className={styles.cardHead}>
         <div>
-          <span className="candidate-kicker">#{action.rank} · {action.opportunity.kind.replaceAll('_', ' ')}</span>
+          <span className="candidate-kicker">{cardPrefix(action, context)} · {action.opportunity.kind.replaceAll('_', ' ')}</span>
           <h3>{action.opportunity.title}</h3>
           <p>{action.opportunity.organization}</p>
         </div>
@@ -99,6 +107,18 @@ function PathwayCard({ action }: { action: CareerNextAction }) {
   );
 }
 
+function ActionGroup({ title, actions, context }: { title: string; actions: CareerNextAction[]; context: CardContext }) {
+  if (actions.length === 0) return null;
+  return (
+    <section aria-label={title}>
+      {context !== 'recommended' ? <h3>{title}</h3> : null}
+      <div className={styles.list}>
+        {actions.map((action) => <PathwayCard key={action.opportunity.id} action={action} context={context} />)}
+      </div>
+    </section>
+  );
+}
+
 export function CareerPathwayPanel() {
   const [goal, setGoal] = useState('');
   const [result, setResult] = useState<CareerPathwayResult | null>(null);
@@ -108,6 +128,15 @@ export function CareerPathwayPanel() {
   const missingFacts = useMemo(() => {
     if (!result) return [];
     return [...new Set(result.actions.flatMap(formatMissingData))];
+  }, [result]);
+
+  const grouped = useMemo(() => {
+    if (!result) return { eligible: [], review: [], ineligible: [] } as const;
+    return {
+      eligible: result.actions.filter((action) => action.eligibility.status === 'ELIGIBLE'),
+      review: result.actions.filter((action) => action.eligibility.status === 'REVIEW_REQUIRED'),
+      ineligible: result.actions.filter((action) => action.eligibility.status === 'INELIGIBLE'),
+    };
   }, [result]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -169,9 +198,14 @@ export function CareerPathwayPanel() {
             </div>
           )}
 
-          <div className={styles.list}>
-            {result.actions.map((action) => <PathwayCard key={action.opportunity.id} action={action} />)}
-          </div>
+          {grouped.eligible.length === 0 ? (
+            <div className="candidate-alert">Aucune recommandation sûre tant que les critères bloquants ne sont pas vérifiés.</div>
+          ) : (
+            <ActionGroup title="Prochaines étapes recommandées" actions={grouped.eligible} context="recommended" />
+          )}
+
+          <ActionGroup title="À vérifier avant recommandation" actions={grouped.review} context="review" />
+          <ActionGroup title="Non éligibles actuellement" actions={grouped.ineligible} context="ineligible" />
         </div>
       )}
     </section>
