@@ -1,9 +1,9 @@
 # AFRIAGENESIS® Intelligence MCP Server
 
-Package MCP canonique : `0.2.0`  
-Révision du control plane GENESIS V4 : `0.4.0`
+Package MCP canonique : `0.3.0`  
+Révision du control plane GENESIS V4 : `0.6.0`
 
-Passerelle MCP stateless, tenant-aware et deny-by-default du Universal Executive Intelligence OS™. Le service contient désormais le Revenue Engine, le CEO Validation → DeployBot Relay et le World Model Runtime Proof déterministe.
+Passerelle MCP stateless, tenant-aware et deny-by-default du Universal Executive Intelligence OS™. Le service contient le Revenue Engine, le CEO Validation → DeployBot Relay, le World Model Runtime Proof et le ChatGPT Native Control Plane déterministe.
 
 ## Endpoints
 
@@ -45,6 +45,26 @@ Le World Model Runtime est actuellement une **preuve déterministe sandbox**. Il
 Les actions P0 sont des contrats sandbox (`crm.lead.upsert_sandbox`, `crm.task.create_sandbox`, `crm.opportunity.move_sandbox`, `noop`). Aucune capacité d’envoi réel d’email/WhatsApp, de transfert de fonds, d’engagement juridique, de communication institutionnelle externe ou de mutation irréversible n’est introduite par ce proof.
 
 Les schémas SQL canoniques GENESIS V4 restent l’autorité de persistance : `065`, `070`, `071`, `072`, `074`, `076`. Leur présence dans Google Drive/Notion ne constitue pas une preuve de migration staging. Le statut `STAGING_PROVEN` exige une exécution ordonnée et vérifiée de la chaîne SQL complète sur une base autorisée.
+
+## ChatGPT Native Control Plane
+
+L’extension ne crée ni GENESIS V5 ni un orchestrateur parallèle. Elle applique l’ordre d’autorité suivant :
+
+`GENOME → R.E.M.E → World Model → Project Context → ChatGPT Memory`.
+
+ChatGPT Memory reste explicitement **non canonique**.
+
+Outils gouvernés :
+
+- `genesis.context.compile` — scope `context:compile`
+- `genesis.control.compile_transition` — scope `control:compile`
+- `genesis.knowledge.evaluate_promotion` — scope `knowledge:promote`
+
+Le Context Compiler assemble un paquet de contexte borné. Le Control Protocol transforme une interaction exécutive en contrat de transition d’état fail-closed. La Promotion Pipeline empêche une sortie de chat, mémoire ou recherche d’atteindre directement R.E.M.E ou GENOME sans les preuves et gates requis.
+
+### Frontière client ChatGPT
+
+Le serveur MCP est indépendant du plan ChatGPT utilisé par le CEO. La disponibilité d’un branchement MCP personnalisé directement dans l’interface ChatGPT dépend des capacités du plan OpenAI au moment de l’usage. Cette documentation ne considère jamais la présence du serveur comme une preuve que le client ChatGPT est connecté.
 
 ## Validation Relay
 
