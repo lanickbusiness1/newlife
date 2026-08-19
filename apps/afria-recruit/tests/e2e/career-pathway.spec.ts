@@ -19,8 +19,10 @@ test('candidate sees ranked career next actions with provenance and no auto-subm
   await page.getByRole('button', { name: 'Calculer ma prochaine étape' }).click();
 
   await expect(page.getByRole('heading', { name: 'Prochaines étapes recommandées' })).toBeVisible();
+  await expect(page.getByText('Aucune recommandation sûre tant que les critères bloquants ne sont pas vérifiés.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'À vérifier avant recommandation' })).toBeVisible();
   await expect(page.getByText('Source officielle').first()).toBeVisible();
-  await expect(page.getByText(/À vérifier|Éligible/).first()).toBeVisible();
+  await expect(page.getByText('À vérifier').first()).toBeVisible();
   await expect(page.getByText('Score de progression — heuristique explicable').first()).toBeVisible();
   await expect(page.getByText(/Âge à renseigner|Données à compléter/i).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /Postuler automatiquement/i })).toHaveCount(0);
