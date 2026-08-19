@@ -4,7 +4,9 @@ import { createUserTokenClient } from '../supabase/user-client.js';
 import type { Database } from '../supabase/database.types.js';
 import { getCandidateRepository } from '../repositories/index.js';
 import { getCandidateAiAdapter } from '../ai/index.js';
+import { OFFICIAL_CAREER_OPPORTUNITIES } from '../fixtures/career-opportunities.js';
 import { CandidateOptimizerService } from './candidate-optimizer-service.js';
+import { CareerPathwayService } from './career-pathway-service.js';
 import { LiveDecisionStore, LiveHumanReviewStore, LiveJobRepository } from './live-stores.js';
 import { createCandidateE2ERuntime, isCandidateE2ERequest } from '../testing/e2e-runtime.js';
 import { InterviewService } from './interview-service.js';
@@ -57,5 +59,9 @@ export async function createCandidateRuntime(request: Request) {
     applicationStore: new LiveApplicationStore(admin),
     eventStore: new LiveApplicationEventStore(admin),
   });
-  return { auth, service, interviewService, applicationService };
+  const careerPathwayService = new CareerPathwayService({
+    candidateRepository,
+    opportunities: OFFICIAL_CAREER_OPPORTUNITIES,
+  });
+  return { auth, service, interviewService, applicationService, careerPathwayService };
 }

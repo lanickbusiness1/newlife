@@ -2,6 +2,7 @@ import type { CandidateContext } from '../repositories/candidate-context.js';
 import type { DiagnosticFinding, JobSpec, RequirementCoverage } from '../domain/types.js';
 import type { ConfirmedFact } from '../domain/evidence-elicitation.js';
 import type { RecruiterLensItem } from '../domain/recruiter-lens.js';
+import type { CareerPathwayResult } from '../services/career-pathway-service.js';
 
 export type DiagnosticResponse = { decisionId: string; diagnostic: { findings: DiagnosticFinding[] } };
 export type GapAnalysisResponse = {
@@ -53,6 +54,7 @@ export const candidateApi = {
   context: () => requestJson<{ context: CandidateContext }>('/api/candidate/context'),
   diagnostic: () => requestJson<DiagnosticResponse>('/api/candidate/diagnostic', { method: 'POST' }),
   jobs: () => requestJson<{ jobs: JobSpec[] }>('/api/candidate/jobs'),
+  careerPathway: (goal: string) => requestJson<CareerPathwayResult>(`/api/candidate/career-pathway?goal=${encodeURIComponent(goal)}`),
   gapAnalysis: (jobId: string) => requestJson<GapAnalysisResponse>('/api/candidate/gap-analysis', { method: 'POST', body: JSON.stringify({ jobId }) }),
   rewrite: (sourceRef: string, sourceStatement: string, jobId: string, consent: boolean, confirmedFacts: ConfirmedFact[] = []) => requestJson<{ decisionId: string; rewrite: { text: string; usedMetrics: string[]; usedConfirmedFacts?: string[] }; consentId: string | null }>('/api/candidate/rewrite', {
     method: 'POST',
