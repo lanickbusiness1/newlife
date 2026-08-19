@@ -97,6 +97,14 @@ test('progression scoring clamps components and discloses weighted components', 
   assert.ok(scored.total >= 0 && scored.total <= 100);
 });
 
+test('unstructured free-text goal never pretends to know career-goal alignment', () => {
+  const scored = scoreProgression(
+    fixture('free-text-goal', { progression: { goalAlignment: 95, evidenceGain: 70, skillGain: 70, futureEligibilityUnlock: 70, networkExposure: 70, immediateFit: 70 } }),
+    { id: 'goal-free', title: 'Programme Officer' },
+  );
+  assert.equal(scored.components.goalAlignment.raw, 0);
+});
+
 test('eligible opportunities rank before review-required and ineligible opportunities', () => {
   const ranked = rankCareerNextActions(goal, [ineligibleHigh, reviewHigh, eligibleLow], profile, now);
   assert.equal(ranked[0].eligibility.status, 'ELIGIBLE');
