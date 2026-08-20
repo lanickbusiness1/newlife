@@ -30,8 +30,9 @@ describe("AfrIA Marketing Team production domain", () => {
     expect(CAPABILITIES).toContain("EXPORT");
   });
 
-  test("product shell exposes production sections", () => {
+  test("product shell exposes production and cash activation sections", () => {
     expect(PRODUCT_SECTIONS).toContain("Revenue Cockpit");
+    expect(PRODUCT_SECTIONS).toContain("Cash Activation");
     expect(PRODUCT_SECTIONS).toContain("R.E.M.E");
     expect(PRODUCT_SECTIONS).toContain("Governance");
   });
