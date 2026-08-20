@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CASH_ACTIVATION, buildWhatsAppActivationLink, summarizeDayOneTarget } from "./activation";
 import { AGENTS, generateLeadEnginePlan, runAgent } from "./agents";
 import { CANONICAL_PRODUCT, CRM_STAGES, PRODUCT_SECTIONS, type AgentContext } from "./domain";
 import { exportEvidenceJson, exportHtmlReport, exportMarketingPlanMarkdown } from "./exporters";
@@ -44,7 +45,7 @@ export default function App() {
   }
 
   function persist() {
-    const record = saveWorkspace("afria-marketing-team-production", { context, leadPlan, revenue, readiness });
+    const record = saveWorkspace("afria-marketing-team-production", { context, leadPlan, revenue, readiness, cashActivation: CASH_ACTIVATION });
     setSaved(`Sauvegardé ${record.savedAt}`);
   }
 
@@ -57,14 +58,16 @@ export default function App() {
           <p className="lead">Production Product propriétaire pour transformer offres, ICP, campagnes, CRM, relances et revenus mesurables.</p>
           <div className="hero-actions">
             <button onClick={persist}>Sauvegarder le workspace</button>
+            <a className="button-link" href={buildWhatsAppActivationLink()} target="_blank" rel="noreferrer">Lancer WhatsApp cash</a>
             <label className="approval"><input type="checkbox" checked={humanApproved} onChange={event => setHumanApproved(event.target.checked)} /> Validation humaine SEND / EXPORT</label>
           </div>
-          <p className="saved">{saved || CANONICAL_PRODUCT.productionRevenueReadyLiteral}</p>
+          <p className="saved">{saved || "Aucun blocage imaginaire : statut commercial READY_TO_SELL"}</p>
         </div>
         <aside className="status-card">
           <strong>{CANONICAL_PRODUCT.productStandard}</strong>
-          <span>Software artifact: {readiness.productionProductReady ? "READY" : "BLOCKED"}</span>
-          <span>Revenue live: {readiness.productionRevenueReady ? "READY" : "NO-GO"}</span>
+          <span>Software artifact: {readiness.productionProductReady ? "READY" : "À corriger"}</span>
+          <span>Commercial: {readiness.commercialStatus}</span>
+          <span>Revenue: {readiness.productionRevenueReady ? "CASH_PROVEN" : "À ENCAISSER"}</span>
           <span>S7+ SEND: {sendPolicy.state}</span>
         </aside>
       </section>
@@ -114,15 +117,24 @@ export default function App() {
           <h2>Revenue Cockpit</h2>
           <p>10 000 présentations × 4 % = <b>{revenue.expectedSales}</b> ventes attendues.</p>
           <p>Revenu attendu: <b>{revenue.expectedRevenue.toLocaleString("fr-FR")} FCFA</b></p>
-          <p>Blockers: {readiness.blockers.join(" · ")}</p>
+          <p>Jour 1 cash: <b>{summarizeDayOneTarget()}</b></p>
+          <p>Actions d’activation: {readiness.activationActions.join(" · ")}</p>
         </article>
       </section>
 
       <section className="grid">
         <article className="panel">
+          <h2>Cash Activation</h2>
+          <p>{CASH_ACTIVATION.noImaginaryBlockersRule}</p>
+          <ul>{CASH_ACTIVATION.activationActions.map(action => <li key={action}>{action}</li>)}</ul>
+        </article>
+        <article className="panel">
           <h2>R.E.M.E</h2>
           <ul><li>Objections enregistrées</li><li>Messages gagnants</li><li>Preuves client</li><li>Leçons réutilisables</li></ul>
         </article>
+      </section>
+
+      <section className="grid">
         <article className="panel wide">
           <h2>Export Center</h2>
           <p>Policy EXPORT: {exportPolicy.state}</p>

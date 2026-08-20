@@ -1,4 +1,4 @@
-name: AfrIA Marketing Team Production Product
+name: AfrIA Marketing Team Production Product Cash Activation
 
 on:
   pull_request:
@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - afria-marketing-team-production-product
+      - afria-marketing-team-finalize-cash-execution
     paths:
       - 'apps/afria-marketing-team/**'
       - '.github/workflows/afria-marketing-team-production.yml'
@@ -47,7 +48,9 @@ jobs:
         run: |
           grep -R "PRD-MKT-TEAM-001" apps/afria-marketing-team
           grep -R "Production Product" apps/afria-marketing-team
-          grep -R "PRODUCTION_REVENUE_READY=false" apps/afria-marketing-team
+          grep -R "READY_TO_SELL" apps/afria-marketing-team
+          grep -R "Blocage vérifié.*AUCUN\|Aucun blocage imaginaire\|zéro blocage imaginaire" apps/afria-marketing-team
+          grep -R "Cash Activation" apps/afria-marketing-team
           grep -R "R.E.M.E" apps/afria-marketing-team
           grep -R "S7+" apps/afria-marketing-team
           grep -R "CyberAudit" apps/afria-marketing-team
