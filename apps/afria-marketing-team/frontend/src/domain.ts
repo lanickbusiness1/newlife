@@ -95,6 +95,7 @@ export const PRODUCT_SECTIONS = [
   "LeadEngine",
   "CRM",
   "Revenue Cockpit",
+  "Cash Activation",
   "R.E.M.E",
   "Export Center",
   "Governance"
