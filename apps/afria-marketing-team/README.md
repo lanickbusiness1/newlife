@@ -1,19 +1,33 @@
-# AfrIA Marketing Team™ — MVP Cash Rapide
+# AfrIA Marketing Team™ — Production Product v1.0
 
 **Product ID:** `PRD-MKT-TEAM-001`  
 **GENOME:** `GENESIS_V4`  
 **Revenue Engine:** `GEN-V4-REV-ENGINE-001`  
-**Role:** premier moteur de cash rapide AfrIAgenesis®, puis moteur commercial transversal pour les autres produits.
+**Baseline canonique:** `v1.1 + Auto-GTM P0 v0.3.0`  
+**Product standard:** `Production Product`  
+**Revenue live boundary:** `PRODUCTION_REVENUE_READY=false`
 
-## Objectif
+AfrIA Marketing Team™ est le premier moteur commercial propriétaire AfrIAgenesis® : il sert à vendre ses propres offres rapidement, puis à devenir l’opérateur commercial transversal pour AfrIA PaySwitch™, AfrIA Recruit™, AfrIA CyberAudit™, AfrIA PIA™ et les autres produits.
 
-Transformer AfrIA Marketing Team™ en produit vendable immédiatement : offre claire, ICP, scripts, CRM, séquence, paiement manuel et première preuve d’encaissement.
+## Ce que livre cette version production
 
-## Offres MVP
+- PWA premium avec interface sombre africaine.
+- Command Center produit/offre/pays/acheteur.
+- 5 agents opérationnels : Stratège, Créateur, Designer, Analyste, CMO IA.
+- LeadEngine™ : ICP, script, séquence J+0/J+1/J+3/J+5/J+7/J+14.
+- CRM pipeline : Signal → Lead qualifié → Diagnostic → Proposition → Paiement → Livraison → Cas client → Upsell / Referral.
+- Revenue Cockpit : loi des moyennes, ventes attendues, revenu attendu, blockers de cash collection.
+- R.E.M.E : objections, messages gagnants, preuves, lessons réutilisables.
+- Export Center : Markdown plan, JSON evidence, HTML report.
+- S7+ policy gate : SEND, PAY, DELETE, EXPORT nécessitent validation humaine.
+- FastAPI backend boundary : health, product intake, policy simulation, evidence validation.
+- CI production : frontend tests/build, backend tests, static anchors.
+
+## Offres commerciales
 
 | Offre | Prix | Client cible | Livrable |
 |---|---:|---|---|
-| Starter | 49 900 FCFA | entrepreneur solo / petite PME | 1 offre, scripts, mini CRM, séquence 14 jours |
+| Starter | 49 900 FCFA | entrepreneur solo / petite PME | 1 offre, scripts, CRM pipeline, séquence 14 jours |
 | Business | 89 900 FCFA | PME active | 3 offres, 3 ICP, calendrier contenu, CRM complet |
 | Agence | 199 000 FCFA | agence, cabinet, consultant senior | 5 campagnes, objections, cash collection, upsell/referral |
 
@@ -35,29 +49,25 @@ Produit
 → Scale / Correct / Kill
 ```
 
-## Canaux de lancement
+## Configuration live restante
 
-1. WhatsApp direct : prospects chauds, entrepreneurs, PME, consultants.
-2. LinkedIn : dirigeants, consultants, diaspora, cabinets.
-3. Email : institutions, agences, partenaires.
-4. Terrain : Bamako/Cotonou/Conakry selon disponibilité.
+Le logiciel peut être terminé et testé sans prétendre être prêt pour revenu live. Avant de déclarer `PRODUCTION_REVENUE_READY=true`, il faut configurer et vérifier :
 
-## Configuration production restante
-
-Avant d’appeler ce MVP `PRODUCTION_REVENUE_READY`, configurer :
-
-- `WHATSAPP_NUMBER` dans `apps/afria-marketing-team/index.html`.
+- WhatsApp Business/API sender réel.
 - Compte Mobile Money / virement / facture.
-- CRM persistant ou export Airtable/Notion/Sheets.
-- Référence preuve paiement.
+- CRM persistant ou connecteur externe.
+- Domaine de production et TLS.
+- Référence de preuve paiement.
 - Owner cash collection.
+- Premier client payant et preuve d’encaissement.
 
 ## Gates
 
-- **M6** : offre, scripts, preuve, landing et CRM MVP cohérents.
-- **S7+** : pas de données sensibles, rollback manuel possible, pas de paiement automatique non contrôlé.
-- **M8** : pricing, cible, promesse, potentiel revenu.
-- **Big4** : non requis pour MVP PME ; requis avant scale institutionnel.
+- **M6** : tests, build, evidence pack, product contract et chain Release-to-Revenue cohérents.
+- **S7+** : SEND/PAY/DELETE/EXPORT séparés, human gate, kill switch, pas de secrets.
+- **CyberAudit** : abus, cross-tenant, injection, secret leakage, export, consent et rollback à vérifier avant scale.
+- **M8** : gouvernance stratégique après preuve de revenu.
+- **Big4** : requis avant scale institutionnel ou promesse économique sensible.
 
 ## Premier objectif cash
 
@@ -67,3 +77,26 @@ Avant d’appeler ce MVP `PRODUCTION_REVENUE_READY`, configurer :
 - 4 ventes.
 - Revenu attendu Starter : `4 × 49 900 = 199 600 FCFA`.
 - Objectif stretch à 10 000 présentations : `400 ventes × 49 900 = 19 960 000 FCFA`.
+
+## Exécution locale
+
+Frontend :
+
+```bash
+cd apps/afria-marketing-team/frontend
+npm install
+npm run typecheck
+npm test
+npm run build
+```
+
+Backend :
+
+```bash
+cd apps/afria-marketing-team/backend
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+pytest -q
+uvicorn main:app --reload
+```
