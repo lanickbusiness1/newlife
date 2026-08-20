@@ -10,6 +10,9 @@ import {
   GENESIS_V4_TODAY_INNOVATIONS
 } from "./revenueEngine.js";
 import { compileValidationRelay, GENESIS_V4_VALIDATION_RELAY_ANCHOR } from "./validationRelay.js";
+import { compileDeploymentRequest } from "./deploymentOrchestrator.js";
+import { compileDomainIntent } from "./domainManager.js";
+import { compileReleaseEvidenceBundle, verifyReleaseEvidenceBundle } from "./releaseCenter.js";
 import {
   decideNextAction,
   evaluateOutcome,
@@ -24,8 +27,10 @@ import {
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
 
-const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.6.0";
+const PACKAGE_VERSION = "0.4.0";
+const CONTROL_PLANE_REVISION = "0.7.0";
+const SOVEREIGN_DELIVERY_RUNTIME = "DEPLOYBOT_SOVEREIGN_DELIVERY_RUNTIME_0.4.0";
+const RELEASE_EVIDENCE_SCHEMA = "1.0.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -68,9 +73,9 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
+    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine and Sovereign Delivery Runtime v0.4.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.4.0 / control-plane revision 0.7.0: deterministic runtime contracts do not constitute provider, DNS, HTTPS or production proof without externally captured release evidence."]
   };
 }
 
@@ -161,6 +166,38 @@ function buildServer() {
     ...compileValidationRelay(payload)
   }));
 
+  register("deploybot.deployment.compile", "Compile un contrat de déploiement provider-neutral avec gate de souveraineté.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    deployment: compileDeploymentRequest(payload as any)
+  }));
+
+  register("deploybot.domain.compile", "Compile l'intention DNS canonique *.afriagenesis.com pour un environnement DeployBot.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    domain: compileDomainIntent(payload as any)
+  }));
+
+  register("deploybot.release.compile", "Compile un Release Evidence Bundle immuable et hashé avant livraison terminale.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    release: compileReleaseEvidenceBundle(payload as any)
+  }));
+
+  register("deploybot.release.verify", "Vérifie l'intégrité et les gates d'un Release Evidence Bundle avant DELIVERED_*.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    verification: verifyReleaseEvidenceBundle((payload as any)?.bundle, (payload as any)?.policy)
+  }));
+
   register("world.reconstruct_state", "Reconstruit un World State depuis des observations explicitement sourcées et conserve leur lineage de preuve.", {
     context: RequestContext,
     payload: z.unknown()
@@ -242,6 +279,8 @@ if (mode === "stdio") {
       revenueEngineVersion: GENESIS_V4_REVENUE_ENGINE_ANCHOR.version,
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
+      sovereignDeliveryRuntime: SOVEREIGN_DELIVERY_RUNTIME,
+      releaseEvidenceSchema: RELEASE_EVIDENCE_SCHEMA,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
     });
