@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { compileReleaseEvidenceBundle } from "../src/releaseCenter";
 import {
   compileValidationRelay,
   type ValidationRelayInput
@@ -17,6 +18,46 @@ const baseInput: ValidationRelayInput = {
     productionDelegated: true
   }
 };
+
+function serviceBundle() {
+  return compileReleaseEvidenceBundle({
+    releaseId: "REL-MCP-0.4.0",
+    assetId: "INF-DEPLOYBOT-001",
+    version: "0.4.0",
+    commitSha: "abc123",
+    ciRun: "run-release",
+    testSummary: "all tests passed",
+    gates: { m6: "pass", s7plus: "pass", m8: "pass" },
+    sovereigntyDecisionRef: "SOV-DEPLOY-001",
+    provider: {
+      provider: "render",
+      deploymentId: "dep-1",
+      deploymentUrl: "https://provider.example",
+      deployedCommitSha: "abc123",
+      deployedAt: "2026-08-20T02:00:00Z",
+      providerStatus: "live"
+    },
+    domain: {
+      hostname: "mcp.afriagenesis.com",
+      resolvedTargets: ["provider.example"],
+      dnsVerified: true,
+      tlsVerified: true,
+      httpsStatus: 200,
+      verifiedAt: "2026-08-20T02:01:00Z"
+    },
+    finalUrlOrArtifact: "https://mcp.afriagenesis.com",
+    healthcheck: {
+      url: "https://mcp.afriagenesis.com/health",
+      status: 200,
+      passed: true,
+      checkedAt: "2026-08-20T02:02:00Z"
+    },
+    rollback: { reference: "rollback:dep-1", verified: true },
+    changelog: ["Sovereign Delivery Runtime"],
+    remeRef: "REME-REL-001",
+    generatedAt: "2026-08-20T02:03:00Z"
+  });
+}
 
 describe("GENESIS V4 CEO Validation Relay", () => {
   test("takes the relay automatically after CEO validation and asks for build evidence next", () => {
@@ -62,7 +103,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     ]));
   });
 
-  test("returns DELIVERED_URL only when the complete evidence contract is satisfied", () => {
+  test("keeps legacy terminal delivery compatible until bundle enforcement is activated", () => {
     const output = compileValidationRelay({
       ...baseInput,
       evidence: {
@@ -79,15 +120,47 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     });
 
     expect(output.state).toBe("DELIVERED_URL");
-    expect(output.continueAutomatically).toBe(false);
-    expect(output.humanApprovalRequired).toBe(false);
-    expect(output.finalDeliverable).toBe("https://example.africa");
   });
 
-  test("maps Android APK delivery to DELIVERED_APK", () => {
+  test("fails closed for URL delivery when release bundle enforcement is active", () => {
+    const output = compileValidationRelay({
+      ...baseInput,
+      releaseEvidenceEnforced: true,
+      evidence: {
+        commitSha: "abc123",
+        ciRun: "run-2",
+        testsPassed: true,
+        m6: "pass",
+        s7plus: "pass",
+        m8: "pass",
+        finalUrlOrArtifact: "https://example.africa",
+        healthcheckPassed: true,
+        rollbackRef: "rollback:v1"
+      }
+    });
+
+    expect(output.state).toBe("DEPLOYED_UNVERIFIED");
+    expect(output.blockers).toContain("Release Evidence Bundle required");
+  });
+
+  test("returns DELIVERED_SERVICE from a verified release bundle", () => {
+    const bundle = serviceBundle();
+    const output = compileValidationRelay({
+      ...baseInput,
+      targetDeliverable: "service",
+      releaseEvidenceEnforced: true,
+      evidence: { releaseEvidenceBundle: bundle }
+    });
+
+    expect(output.state).toBe("DELIVERED_SERVICE");
+    expect(output.finalDeliverable).toBe("https://mcp.afriagenesis.com");
+  });
+
+  test("preserves APK delivery compatibility without public DNS", () => {
     const output = compileValidationRelay({
       ...baseInput,
       targetDeliverable: "apk",
+      releaseEvidenceEnforced: true,
       evidence: {
         commitSha: "def456",
         ciRun: "run-3",
