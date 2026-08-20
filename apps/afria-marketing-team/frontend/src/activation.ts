@@ -28,7 +28,7 @@ export const CASH_ACTIVATION = {
     "Bonjour, j’ai finalisé AfrIA Marketing Team™, une équipe marketing IA prête à générer offre, scripts, CRM et relances pour entrepreneurs et PME africaines. L’offre Starter est à 49 900 FCFA avec un diagnostic rapide. On le lance pour votre activité ?"
 } as const;
 
-export function buildWhatsAppActivationLink(message = CASH_ACTIVATION.openingMessage): string {
+export function buildWhatsAppActivationLink(message: string = CASH_ACTIVATION.openingMessage): string {
   const phone = CASH_ACTIVATION.primaryWhatsApp.replace(/\D/g, "");
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
