@@ -2,7 +2,7 @@ export const CASH_ACTIVATION = {
   status: "READY_TO_SELL",
   noImaginaryBlockersRule: "Live setup items are activation tasks unless a verified technical, legal, security, or permission failure exists.",
   owner: "Lanick Mohamed / AfrIAgenesis®",
-  primaryWhatsApp: "+2290161107373",
+  primaryWhatsApp: "+22961107373",
   secondaryWhatsApp: "+224611406262",
   firstOffer: {
     name: "Starter Revenue Engine",
