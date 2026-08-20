@@ -19,10 +19,14 @@ export interface ReadinessInput {
   firstCashProof: boolean;
 }
 
+export type CommercialStatus = "FIX_PRODUCT" | "READY_TO_SELL" | "READY_TO_COLLECT_CASH" | "CASH_PROVEN";
+
 export interface ReadinessOutput {
   productionProductReady: boolean;
   productionRevenueReady: boolean;
-  blockers: string[];
+  commercialStatus: CommercialStatus;
+  activationActions: string[];
+  verifiedBlockers: string[];
   gates: {
     m6: "pass" | "fail";
     s7plus: "pass" | "fail";
@@ -48,22 +52,28 @@ export function calculateRevenueMath(input: RevenueMathInput): RevenueMathOutput
 }
 
 export function assessProductionReadiness(input: ReadinessInput): ReadinessOutput {
-  const blockers = [
-    input.offerReady ? "" : "Offer not ready",
-    input.icpReady ? "" : "ICP not ready",
-    input.crmReady ? "" : "CRM not ready",
-    input.paymentConfigured ? "" : "Payment provider not configured",
-    input.whatsappConfigured ? "" : "WhatsApp Business/API sender not configured",
-    input.firstCashProof ? "" : "First cash collection proof missing"
+  const verifiedBlockers = [
+    input.offerReady ? "" : "Offre produit absente",
+    input.icpReady ? "" : "ICP prioritaire absent",
+    input.crmReady ? "" : "Pipeline CRM absent"
+  ].filter(Boolean);
+
+  const activationActions = [
+    input.paymentConfigured ? "" : "Configurer paiement réel ou procédure d'encaissement manuelle",
+    input.whatsappConfigured ? "" : "Configurer sender WhatsApp commercial",
+    input.firstCashProof ? "" : "Collecter première preuve d'encaissement"
   ].filter(Boolean);
 
   const productionProductReady = input.offerReady && input.icpReady && input.crmReady;
   const productionRevenueReady = productionProductReady && input.paymentConfigured && input.whatsappConfigured && input.firstCashProof;
+  const commercialStatus = deriveCommercialStatus(productionProductReady, productionRevenueReady, activationActions);
 
   return {
     productionProductReady,
     productionRevenueReady,
-    blockers,
+    commercialStatus,
+    activationActions,
+    verifiedBlockers,
     gates: {
       m6: productionProductReady ? "pass" : "fail",
       s7plus: input.crmReady ? "pass" : "fail",
@@ -72,4 +82,15 @@ export function assessProductionReadiness(input: ReadinessInput): ReadinessOutpu
       big4: "not_required"
     }
   };
+}
+
+function deriveCommercialStatus(
+  productionProductReady: boolean,
+  productionRevenueReady: boolean,
+  activationActions: string[]
+): CommercialStatus {
+  if (!productionProductReady) return "FIX_PRODUCT";
+  if (productionRevenueReady) return "CASH_PROVEN";
+  if (activationActions.length <= 1) return "READY_TO_COLLECT_CASH";
+  return "READY_TO_SELL";
 }
