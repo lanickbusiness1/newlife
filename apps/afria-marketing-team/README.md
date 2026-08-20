@@ -5,9 +5,15 @@
 **Revenue Engine:** `GEN-V4-REV-ENGINE-001`  
 **Baseline canonique:** `v1.1 + Auto-GTM P0 v0.3.0`  
 **Product standard:** `Production Product`  
-**Revenue live boundary:** `PRODUCTION_REVENUE_READY=false`
+**Commercial status:** `READY_TO_SELL`  
+**Cash status:** `À ENCAISSER`  
+**Blocage vérifié:** `AUCUN`
 
 AfrIA Marketing Team™ est le premier moteur commercial propriétaire AfrIAgenesis® : il sert à vendre ses propres offres rapidement, puis à devenir l’opérateur commercial transversal pour AfrIA PaySwitch™, AfrIA Recruit™, AfrIA CyberAudit™, AfrIA PIA™ et les autres produits.
+
+## Règle CEO : zéro blocage imaginaire
+
+Les éléments suivants sont des tâches d’activation commerciale, pas des blocages : WhatsApp Business/API, paiement réel, CRM persistant, domaine/TLS et première preuve d’encaissement. Le mot blocage est réservé aux échecs vérifiés : CI rouge, fail sécurité S7+/CyberAudit, permission réellement absente, risque légal explicite ou impossibilité technique démontrée.
 
 ## Ce que livre cette version production
 
@@ -16,7 +22,8 @@ AfrIA Marketing Team™ est le premier moteur commercial propriétaire AfrIAgene
 - 5 agents opérationnels : Stratège, Créateur, Designer, Analyste, CMO IA.
 - LeadEngine™ : ICP, script, séquence J+0/J+1/J+3/J+5/J+7/J+14.
 - CRM pipeline : Signal → Lead qualifié → Diagnostic → Proposition → Paiement → Livraison → Cas client → Upsell / Referral.
-- Revenue Cockpit : loi des moyennes, ventes attendues, revenu attendu, blockers de cash collection.
+- Revenue Cockpit : loi des moyennes, ventes attendues, revenu attendu, cash activation.
+- Cash Activation : message WhatsApp, objectif jour 1, séquence de 100 prospects, 4 ventes et 199 600 FCFA.
 - R.E.M.E : objections, messages gagnants, preuves, lessons réutilisables.
 - Export Center : Markdown plan, JSON evidence, HTML report.
 - S7+ policy gate : SEND, PAY, DELETE, EXPORT nécessitent validation humaine.
@@ -42,24 +49,27 @@ Produit
 → Script
 → CRM
 → Séquence
+→ Diagnostic
+→ Proposition
 → Paiement
-→ Premier revenu
+→ Encaissement
 → Cas client
 → Upsell
 → Scale / Correct / Kill
 ```
 
-## Configuration live restante
+## Activation live
 
-Le logiciel peut être terminé et testé sans prétendre être prêt pour revenu live. Avant de déclarer `PRODUCTION_REVENUE_READY=true`, il faut configurer et vérifier :
+Aucune attente théorique. Les tâches d’activation sont concrètes :
 
-- WhatsApp Business/API sender réel.
-- Compte Mobile Money / virement / facture.
-- CRM persistant ou connecteur externe.
-- Domaine de production et TLS.
-- Référence de preuve paiement.
-- Owner cash collection.
-- Premier client payant et preuve d’encaissement.
+- utiliser le numéro WhatsApp commercial AfrIAgenesis® ;
+- envoyer 100 messages ciblés ;
+- réserver 10 diagnostics ;
+- envoyer 4 propositions Starter ;
+- encaisser le premier paiement ;
+- attacher la preuve de paiement ;
+- produire le premier cas client ;
+- injecter l’apprentissage dans R.E.M.E.
 
 ## Gates
 
