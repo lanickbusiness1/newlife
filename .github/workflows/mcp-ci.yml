@@ -1,7 +1,7 @@
 name: MCP CI
 on:
   push:
-    branches: [main]
+    branches: [main, feat/deploybot-sovereign-delivery-runtime]
     paths:
       - 'services/mcp-server/**'
       - 'render.yaml'
