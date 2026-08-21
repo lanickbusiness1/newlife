@@ -2,10 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   ContractClause,
+  ContractObligation,
   Concession,
   CorridorNode,
+  DecisionRecord,
   EvidenceArtifact,
   NationalInterestAssessment,
+  OperatorExposure,
+  ResourceAsset,
+  SovereignScenarioRecord,
+  computeOperatorConcentration,
   scoreNationalInterest,
   compareSovereignScenarios,
   type NationalInterestWeights,
@@ -19,6 +25,16 @@ const evidence = new EvidenceArtifact(
   "a".repeat(64),
   "2026-08-21T00:00:00.000Z",
   "FACT",
+);
+
+const simulationEvidence = new EvidenceArtifact(
+  "ev-sim-1",
+  "tenant-gn",
+  "simandou",
+  "synthetic://scenario/counter-proposal",
+  "b".repeat(64),
+  "2026-08-21T00:00:00.000Z",
+  "SIMULATION",
 );
 
 const weights: NationalInterestWeights = {
@@ -151,4 +167,118 @@ test("preserves concession identity and evidence lineage", () => {
 
   assert.equal(concession.operatorId, "operator-a");
   assert.equal(concession.evidence.length, 1);
+});
+
+test("models strategic resource assets with evidence-backed reserve quantities", () => {
+  const asset = new ResourceAsset(
+    "asset-iron-1",
+    "tenant-gn",
+    "simandou",
+    "IRON_ORE",
+    "Synthetic Simandou Block",
+    1_500_000_000,
+    "TONNE",
+    [evidence],
+  );
+
+  assert.equal(asset.resourceType, "IRON_ORE");
+  assert.equal(asset.reserveQuantity, 1_500_000_000);
+  assert.throws(
+    () => new ResourceAsset("asset-bad", "tenant-gn", "simandou", "IRON_ORE", "Bad", -1, "TONNE", [evidence]),
+    /reserve quantity/i,
+  );
+});
+
+test("tracks contract obligations as advisory performance observations, not autonomous legal breach findings", () => {
+  const obligation = new ContractObligation(
+    "obl-1",
+    "tenant-gn",
+    "simandou",
+    "concession-1",
+    "clause-1",
+    "operator-a",
+    "CAPEX_COMMITMENT",
+    "2030-12-31",
+    "USD 500m cumulative investment",
+    "PENDING",
+    [evidence],
+  );
+
+  const observed = obligation.observe("POTENTIAL_BREACH", evidence);
+  assert.equal(observed.performanceStatus, "POTENTIAL_BREACH");
+  assert.equal(observed.version, 2);
+  assert.equal(observed.evidence.length, 2);
+  assert.equal(obligation.performanceStatus, "PENDING");
+});
+
+test("computes operator concentration from controlled-capacity exposure", () => {
+  const exposureA = new OperatorExposure("exp-a", "tenant-gn", "simandou", "operator-a", 0.6, 3, [evidence]);
+  const exposureB = new OperatorExposure("exp-b", "tenant-gn", "simandou", "operator-b", 0.4, 2, [evidence]);
+  const concentration = computeOperatorConcentration([exposureA, exposureB]);
+
+  assert.equal(concentration.hhi, 5200);
+  assert.equal(concentration.largestOperatorId, "operator-a");
+  assert.equal(concentration.largestShare, 0.6);
+});
+
+test("requires scenario records to remain explicitly classified as simulations", () => {
+  const scenario = new SovereignScenarioRecord(
+    "scenario-1",
+    "tenant-gn",
+    "simandou",
+    "COUNTER_PROPOSAL",
+    1_450,
+    540,
+    0.62,
+    0.51,
+    0.45,
+    [simulationEvidence],
+  );
+
+  assert.equal(scenario.truthClass, "SIMULATION");
+  assert.throws(
+    () =>
+      new SovereignScenarioRecord(
+        "scenario-bad",
+        "tenant-gn",
+        "simandou",
+        "OFFER_A",
+        1_000,
+        400,
+        0.5,
+        0.4,
+        0.5,
+        [evidence],
+      ),
+    /simulation evidence/i,
+  );
+});
+
+test("rejects agent-authored sovereign decision records", () => {
+  assert.throws(
+    () =>
+      new DecisionRecord(
+        "decision-1",
+        "tenant-gn",
+        "simandou",
+        "nia-1",
+        "NO_GO",
+        "Synthetic sovereign decision",
+        { id: "agent-1", kind: "AGENT" },
+        [evidence],
+      ),
+    /human decision authority/i,
+  );
+
+  const decision = new DecisionRecord(
+    "decision-2",
+    "tenant-gn",
+    "simandou",
+    "nia-1",
+    "NO_GO",
+    "Synthetic sovereign decision",
+    { id: "human-1", kind: "HUMAN" },
+    [evidence],
+  );
+  assert.equal(decision.decidedBy.id, "human-1");
 });
