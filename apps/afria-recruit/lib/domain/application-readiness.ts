@@ -34,9 +34,18 @@ export interface ApplicationReadinessDimensions {
   institutionFit: number;
 }
 
+export interface ApplicationReadinessGap {
+  dimension: keyof ApplicationReadinessDimensions;
+  code: string;
+  label: string;
+  action: string;
+  evidenceRefs: string[];
+}
+
 export interface ApplicationReadinessResult {
   total: number;
   dimensions: ApplicationReadinessDimensions;
+  gaps: ApplicationReadinessGap[];
 }
 
 const COVERAGE_RATIO: Record<RequirementCoverage['coverage'], number> = {
@@ -58,8 +67,7 @@ function scoreAtsTechnical(technical: ApplicationReadinessTechnicalSignals): num
     + (technical.safeFileFormat ? 2 : 0);
 }
 
-function scoreJobMatch(context: CandidateContext, jobSpec: JobSpec): number {
-  const coverage = classifyRequirementCoverage(context, jobSpec);
+function scoreJobMatch(coverage: RequirementCoverage[], jobSpec: JobSpec): number {
   if (!coverage.length) return 0;
 
   let earned = 0;
@@ -81,24 +89,86 @@ function scoreEvidenceBackedSignals(signals: ApplicationReadinessEvidenceSignal[
   return roundOne((supported / signals.length) * maximum);
 }
 
-function scoreCandidateEvidence(context: CandidateContext): number {
-  const evidenceStatuses = [
+function evidenceStatuses(context: CandidateContext): string[] {
+  return [
     ...context.experiences.map((fact) => fact.evidenceStatus),
     ...context.educations.map((fact) => fact.evidenceStatus),
     ...context.skills.map((fact) => fact.evidenceStatus),
     ...context.languages.map((fact) => fact.evidenceStatus),
     ...context.certifications.map((fact) => fact.evidenceStatus),
   ];
+}
 
-  if (!evidenceStatuses.length) return 0;
-  const substantiated = evidenceStatuses.filter((status) => normalizeEvidenceLevel(status) !== 'DECLARED').length;
-  return roundOne((substantiated / evidenceStatuses.length) * 15);
+function scoreCandidateEvidence(context: CandidateContext): number {
+  const statuses = evidenceStatuses(context);
+  if (!statuses.length) return 0;
+  const substantiated = statuses.filter((status) => normalizeEvidenceLevel(status) !== 'DECLARED').length;
+  return roundOne((substantiated / statuses.length) * 15);
+}
+
+function technicalGaps(technical: ApplicationReadinessTechnicalSignals): ApplicationReadinessGap[] {
+  const gaps: ApplicationReadinessGap[] = [];
+  if (!technical.parserReadable) gaps.push({ dimension: 'atsTechnical', code: 'ATS_PARSER_UNREADABLE', label: 'Le CV n’est pas lisible de façon fiable par le parseur ATS.', action: 'Produire une version texte exploitable et vérifier le parsing avant candidature.', evidenceRefs: [] });
+  if (!technical.standardSections) gaps.push({ dimension: 'atsTechnical', code: 'ATS_NON_STANDARD_SECTIONS', label: 'Les sections du CV ne suivent pas une structure ATS standard.', action: 'Utiliser des titres de sections explicites et conventionnels.', evidenceRefs: [] });
+  if (!technical.singleColumn) gaps.push({ dimension: 'atsTechnical', code: 'ATS_COMPLEX_LAYOUT', label: 'La mise en page peut perturber la lecture séquentielle ATS.', action: 'Générer une variante ATS à lecture linéaire.', evidenceRefs: [] });
+  if (!technical.noImageOnlyText) gaps.push({ dimension: 'atsTechnical', code: 'ATS_IMAGE_ONLY_TEXT', label: 'Des informations utiles sont encodées uniquement dans des images.', action: 'Restituer toute information candidate sous forme de texte sélectionnable.', evidenceRefs: [] });
+  if (!technical.safeFileFormat) gaps.push({ dimension: 'atsTechnical', code: 'ATS_UNSAFE_FILE_FORMAT', label: 'Le format de fichier n’est pas considéré comme sûr pour le traitement ATS.', action: 'Exporter une version PDF texte ou DOCX validée par le parseur.', evidenceRefs: [] });
+  return gaps;
+}
+
+function jobGaps(coverage: RequirementCoverage[]): ApplicationReadinessGap[] {
+  return coverage.flatMap((row) => {
+    if (row.coverage === 'COVERED') return [];
+    const suffix = row.coverage === 'PARTIAL' ? 'PARTIAL' : row.coverage === 'NOT_APPLICABLE' ? 'REVIEW_REQUIRED' : 'GAP';
+    return [{
+      dimension: 'jobMatch' as const,
+      code: `JOB_REQUIREMENT_${suffix}:${row.requirementId}`,
+      label: `${row.requirement} — ${row.explanation}`,
+      action: row.coverage === 'GAP'
+        ? 'Ne pas inventer cette exigence : documenter une preuve réelle, combler le gap ou conserver le statut GAP.'
+        : 'Renforcer la preuve ou soumettre cette exigence à une revue humaine avant optimisation.',
+      evidenceRefs: row.evidenceRefs,
+    }];
+  });
+}
+
+function signalGaps(
+  dimension: 'semanticFit' | 'institutionFit',
+  signals: ApplicationReadinessEvidenceSignal[],
+): ApplicationReadinessGap[] {
+  const prefix = dimension === 'semanticFit' ? 'SEMANTIC' : 'INSTITUTION';
+  return signals.flatMap((signal) => {
+    if (signal.matched && signal.evidenceRefs.length > 0) return [];
+    const missingEvidence = signal.matched && signal.evidenceRefs.length === 0;
+    return [{
+      dimension,
+      code: `${prefix}_${missingEvidence ? 'EVIDENCE_MISSING' : 'CRITERION_GAP'}:${signal.id}`,
+      label: signal.label,
+      action: missingEvidence
+        ? 'Rattacher une preuve candidate existante ; sinon retirer le match.'
+        : 'Conserver le critère comme gap jusqu’à ce qu’une correspondance réelle et prouvée existe.',
+      evidenceRefs: signal.evidenceRefs,
+    }];
+  });
+}
+
+function evidenceGaps(context: CandidateContext): ApplicationReadinessGap[] {
+  const declaredCount = evidenceStatuses(context).filter((status) => normalizeEvidenceLevel(status) === 'DECLARED').length;
+  if (!declaredCount) return [];
+  return [{
+    dimension: 'evidence',
+    code: 'EVIDENCE_UNSUBSTANTIATED',
+    label: `${declaredCount} fait(s) candidat restent déclaratifs.`,
+    action: 'Rattacher des documents, références ou validations réelles avant de présenter ces faits comme étayés.',
+    evidenceRefs: [],
+  }];
 }
 
 export function scoreApplicationReadiness(input: ApplicationReadinessInput): ApplicationReadinessResult {
+  const coverage = classifyRequirementCoverage(input.context, input.jobSpec);
   const dimensions: ApplicationReadinessDimensions = {
     atsTechnical: scoreAtsTechnical(input.technical),
-    jobMatch: scoreJobMatch(input.context, input.jobSpec),
+    jobMatch: scoreJobMatch(coverage, input.jobSpec),
     semanticFit: scoreEvidenceBackedSignals(input.semanticSignals, 20),
     evidence: scoreCandidateEvidence(input.context),
     institutionFit: scoreEvidenceBackedSignals(input.institutionSignals, 15),
@@ -113,5 +183,12 @@ export function scoreApplicationReadiness(input: ApplicationReadinessInput): App
       + dimensions.institutionFit,
     ),
     dimensions,
+    gaps: [
+      ...technicalGaps(input.technical),
+      ...jobGaps(coverage),
+      ...signalGaps('semanticFit', input.semanticSignals),
+      ...evidenceGaps(input.context),
+      ...signalGaps('institutionFit', input.institutionSignals),
+    ],
   };
 }
