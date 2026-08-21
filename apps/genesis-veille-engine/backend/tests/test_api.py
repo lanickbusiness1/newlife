@@ -46,6 +46,15 @@ def test_health_contract():
     }
 
 
+def test_root_serves_public_africa_shell():
+    response = client().get("/")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Genesis Veille — Africa World State" in response.text
+    assert "Africa World State · Public Intelligence" in response.text
+
+
 def test_register_source_and_list_it():
     api = client()
 
