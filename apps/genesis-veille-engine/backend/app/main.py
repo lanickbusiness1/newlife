@@ -88,7 +88,18 @@ def create_app(ingest_key: str | None = None) -> FastAPI:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=decision.model_dump(),
             )
-        return store.add(event, decision)
+        try:
+            return store.add(event, decision)
+        except ValueError as exc:
+            if str(exc) == "duplicate event id":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "DUPLICATE_EVENT_ID",
+                        "message": "event id already exists in world-state ledger",
+                    },
+                ) from exc
+            raise
 
     @app.get("/api/v1/world-state/countries/{iso3}")
     def country_world_state(iso3: str) -> dict:
