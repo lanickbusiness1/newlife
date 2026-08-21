@@ -6,9 +6,13 @@ declare
   table_name text;
   required_tables text[] := array[
     'sovereign_evidence_artifacts',
+    'sovereign_resource_assets',
     'sovereign_concessions',
     'sovereign_contract_clauses',
+    'sovereign_contract_obligations',
     'sovereign_corridor_nodes',
+    'sovereign_operator_exposures',
+    'sovereign_scenarios',
     'sovereign_national_interest_assessments',
     'sovereign_decision_records'
   ];
@@ -51,16 +55,38 @@ insert into mining_projects (id, tenant_id, project_code, name, state) values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '22222222-2222-4222-8222-222222222222', 'SOV-B', 'Sovereign B', 'ACTIVE')
 on conflict (id) do nothing;
 
+insert into workforce_identities (id, tenant_id, kind, display_name, roles) values
+  ('56000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'HUMAN', 'Synthetic Sovereign Approver', '["SOVEREIGN_DECISION_APPROVER"]'::jsonb),
+  ('56000000-0000-4000-8000-000000000002', '11111111-1111-4111-8111-111111111111', 'AGENT', 'Synthetic Negotiation Agent', '["NEGOTIATION_ADVISOR"]'::jsonb)
+on conflict (id) do nothing;
+
 set role workforce_app;
 select set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', false);
 
 insert into sovereign_evidence_artifacts (
   id, tenant_id, project_id, external_id, source_uri, sha256, observed_at, truth_class
+) values
+  (
+    '50000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'EV-A-1', 'synthetic://offer-a/concession', repeat('a', 64), now(), 'FACT'
+  ),
+  (
+    '50000000-0000-4000-8000-000000000002',
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'EV-SIM-1', 'synthetic://scenario/counter-proposal', repeat('b', 64), now(), 'SIMULATION'
+  );
+
+insert into sovereign_resource_assets (
+  id, tenant_id, project_id, external_id, resource_type, name, reserve_quantity, reserve_unit, evidence_ids
 ) values (
-  '50000000-0000-4000-8000-000000000001',
+  '50500000-0000-4000-8000-000000000001',
   '11111111-1111-4111-8111-111111111111',
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-  'EV-A-1', 'synthetic://offer-a/concession', repeat('a', 64), now(), 'FACT'
+  'ASSET-A-1', 'IRON_ORE', 'Synthetic Simandou Block', 1500000000, 'TONNE',
+  array['50000000-0000-4000-8000-000000000001'::uuid]
 );
 
 insert into sovereign_concessions (
@@ -84,6 +110,19 @@ insert into sovereign_contract_clauses (
   array['50000000-0000-4000-8000-000000000001'::uuid]
 );
 
+insert into sovereign_contract_obligations (
+  id, tenant_id, project_id, concession_id, clause_id, external_id, responsible_party,
+  obligation_type, due_date, threshold_description, performance_status, evidence_ids
+) values (
+  '52500000-0000-4000-8000-000000000001',
+  '11111111-1111-4111-8111-111111111111',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  '51000000-0000-4000-8000-000000000001',
+  '52000000-0000-4000-8000-000000000001',
+  'OBL-A-1', 'operator-a', 'CAPEX_COMMITMENT', '2030-12-31', 'USD 500m cumulative investment',
+  'POTENTIAL_BREACH', array['50000000-0000-4000-8000-000000000001'::uuid]
+);
+
 insert into sovereign_corridor_nodes (
   id, tenant_id, project_id, external_id, node_type, name, operator_id, dependency_ratio, evidence_ids
 ) values (
@@ -92,6 +131,27 @@ insert into sovereign_corridor_nodes (
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'NODE-A-1', 'PORT_TERMINAL', 'Synthetic Terminal', 'operator-a', 0.85,
   array['50000000-0000-4000-8000-000000000001'::uuid]
+);
+
+insert into sovereign_operator_exposures (
+  id, tenant_id, project_id, external_id, operator_id, controlled_capacity_ratio, critical_node_count, evidence_ids
+) values (
+  '53500000-0000-4000-8000-000000000001',
+  '11111111-1111-4111-8111-111111111111',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  'EXP-A-1', 'operator-a', 0.60, 3,
+  array['50000000-0000-4000-8000-000000000001'::uuid]
+);
+
+insert into sovereign_scenarios (
+  id, tenant_id, project_id, external_id, scenario_type, sovereign_npv, fiscal_take,
+  fx_retention, local_value_capture, dependency_score, truth_class, evidence_ids
+) values (
+  '53800000-0000-4000-8000-000000000001',
+  '11111111-1111-4111-8111-111111111111',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  'SCENARIO-A-1', 'COUNTER_PROPOSAL', 1450, 540, 0.62, 0.51, 0.45, 'SIMULATION',
+  array['50000000-0000-4000-8000-000000000002'::uuid]
 );
 
 insert into sovereign_national_interest_assessments (
@@ -116,9 +176,32 @@ insert into sovereign_decision_records (
   '11111111-1111-4111-8111-111111111111',
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'DEC-A-1', '54000000-0000-4000-8000-000000000001', 'NO_GO',
-  'Synthetic human decision record for test', null,
+  'Synthetic human decision record for test', '56000000-0000-4000-8000-000000000001',
   array['50000000-0000-4000-8000-000000000001'::uuid]
 );
+
+-- Agents may advise, but cannot author a sovereign decision record.
+do $$
+begin
+  begin
+    insert into sovereign_decision_records (
+      id, tenant_id, project_id, external_id, assessment_id, decision, rationale, decided_by_identity_id, evidence_ids
+    ) values (
+      '55000000-0000-4000-8000-000000000002',
+      '11111111-1111-4111-8111-111111111111',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'DEC-A-AGENT', '54000000-0000-4000-8000-000000000001', 'NO_GO',
+      'Agent must not be allowed to author this record', '56000000-0000-4000-8000-000000000002',
+      array['50000000-0000-4000-8000-000000000001'::uuid]
+    );
+    raise exception 'agent-authored sovereign decision unexpectedly succeeded';
+  exception
+    when raise_exception then
+      if sqlerrm = 'agent-authored sovereign decision unexpectedly succeeded' then raise; end if;
+    when others then null;
+  end;
+end
+$$;
 
 -- Cross-tenant visibility must be blocked.
 do $$
