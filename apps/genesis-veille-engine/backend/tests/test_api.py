@@ -3,8 +3,12 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 
 
+INGEST_KEY = "test-ingest-key"
+AUTH_HEADERS = {"X-Genesis-Ingest-Key": INGEST_KEY}
+
+
 def client() -> TestClient:
-    return TestClient(create_app())
+    return TestClient(create_app(ingest_key=INGEST_KEY))
 
 
 def source_payload(source_id: str = "src-official-1") -> dict:
@@ -55,10 +59,25 @@ def test_root_serves_public_africa_shell():
     assert "Africa World State · Public Intelligence" in response.text
 
 
+def test_write_endpoints_require_internal_ingest_key():
+    api = client()
+
+    missing = api.post("/api/v1/sources", json=source_payload())
+    wrong = api.post(
+        "/api/v1/sources",
+        json=source_payload(),
+        headers={"X-Genesis-Ingest-Key": "wrong-key"},
+    )
+
+    assert missing.status_code == 401
+    assert wrong.status_code == 401
+    assert api.get("/api/v1/sources").json() == []
+
+
 def test_register_source_and_list_it():
     api = client()
 
-    created = api.post("/api/v1/sources", json=source_payload())
+    created = api.post("/api/v1/sources", json=source_payload(), headers=AUTH_HEADERS)
     listed = api.get("/api/v1/sources")
 
     assert created.status_code == 201
@@ -70,7 +89,11 @@ def test_register_source_and_list_it():
 def test_rejected_event_returns_conflict_and_is_not_stored():
     api = client()
 
-    response = api.post("/api/v1/events", json=event_payload(source_ids=["unknown-source"]))
+    response = api.post(
+        "/api/v1/events",
+        json=event_payload(source_ids=["unknown-source"]),
+        headers=AUTH_HEADERS,
+    )
 
     assert response.status_code == 409
     assert response.json()["detail"]["status"] == "REJECTED"
@@ -79,9 +102,9 @@ def test_rejected_event_returns_conflict_and_is_not_stored():
 
 def test_accept_event_and_expose_country_world_state():
     api = client()
-    api.post("/api/v1/sources", json=source_payload())
+    api.post("/api/v1/sources", json=source_payload(), headers=AUTH_HEADERS)
 
-    accepted = api.post("/api/v1/events", json=event_payload())
+    accepted = api.post("/api/v1/events", json=event_payload(), headers=AUTH_HEADERS)
     state = api.get("/api/v1/world-state/countries/mli")
 
     assert accepted.status_code == 201
