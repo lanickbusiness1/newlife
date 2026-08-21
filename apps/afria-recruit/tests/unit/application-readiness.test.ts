@@ -17,6 +17,14 @@ type ReadinessInput = {
   institutionSignals: Array<{ id: string; label: string; matched: boolean; evidenceRefs: string[] }>;
 };
 
+type ReadinessGap = {
+  dimension: 'atsTechnical' | 'jobMatch' | 'semanticFit' | 'evidence' | 'institutionFit';
+  code: string;
+  label: string;
+  action: string;
+  evidenceRefs: string[];
+};
+
 type ReadinessResult = {
   total: number;
   dimensions: {
@@ -26,6 +34,7 @@ type ReadinessResult = {
     evidence: number;
     institutionFit: number;
   };
+  gaps: ReadinessGap[];
 };
 
 type ScoreApplicationReadiness = (input: ReadinessInput) => ReadinessResult;
@@ -125,4 +134,42 @@ test('a fully supported application scores the canonical 100 points', async () =
     institutionFit: 15,
   });
   assert.equal(result.total, 100);
+  assert.deepEqual(result.gaps, []);
+});
+
+test('readiness gaps stay explicit and never invent missing evidence', async () => {
+  const scorer = await loadScorer();
+  const context = syntheticContext();
+  context.skills = [];
+
+  const result = scorer({
+    context,
+    jobSpec: targetJob,
+    technical: {
+      parserReadable: false,
+      standardSections: true,
+      singleColumn: true,
+      noImageOnlyText: true,
+      safeFileFormat: true,
+    },
+    semanticSignals: [{ id: 'sem-1', label: 'Pilotage conformité régionale', matched: true, evidenceRefs: [] }],
+    institutionSignals: [{ id: 'inst-1', label: 'Langage institutionnel attendu', matched: false, evidenceRefs: [] }],
+  });
+
+  assert.deepEqual(result.dimensions, {
+    atsTechnical: 12,
+    jobMatch: 15,
+    semanticFit: 0,
+    evidence: 15,
+    institutionFit: 0,
+  });
+  assert.equal(result.total, 42);
+  assert.deepEqual(result.gaps.map((gap) => gap.code), [
+    'ATS_PARSER_UNREADABLE',
+    'JOB_REQUIREMENT_GAP:req-compliance',
+    'SEMANTIC_EVIDENCE_MISSING:sem-1',
+    'INSTITUTION_CRITERION_GAP:inst-1',
+  ]);
+  assert.deepEqual(result.gaps.find((gap) => gap.code === 'JOB_REQUIREMENT_GAP:req-compliance')?.evidenceRefs, []);
+  assert.deepEqual(result.gaps.find((gap) => gap.code === 'SEMANTIC_EVIDENCE_MISSING:sem-1')?.evidenceRefs, []);
 });
