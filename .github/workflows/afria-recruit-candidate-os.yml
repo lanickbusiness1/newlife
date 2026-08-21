@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/afria-recruit-candidate-os-v1
+      - feat/afria-recruit-ats-readiness-p0
     paths:
       - 'apps/afria-recruit/**'
       - '.github/workflows/afria-recruit-candidate-os.yml'
