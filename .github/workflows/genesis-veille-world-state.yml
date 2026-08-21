@@ -38,3 +38,37 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -q
+
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: backend-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build container
+        working-directory: apps/genesis-veille-engine
+        run: docker build -t genesis-veille-world-state:ci .
+
+      - name: Boot container
+        run: docker run -d --rm --name genesis-veille-smoke -p 8000:8000 genesis-veille-world-state:ci
+
+      - name: Verify health and public shell
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/health > /tmp/health.json; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/health.json
+          curl --fail --silent http://127.0.0.1:8000/ | grep -q 'Genesis Veille — Africa World State'
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs genesis-veille-smoke || true
+
+      - name: Stop container
+        if: always()
+        run: docker stop genesis-veille-smoke || true
