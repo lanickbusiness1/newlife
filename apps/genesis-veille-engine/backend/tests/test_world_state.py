@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from app.models import EventInput, ProvenanceDecision
 from app.world_state import WorldStateStore
 
@@ -65,9 +67,19 @@ def test_rejected_event_cannot_enter_world_state():
     store = WorldStateStore()
     rejected = ProvenanceDecision(accepted=False, status="REJECTED", reasons=["bad provenance"])
 
-    try:
+    with pytest.raises(ValueError, match="cannot store rejected event"):
         store.add(make_event("bad", "conflict", 0.90, "security", 4), rejected)
-    except ValueError as exc:
-        assert str(exc) == "cannot store rejected event"
-    else:
-        raise AssertionError("rejected event was stored")
+
+
+def test_duplicate_event_id_cannot_inflate_country_score():
+    store = WorldStateStore()
+    verified = ProvenanceDecision(accepted=True, status="VERIFIED", reasons=[])
+    event = make_event("risk-unique", "internet_outage", 0.90, "telecom", 5)
+
+    store.add(event, verified)
+    with pytest.raises(ValueError, match="duplicate event id"):
+        store.add(event, verified)
+
+    state = store.country_state("MLI")
+    assert state["event_count"] == 1
+    assert state["risk_score"] == 10.0
