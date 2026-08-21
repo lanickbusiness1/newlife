@@ -100,6 +100,21 @@ def test_rejected_event_returns_conflict_and_is_not_stored():
     assert api.get("/api/v1/events").json() == []
 
 
+def test_duplicate_event_id_returns_conflict_without_inflating_state():
+    api = client()
+    api.post("/api/v1/sources", json=source_payload(), headers=AUTH_HEADERS)
+
+    first = api.post("/api/v1/events", json=event_payload(), headers=AUTH_HEADERS)
+    duplicate = api.post("/api/v1/events", json=event_payload(), headers=AUTH_HEADERS)
+    state = api.get("/api/v1/world-state/countries/MLI").json()
+
+    assert first.status_code == 201
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["code"] == "DUPLICATE_EVENT_ID"
+    assert state["event_count"] == 1
+    assert state["risk_score"] == 10.0
+
+
 def test_accept_event_and_expose_country_world_state():
     api = client()
     api.post("/api/v1/sources", json=source_payload(), headers=AUTH_HEADERS)
