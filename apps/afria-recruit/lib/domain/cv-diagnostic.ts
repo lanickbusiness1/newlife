@@ -43,6 +43,7 @@ export { scoreApplicationReadiness } from './application-readiness.js';
 export type {
   ApplicationReadinessDimensions,
   ApplicationReadinessEvidenceSignal,
+  ApplicationReadinessGap,
   ApplicationReadinessInput,
   ApplicationReadinessResult,
   ApplicationReadinessTechnicalSignals,
