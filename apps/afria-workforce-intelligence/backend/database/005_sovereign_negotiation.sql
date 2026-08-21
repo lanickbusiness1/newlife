@@ -16,6 +16,23 @@ create table if not exists sovereign_evidence_artifacts (
   foreign key (project_id, tenant_id) references mining_projects (id, tenant_id)
 );
 
+create table if not exists sovereign_resource_assets (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references workforce_tenants(id),
+  project_id uuid not null,
+  external_id text not null,
+  resource_type text not null check (resource_type in ('IRON_ORE','BAUXITE','GOLD','LITHIUM','COBALT','COPPER','OTHER')),
+  name text not null,
+  reserve_quantity numeric(24,6) not null check (reserve_quantity >= 0),
+  reserve_unit text not null check (reserve_unit in ('TONNE','KILOGRAM','BARREL','CUBIC_METER')),
+  evidence_ids uuid[] not null check (cardinality(evidence_ids) > 0),
+  version integer not null default 1 check (version > 0),
+  created_at timestamptz not null default now(),
+  unique (tenant_id, project_id, external_id),
+  unique (id, tenant_id, project_id),
+  foreign key (project_id, tenant_id) references mining_projects (id, tenant_id)
+);
+
 create table if not exists sovereign_concessions (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references workforce_tenants(id),
@@ -58,6 +75,35 @@ create table if not exists sovereign_contract_clauses (
   )
 );
 
+create table if not exists sovereign_contract_obligations (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references workforce_tenants(id),
+  project_id uuid not null,
+  concession_id uuid not null,
+  clause_id uuid not null,
+  external_id text not null,
+  responsible_party text not null,
+  obligation_type text not null,
+  due_date date not null,
+  threshold_description text not null,
+  performance_status text not null check (performance_status in ('PENDING','DUE','EVIDENCE_SATISFIED','POTENTIAL_BREACH','WAIVED_BY_AUTHORITY')),
+  waived_by_identity_id uuid,
+  waived_at timestamptz,
+  evidence_ids uuid[] not null check (cardinality(evidence_ids) > 0),
+  version integer not null default 1 check (version > 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_id, project_id, external_id),
+  unique (id, tenant_id, project_id),
+  foreign key (concession_id, tenant_id, project_id) references sovereign_concessions (id, tenant_id, project_id),
+  foreign key (clause_id, tenant_id, project_id) references sovereign_contract_clauses (id, tenant_id, project_id),
+  foreign key (waived_by_identity_id, tenant_id) references workforce_identities (id, tenant_id),
+  check (
+    (performance_status = 'WAIVED_BY_AUTHORITY' and waived_by_identity_id is not null and waived_at is not null)
+    or performance_status <> 'WAIVED_BY_AUTHORITY'
+  )
+);
+
 create table if not exists sovereign_corridor_nodes (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references workforce_tenants(id),
@@ -71,6 +117,43 @@ create table if not exists sovereign_corridor_nodes (
   version integer not null default 1 check (version > 0),
   created_at timestamptz not null default now(),
   unique (tenant_id, project_id, external_id),
+  unique (id, tenant_id, project_id),
+  foreign key (project_id, tenant_id) references mining_projects (id, tenant_id)
+);
+
+create table if not exists sovereign_operator_exposures (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references workforce_tenants(id),
+  project_id uuid not null,
+  external_id text not null,
+  operator_id text not null,
+  controlled_capacity_ratio numeric(7,6) not null check (controlled_capacity_ratio between 0 and 1),
+  critical_node_count integer not null check (critical_node_count >= 0),
+  evidence_ids uuid[] not null check (cardinality(evidence_ids) > 0),
+  version integer not null default 1 check (version > 0),
+  created_at timestamptz not null default now(),
+  unique (tenant_id, project_id, external_id),
+  unique (id, tenant_id, project_id),
+  foreign key (project_id, tenant_id) references mining_projects (id, tenant_id)
+);
+
+create table if not exists sovereign_scenarios (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references workforce_tenants(id),
+  project_id uuid not null,
+  external_id text not null,
+  scenario_type text not null check (scenario_type in ('BASE_CASE','OFFER_A','OFFER_B','COUNTER_PROPOSAL','WALK_AWAY')),
+  sovereign_npv numeric(24,4) not null,
+  fiscal_take numeric(24,4) not null,
+  fx_retention numeric(7,6) not null check (fx_retention between 0 and 1),
+  local_value_capture numeric(7,6) not null check (local_value_capture between 0 and 1),
+  dependency_score numeric(7,6) not null check (dependency_score between 0 and 1),
+  truth_class text not null default 'SIMULATION' check (truth_class = 'SIMULATION'),
+  evidence_ids uuid[] not null check (cardinality(evidence_ids) > 0),
+  methodology_version text not null default 'B8-v1',
+  version integer not null default 1 check (version > 0),
+  created_at timestamptz not null default now(),
+  unique (tenant_id, project_id, external_id, methodology_version),
   unique (id, tenant_id, project_id),
   foreign key (project_id, tenant_id) references mining_projects (id, tenant_id)
 );
@@ -111,7 +194,7 @@ create table if not exists sovereign_decision_records (
   assessment_id uuid not null,
   decision text not null check (decision in ('GO','HOLD','NO_GO','INSUFFICIENT_EVIDENCE')),
   rationale text not null,
-  decided_by_identity_id uuid,
+  decided_by_identity_id uuid not null,
   evidence_ids uuid[] not null check (cardinality(evidence_ids) > 0),
   decided_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
@@ -123,12 +206,20 @@ create table if not exists sovereign_decision_records (
 
 create index if not exists sovereign_evidence_artifacts_project_idx
   on sovereign_evidence_artifacts (tenant_id, project_id, observed_at desc);
+create index if not exists sovereign_resource_assets_type_idx
+  on sovereign_resource_assets (tenant_id, project_id, resource_type);
 create index if not exists sovereign_concessions_operator_idx
   on sovereign_concessions (tenant_id, project_id, operator_id);
 create index if not exists sovereign_contract_clauses_type_idx
   on sovereign_contract_clauses (tenant_id, project_id, clause_type, legal_status);
+create index if not exists sovereign_contract_obligations_status_idx
+  on sovereign_contract_obligations (tenant_id, project_id, performance_status, due_date);
 create index if not exists sovereign_corridor_nodes_operator_idx
   on sovereign_corridor_nodes (tenant_id, project_id, operator_id, dependency_ratio desc);
+create index if not exists sovereign_operator_exposures_operator_idx
+  on sovereign_operator_exposures (tenant_id, project_id, operator_id, controlled_capacity_ratio desc);
+create index if not exists sovereign_scenarios_type_idx
+  on sovereign_scenarios (tenant_id, project_id, scenario_type, methodology_version);
 create index if not exists sovereign_national_interest_decision_idx
   on sovereign_national_interest_assessments (tenant_id, project_id, decision, assessed_at desc);
 create index if not exists sovereign_decision_records_assessment_idx
@@ -148,7 +239,36 @@ create trigger sovereign_decision_append_only
 before update or delete on sovereign_decision_records
 for each row execute function sovereign_reject_decision_mutation();
 
--- Evidence IDs are arrays because one assessment can depend on many heterogeneous artifacts.
+create or replace function sovereign_require_human_decision_authority()
+returns trigger
+language plpgsql
+as $$
+declare
+  authority_kind text;
+  authority_roles jsonb;
+begin
+  select identity.kind, identity.roles
+    into authority_kind, authority_roles
+  from workforce_identities identity
+  where identity.id = new.decided_by_identity_id
+    and identity.tenant_id = new.tenant_id;
+
+  if authority_kind is distinct from 'HUMAN' then
+    raise exception 'sovereign decisions require a human decision authority';
+  end if;
+  if not (coalesce(authority_roles, '[]'::jsonb) ? 'SOVEREIGN_DECISION_APPROVER') then
+    raise exception 'human decision authority lacks SOVEREIGN_DECISION_APPROVER role';
+  end if;
+  return new;
+end
+$$;
+
+drop trigger if exists sovereign_decision_human_authority on sovereign_decision_records;
+create trigger sovereign_decision_human_authority
+before insert on sovereign_decision_records
+for each row execute function sovereign_require_human_decision_authority();
+
+-- Evidence IDs are arrays because an assessment can depend on many heterogeneous artifacts.
 -- Enforce that every referenced evidence UUID resolves inside the same tenant/project.
 create or replace function sovereign_validate_evidence_lineage()
 returns trigger
@@ -172,13 +292,39 @@ begin
 end
 $$;
 
+create or replace function sovereign_validate_scenario_evidence()
+returns trigger
+language plpgsql
+as $$
+declare
+  bad_count integer;
+begin
+  select count(*) into bad_count
+  from unnest(new.evidence_ids) evidence_id
+  left join sovereign_evidence_artifacts evidence
+    on evidence.id = evidence_id
+   and evidence.tenant_id = new.tenant_id
+   and evidence.project_id = new.project_id
+  where evidence.id is null or evidence.truth_class <> 'SIMULATION';
+
+  if bad_count <> 0 then
+    raise exception 'sovereign scenarios require SIMULATION evidence only';
+  end if;
+  return new;
+end
+$$;
+
 do $$
 declare
   table_name text;
   lineage_tables text[] := array[
+    'sovereign_resource_assets',
     'sovereign_concessions',
     'sovereign_contract_clauses',
+    'sovereign_contract_obligations',
     'sovereign_corridor_nodes',
+    'sovereign_operator_exposures',
+    'sovereign_scenarios',
     'sovereign_national_interest_assessments',
     'sovereign_decision_records'
   ];
@@ -194,15 +340,24 @@ begin
 end
 $$;
 
+drop trigger if exists sovereign_scenario_simulation_evidence on sovereign_scenarios;
+create trigger sovereign_scenario_simulation_evidence
+before insert or update on sovereign_scenarios
+for each row execute function sovereign_validate_scenario_evidence();
+
 -- Forced tenant isolation on every B8 table.
 do $$
 declare
   table_name text;
   tables text[] := array[
     'sovereign_evidence_artifacts',
+    'sovereign_resource_assets',
     'sovereign_concessions',
     'sovereign_contract_clauses',
+    'sovereign_contract_obligations',
     'sovereign_corridor_nodes',
+    'sovereign_operator_exposures',
+    'sovereign_scenarios',
     'sovereign_national_interest_assessments',
     'sovereign_decision_records'
   ];
