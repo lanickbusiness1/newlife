@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hmac
+import os
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse
 
 from .models import AcceptedEvent, EventInput, SourceRecord
@@ -16,7 +19,7 @@ SERVICE_VERSION = "0.1.0"
 FRONTEND_INDEX = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
 
 
-def create_app() -> FastAPI:
+def create_app(ingest_key: str | None = None) -> FastAPI:
     registry = SourceRegistry()
     gate = ProvenanceGate(registry)
     store = WorldStateStore()
@@ -25,6 +28,23 @@ def create_app() -> FastAPI:
         title="Genesis Veille Engine — World State API",
         version=SERVICE_VERSION,
     )
+
+    def require_ingest_access(
+        supplied_key: Annotated[
+            str | None,
+            Header(alias="X-Genesis-Ingest-Key"),
+        ] = None,
+    ) -> None:
+        if ingest_key is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="ingestion is disabled until GENESIS_INGEST_KEY is configured",
+            )
+        if supplied_key is None or not hmac.compare_digest(supplied_key, ingest_key):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="invalid ingest credential",
+            )
 
     @app.get("/", include_in_schema=False)
     def public_shell() -> FileResponse:
@@ -46,6 +66,7 @@ def create_app() -> FastAPI:
         "/api/v1/sources",
         response_model=SourceRecord,
         status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_ingest_access)],
     )
     def register_source(source: SourceRecord) -> SourceRecord:
         return registry.register(source)
@@ -58,6 +79,7 @@ def create_app() -> FastAPI:
         "/api/v1/events",
         response_model=AcceptedEvent,
         status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_ingest_access)],
     )
     def ingest_event(event: EventInput) -> AcceptedEvent:
         decision = gate.evaluate(event)
@@ -81,4 +103,4 @@ def create_app() -> FastAPI:
     return app
 
 
-app = create_app()
+app = create_app(ingest_key=os.getenv("GENESIS_INGEST_KEY"))
