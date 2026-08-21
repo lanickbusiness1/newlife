@@ -35,7 +35,7 @@ def create_app(ingest_key: str | None = None) -> FastAPI:
             Header(alias="X-Genesis-Ingest-Key"),
         ] = None,
     ) -> None:
-        if ingest_key is None:
+        if not ingest_key:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="ingestion is disabled until GENESIS_INGEST_KEY is configured",
@@ -69,7 +69,18 @@ def create_app(ingest_key: str | None = None) -> FastAPI:
         dependencies=[Depends(require_ingest_access)],
     )
     def register_source(source: SourceRecord) -> SourceRecord:
-        return registry.register(source)
+        try:
+            return registry.register(source)
+        except ValueError as exc:
+            if str(exc) == "source id conflict":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "SOURCE_ID_CONFLICT",
+                        "message": "source id already exists with different trust metadata",
+                    },
+                ) from exc
+            raise
 
     @app.get("/api/v1/events", response_model=list[AcceptedEvent])
     def list_events() -> list[AcceptedEvent]:
