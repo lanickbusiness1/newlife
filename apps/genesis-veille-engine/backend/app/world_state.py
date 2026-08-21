@@ -28,13 +28,17 @@ OPPORTUNITY_EVENT_TYPES = {
 class WorldStateStore:
     def __init__(self) -> None:
         self._events: list[AcceptedEvent] = []
+        self._event_ids: set[str] = set()
 
     def add(self, event: EventInput, decision: ProvenanceDecision) -> AcceptedEvent:
         if not decision.accepted:
             raise ValueError("cannot store rejected event")
+        if event.id in self._event_ids:
+            raise ValueError("duplicate event id")
 
         accepted = AcceptedEvent(event=event, provenance=decision)
         self._events.append(accepted)
+        self._event_ids.add(event.id)
         return accepted
 
     def list_events(self) -> list[AcceptedEvent]:
