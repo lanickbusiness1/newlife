@@ -38,3 +38,7 @@ export function diagnoseCv(context: CandidateContext): DiagnosticFinding[] {
 
   return findings;
 }
+
+export function scoreApplicationReadiness(): { total: number } {
+  return { total: 0 };
+}
