@@ -1,43 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { scoreApplicationReadiness, type ApplicationReadinessInput } from '../../lib/domain/cv-diagnostic.js';
 import type { CandidateContext } from '../../lib/repositories/candidate-context.js';
 import type { JobSpec } from '../../lib/domain/types.js';
-
-type ReadinessInput = {
-  context: CandidateContext;
-  jobSpec: JobSpec;
-  technical: {
-    parserReadable: boolean;
-    standardSections: boolean;
-    singleColumn: boolean;
-    noImageOnlyText: boolean;
-    safeFileFormat: boolean;
-  };
-  semanticSignals: Array<{ id: string; label: string; matched: boolean; evidenceRefs: string[] }>;
-  institutionSignals: Array<{ id: string; label: string; matched: boolean; evidenceRefs: string[] }>;
-};
-
-type ReadinessGap = {
-  dimension: 'atsTechnical' | 'jobMatch' | 'semanticFit' | 'evidence' | 'institutionFit';
-  code: string;
-  label: string;
-  action: string;
-  evidenceRefs: string[];
-};
-
-type ReadinessResult = {
-  total: number;
-  dimensions: {
-    atsTechnical: number;
-    jobMatch: number;
-    semanticFit: number;
-    evidence: number;
-    institutionFit: number;
-  };
-  gaps: ReadinessGap[];
-};
-
-type ScoreApplicationReadiness = (input: ReadinessInput) => ReadinessResult;
 
 function syntheticContext(): CandidateContext {
   return {
@@ -99,20 +64,8 @@ const targetJob: JobSpec = {
   ],
 };
 
-async function loadScorer(): Promise<ScoreApplicationReadiness> {
-  const module = await import('../../lib/domain/cv-diagnostic.js');
-  const scorer = (module as unknown as Record<string, unknown>).scoreApplicationReadiness;
-  assert.equal(typeof scorer, 'function');
-  return scorer as ScoreApplicationReadiness;
-}
-
-test('cv diagnostic exposes the canonical application readiness scorer', async () => {
-  await loadScorer();
-});
-
-test('a fully supported application scores the canonical 100 points', async () => {
-  const scorer = await loadScorer();
-  const result = scorer({
+function completeInput(): ApplicationReadinessInput {
+  return {
     context: syntheticContext(),
     jobSpec: targetJob,
     technical: {
@@ -124,7 +77,11 @@ test('a fully supported application scores the canonical 100 points', async () =
     },
     semanticSignals: [{ id: 'sem-1', label: 'Pilotage conformité régionale', matched: true, evidenceRefs: ['experience:exp-1'] }],
     institutionSignals: [{ id: 'inst-1', label: 'Langage institutionnel attendu', matched: true, evidenceRefs: ['experience:exp-1'] }],
-  });
+  };
+}
+
+test('a fully supported application scores the canonical 100 points', () => {
+  const result = scoreApplicationReadiness(completeInput());
 
   assert.deepEqual(result.dimensions, {
     atsTechnical: 20,
@@ -137,24 +94,14 @@ test('a fully supported application scores the canonical 100 points', async () =
   assert.deepEqual(result.gaps, []);
 });
 
-test('readiness gaps stay explicit and never invent missing evidence', async () => {
-  const scorer = await loadScorer();
-  const context = syntheticContext();
-  context.skills = [];
+test('readiness gaps stay explicit and never invent missing evidence', () => {
+  const input = completeInput();
+  input.context.skills = [];
+  input.technical.parserReadable = false;
+  input.semanticSignals = [{ id: 'sem-1', label: 'Pilotage conformité régionale', matched: true, evidenceRefs: [] }];
+  input.institutionSignals = [{ id: 'inst-1', label: 'Langage institutionnel attendu', matched: false, evidenceRefs: [] }];
 
-  const result = scorer({
-    context,
-    jobSpec: targetJob,
-    technical: {
-      parserReadable: false,
-      standardSections: true,
-      singleColumn: true,
-      noImageOnlyText: true,
-      safeFileFormat: true,
-    },
-    semanticSignals: [{ id: 'sem-1', label: 'Pilotage conformité régionale', matched: true, evidenceRefs: [] }],
-    institutionSignals: [{ id: 'inst-1', label: 'Langage institutionnel attendu', matched: false, evidenceRefs: [] }],
-  });
+  const result = scoreApplicationReadiness(input);
 
   assert.deepEqual(result.dimensions, {
     atsTechnical: 12,
@@ -172,4 +119,14 @@ test('readiness gaps stay explicit and never invent missing evidence', async () 
   ]);
   assert.deepEqual(result.gaps.find((gap) => gap.code === 'JOB_REQUIREMENT_GAP:req-compliance')?.evidenceRefs, []);
   assert.deepEqual(result.gaps.find((gap) => gap.code === 'SEMANTIC_EVIDENCE_MISSING:sem-1')?.evidenceRefs, []);
+});
+
+test('canonical score refuses incomplete semantic or institution signal sets', () => {
+  const noSemantic = completeInput();
+  noSemantic.semanticSignals = [];
+  assert.throws(() => scoreApplicationReadiness(noSemantic), /semantic signals/i);
+
+  const noInstitution = completeInput();
+  noInstitution.institutionSignals = [];
+  assert.throws(() => scoreApplicationReadiness(noInstitution), /institution signals/i);
 });
