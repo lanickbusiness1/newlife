@@ -84,7 +84,6 @@ function scoreJobMatch(coverage: RequirementCoverage[], jobSpec: JobSpec): numbe
 }
 
 function scoreEvidenceBackedSignals(signals: ApplicationReadinessEvidenceSignal[], maximum: number): number {
-  if (!signals.length) return 0;
   const supported = signals.filter((signal) => signal.matched && signal.evidenceRefs.length > 0).length;
   return roundOne((supported / signals.length) * maximum);
 }
@@ -164,7 +163,17 @@ function evidenceGaps(context: CandidateContext): ApplicationReadinessGap[] {
   }];
 }
 
+function assertCompleteCanonicalSignalSets(input: ApplicationReadinessInput): void {
+  if (!input.semanticSignals.length) {
+    throw new Error('Canonical application readiness score requires semantic signals.');
+  }
+  if (!input.institutionSignals.length) {
+    throw new Error('Canonical application readiness score requires institution signals.');
+  }
+}
+
 export function scoreApplicationReadiness(input: ApplicationReadinessInput): ApplicationReadinessResult {
+  assertCompleteCanonicalSignalSets(input);
   const coverage = classifyRequirementCoverage(input.context, input.jobSpec);
   const dimensions: ApplicationReadinessDimensions = {
     atsTechnical: scoreAtsTechnical(input.technical),
