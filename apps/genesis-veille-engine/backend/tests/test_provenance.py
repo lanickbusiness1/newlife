@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from app.models import EventInput, SourceRecord
 from app.provenance import ProvenanceGate
 from app.source_registry import SourceRegistry
@@ -74,3 +76,24 @@ def test_low_confidence_single_source_is_observation_only():
     assert decision.accepted is True
     assert decision.status == "OBSERVATION_ONLY"
     assert "single_source_not_verified" in decision.reasons
+
+
+def test_registering_identical_source_is_idempotent():
+    registry = SourceRegistry()
+    original = source("src-1", reliability_tier=2)
+
+    first = registry.register(original)
+    second = registry.register(original)
+
+    assert first == second
+    assert registry.list() == [original]
+
+
+def test_conflicting_source_id_cannot_change_trust_metadata():
+    registry = SourceRegistry([source("src-1", reliability_tier=4)])
+    conflicting = source("src-1", reliability_tier=1)
+
+    with pytest.raises(ValueError, match="source id conflict"):
+        registry.register(conflicting)
+
+    assert registry.get("src-1").reliability_tier == 4
