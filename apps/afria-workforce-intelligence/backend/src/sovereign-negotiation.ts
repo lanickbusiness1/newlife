@@ -2,6 +2,9 @@ export type TruthClass = "FACT" | "HYPOTHESIS" | "SIMULATION";
 export type LegalClauseStatus = "ADVISORY_EXTRACTED" | "HUMAN_VALIDATED" | "REJECTED";
 export type CorridorNodeType = "MINE" | "RAIL" | "ROAD" | "PORT_TERMINAL" | "BERTH" | "WAREHOUSE" | "MARKET";
 export type NationalInterestDecision = "GO" | "HOLD" | "NO_GO" | "INSUFFICIENT_EVIDENCE";
+export type ResourceType = "IRON_ORE" | "BAUXITE" | "GOLD" | "LITHIUM" | "COBALT" | "COPPER" | "OTHER";
+export type ResourceUnit = "TONNE" | "KILOGRAM" | "BARREL" | "CUBIC_METER";
+export type ObligationPerformanceStatus = "PENDING" | "DUE" | "EVIDENCE_SATISFIED" | "POTENTIAL_BREACH" | "WAIVED_BY_AUTHORITY";
 
 export class EvidenceArtifact {
   constructor(
@@ -39,6 +42,26 @@ abstract class SovereignObject {
       if (item.projectId !== projectId) throw new Error("Evidence project isolation violation");
     }
     this.evidence = Object.freeze([...evidence]);
+  }
+}
+
+export class ResourceAsset extends SovereignObject {
+  constructor(
+    id: string,
+    tenantId: string,
+    projectId: string,
+    readonly resourceType: ResourceType,
+    readonly name: string,
+    readonly reserveQuantity: number,
+    readonly reserveUnit: ResourceUnit,
+    evidence: readonly EvidenceArtifact[],
+  ) {
+    super(id, tenantId, projectId, evidence);
+    assertRequired(name, "Resource asset name");
+    if (!Number.isFinite(reserveQuantity) || reserveQuantity < 0) {
+      throw new Error("Resource reserve quantity must be non-negative");
+    }
+    if (evidence.length === 0) throw new Error("Resource asset requires evidence");
   }
 }
 
@@ -81,6 +104,53 @@ export class ContractClause extends SovereignObject {
   }
 }
 
+export class ContractObligation extends SovereignObject {
+  constructor(
+    id: string,
+    tenantId: string,
+    projectId: string,
+    readonly concessionId: string,
+    readonly clauseId: string,
+    readonly responsibleParty: string,
+    readonly obligationType: string,
+    readonly dueDate: string,
+    readonly thresholdDescription: string,
+    readonly performanceStatus: ObligationPerformanceStatus,
+    evidence: readonly EvidenceArtifact[],
+    readonly version = 1,
+  ) {
+    super(id, tenantId, projectId, evidence);
+    assertRequired(concessionId, "Obligation concession id");
+    assertRequired(clauseId, "Obligation clause id");
+    assertRequired(responsibleParty, "Obligation responsible party");
+    assertRequired(obligationType, "Obligation type");
+    assertDate(dueDate, "Obligation due date");
+    assertRequired(thresholdDescription, "Obligation threshold");
+    if (!Number.isInteger(version) || version < 1) throw new Error("Obligation version must be a positive integer");
+    if (evidence.length === 0) throw new Error("Contract obligation requires evidence");
+  }
+
+  observe(nextStatus: ObligationPerformanceStatus, observationEvidence: EvidenceArtifact): ContractObligation {
+    if (nextStatus === "WAIVED_BY_AUTHORITY") {
+      throw new Error("Waiver requires a separate human authority workflow");
+    }
+    return new ContractObligation(
+      this.id,
+      this.tenantId,
+      this.projectId,
+      this.concessionId,
+      this.clauseId,
+      this.responsibleParty,
+      this.obligationType,
+      this.dueDate,
+      this.thresholdDescription,
+      nextStatus,
+      [...this.evidence, observationEvidence],
+      this.version + 1,
+    );
+  }
+}
+
 export class CorridorNode extends SovereignObject {
   constructor(
     id: string,
@@ -97,6 +167,58 @@ export class CorridorNode extends SovereignObject {
     assertRequired(operatorId, "Corridor node operator");
     assertRatio(dependencyRatio, "Corridor dependency ratio");
   }
+}
+
+export class OperatorExposure extends SovereignObject {
+  constructor(
+    id: string,
+    tenantId: string,
+    projectId: string,
+    readonly operatorId: string,
+    readonly controlledCapacityRatio: number,
+    readonly criticalNodeCount: number,
+    evidence: readonly EvidenceArtifact[],
+  ) {
+    super(id, tenantId, projectId, evidence);
+    assertRequired(operatorId, "Operator exposure operator");
+    assertRatio(controlledCapacityRatio, "Operator controlled capacity ratio");
+    if (!Number.isInteger(criticalNodeCount) || criticalNodeCount < 0) {
+      throw new Error("Operator critical node count must be a non-negative integer");
+    }
+    if (evidence.length === 0) throw new Error("Operator exposure requires evidence");
+  }
+}
+
+export type OperatorConcentration = Readonly<{
+  hhi: number;
+  largestOperatorId: string | null;
+  largestShare: number;
+  totalObservedShare: number;
+}>;
+
+export function computeOperatorConcentration(exposures: readonly OperatorExposure[]): OperatorConcentration {
+  if (exposures.length === 0) {
+    return Object.freeze({ hhi: 0, largestOperatorId: null, largestShare: 0, totalObservedShare: 0 });
+  }
+  const tenantId = exposures[0]!.tenantId;
+  const projectId = exposures[0]!.projectId;
+  let totalObservedShare = 0;
+  let hhi = 0;
+  let largest = exposures[0]!;
+  for (const exposure of exposures) {
+    if (exposure.tenantId !== tenantId) throw new Error("Operator exposure tenant isolation violation");
+    if (exposure.projectId !== projectId) throw new Error("Operator exposure project isolation violation");
+    totalObservedShare += exposure.controlledCapacityRatio;
+    hhi += exposure.controlledCapacityRatio ** 2;
+    if (exposure.controlledCapacityRatio > largest.controlledCapacityRatio) largest = exposure;
+  }
+  if (totalObservedShare > 1.000001) throw new Error("Operator controlled capacity shares cannot exceed 100 percent");
+  return Object.freeze({
+    hhi: Math.round(hhi * 10_000),
+    largestOperatorId: largest.operatorId,
+    largestShare: largest.controlledCapacityRatio,
+    totalObservedShare: round4(totalObservedShare),
+  });
 }
 
 export type NationalInterestWeights = Readonly<{
@@ -196,6 +318,33 @@ export type SovereignScenario = Readonly<{
   dependencyScore: number;
 }>;
 
+export class SovereignScenarioRecord extends SovereignObject implements SovereignScenario {
+  readonly truthClass = "SIMULATION" as const;
+
+  constructor(
+    id: string,
+    tenantId: string,
+    projectId: string,
+    readonly scenarioType: "BASE_CASE" | "OFFER_A" | "OFFER_B" | "COUNTER_PROPOSAL" | "WALK_AWAY",
+    readonly sovereignNpv: number,
+    readonly fiscalTake: number,
+    readonly fxRetention: number,
+    readonly localValueCapture: number,
+    readonly dependencyScore: number,
+    evidence: readonly EvidenceArtifact[],
+  ) {
+    super(id, tenantId, projectId, evidence);
+    assertFinite(sovereignNpv, "Scenario sovereign NPV");
+    assertFinite(fiscalTake, "Scenario fiscal take");
+    assertRatio(fxRetention, "Scenario FX retention");
+    assertRatio(localValueCapture, "Scenario local value capture");
+    assertRatio(dependencyScore, "Scenario dependency score");
+    if (evidence.length === 0 || evidence.some((item) => item.truthClass !== "SIMULATION")) {
+      throw new Error("Scenario records require SIMULATION evidence");
+    }
+  }
+}
+
 export function compareSovereignScenarios(scenarios: readonly SovereignScenario[]): readonly SovereignScenario[] {
   for (const scenario of scenarios) {
     assertRequired(scenario.id, "Scenario id");
@@ -207,6 +356,28 @@ export function compareSovereignScenarios(scenarios: readonly SovereignScenario[
   }
 
   return Object.freeze([...scenarios].sort((a, b) => b.sovereignNpv - a.sovereignNpv || a.dependencyScore - b.dependencyScore || a.id.localeCompare(b.id)));
+}
+
+export type DecisionAuthority = Readonly<{ id: string; kind: "HUMAN" | "AGENT" | "SERVICE" }>;
+
+export class DecisionRecord extends SovereignObject {
+  constructor(
+    id: string,
+    tenantId: string,
+    projectId: string,
+    readonly assessmentId: string,
+    readonly decision: NationalInterestDecision,
+    readonly rationale: string,
+    readonly decidedBy: DecisionAuthority,
+    evidence: readonly EvidenceArtifact[],
+  ) {
+    super(id, tenantId, projectId, evidence);
+    assertRequired(assessmentId, "Decision assessment id");
+    assertRequired(rationale, "Decision rationale");
+    assertRequired(decidedBy.id, "Decision authority id");
+    if (decidedBy.kind !== "HUMAN") throw new Error("A human decision authority is required for sovereign decisions");
+    if (evidence.length === 0) throw new Error("Sovereign decision record requires evidence");
+  }
 }
 
 function validateWeights(weights: NationalInterestWeights): void {
@@ -242,4 +413,8 @@ function assertDate(value: string, label: string): void {
 
 function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function round4(value: number): number {
+  return Math.round((value + Number.EPSILON) * 10_000) / 10_000;
 }
