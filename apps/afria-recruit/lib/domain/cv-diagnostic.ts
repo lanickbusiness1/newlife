@@ -39,6 +39,11 @@ export function diagnoseCv(context: CandidateContext): DiagnosticFinding[] {
   return findings;
 }
 
-export function scoreApplicationReadiness(): { total: number } {
-  return { total: 0 };
-}
+export { scoreApplicationReadiness } from './application-readiness.js';
+export type {
+  ApplicationReadinessDimensions,
+  ApplicationReadinessEvidenceSignal,
+  ApplicationReadinessInput,
+  ApplicationReadinessResult,
+  ApplicationReadinessTechnicalSignals,
+} from './application-readiness.js';
