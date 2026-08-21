@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, status
+from fastapi.responses import FileResponse
 
 from .models import AcceptedEvent, EventInput, SourceRecord
 from .provenance import ProvenanceGate
@@ -10,6 +13,7 @@ from .world_state import WorldStateStore
 
 SERVICE_NAME = "genesis-veille-world-state"
 SERVICE_VERSION = "0.1.0"
+FRONTEND_INDEX = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
 
 
 def create_app() -> FastAPI:
@@ -21,6 +25,10 @@ def create_app() -> FastAPI:
         title="Genesis Veille Engine — World State API",
         version=SERVICE_VERSION,
     )
+
+    @app.get("/", include_in_schema=False)
+    def public_shell() -> FileResponse:
+        return FileResponse(FRONTEND_INDEX, media_type="text/html; charset=utf-8")
 
     @app.get("/health")
     def health() -> dict[str, str]:
