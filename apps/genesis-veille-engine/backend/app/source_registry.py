@@ -12,6 +12,12 @@ class SourceRegistry:
             self.register(source)
 
     def register(self, source: SourceRecord) -> SourceRecord:
+        existing = self._sources.get(source.id)
+        if existing is not None:
+            if existing == source:
+                return existing
+            raise ValueError("source id conflict")
+
         self._sources[source.id] = source
         return source
 
