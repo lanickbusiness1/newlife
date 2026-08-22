@@ -13,9 +13,14 @@ RUN python -m pip install --upgrade pip && pip install -r requirements.txt
 COPY backend/app ./app
 COPY frontend /workspace/frontend
 
-RUN mkdir -p /data
+RUN groupadd --system --gid 10001 genesis \
+    && useradd --system --uid 10001 --gid genesis --home-dir /nonexistent --shell /usr/sbin/nologin genesis \
+    && mkdir -p /data \
+    && chown -R genesis:genesis /data
 
 VOLUME ["/data"]
 EXPOSE 8000
+
+USER genesis
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
