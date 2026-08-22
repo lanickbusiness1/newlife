@@ -81,6 +81,30 @@ def test_empty_ingest_key_keeps_writes_disabled():
     assert response.status_code == 503
 
 
+def test_ingest_contract_rejects_oversized_source_and_event_objects():
+    api = client()
+
+    oversized_source = api.post(
+        "/api/v1/sources",
+        json=source_payload(source_id="s" * 129),
+        headers=AUTH_HEADERS,
+    )
+    oversized_title = api.post(
+        "/api/v1/events",
+        json=event_payload(title="x" * 513),
+        headers=AUTH_HEADERS,
+    )
+    too_many_sources = api.post(
+        "/api/v1/events",
+        json=event_payload(source_ids=[f"src-{index}" for index in range(17)]),
+        headers=AUTH_HEADERS,
+    )
+
+    assert oversized_source.status_code == 422
+    assert oversized_title.status_code == 422
+    assert too_many_sources.status_code == 422
+
+
 def test_register_source_and_list_it():
     api = client()
     created = api.post("/api/v1/sources", json=source_payload(), headers=AUTH_HEADERS)
