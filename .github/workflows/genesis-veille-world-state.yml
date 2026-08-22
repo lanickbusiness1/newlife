@@ -146,6 +146,8 @@ jobs:
           curl --fail --silent -X POST http://127.0.0.1:8000/api/v1/sources -H 'Content-Type: application/json' -H 'X-Genesis-Ingest-Key: ci-ingest-key' --data '{"id":"src-ci-1","name":"CI Official Source","source_type":"official","license_class":"public","reliability_tier":1,"active":true}'
           curl --fail --silent -X POST http://127.0.0.1:8000/api/v1/events -H 'Content-Type: application/json' -H 'X-Genesis-Ingest-Key: ci-ingest-key' --data '{"id":"evt-ci-1","event_type":"funding","title":"CI durable event","country_iso3":"MLI","observed_at":"2026-08-22T02:55:00Z","source_ids":["src-ci-1"],"confidence":0.91,"corroboration_count":1,"sensitive":false,"sector":"funding"}'
           curl --fail --silent http://127.0.0.1:8000/api/v1/world-state/countries/MLI | grep -q '"event_count":1'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/audit -H 'X-Genesis-Ingest-Key: ci-ingest-key' | grep -q 'SOURCE_REGISTER'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/audit -H 'X-Genesis-Ingest-Key: ci-ingest-key' | grep -q 'EVENT_INGEST'
 
       - name: Replace container
         run: |
@@ -166,6 +168,8 @@ jobs:
           curl --fail --silent http://127.0.0.1:8000/api/v1/sources | grep -q 'src-ci-1'
           curl --fail --silent http://127.0.0.1:8000/api/v1/events | grep -q 'evt-ci-1'
           curl --fail --silent http://127.0.0.1:8000/api/v1/world-state/countries/MLI | grep -q '"event_count":1'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/audit -H 'X-Genesis-Ingest-Key: ci-ingest-key' | grep -q 'SOURCE_REGISTER'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/audit -H 'X-Genesis-Ingest-Key: ci-ingest-key' | grep -q 'EVENT_INGEST'
 
       - name: Container logs on failure
         if: failure()
