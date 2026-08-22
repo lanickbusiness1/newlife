@@ -1,5 +1,7 @@
+import sqlite3
 from datetime import datetime, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -113,3 +115,23 @@ def test_sqlite_backup_is_restoreable(tmp_path):
     assert [item.id for item in restored.list_sources()] == ["src-persist-1"]
     assert [item.event.id for item in restored.list_events()] == ["evt-persist-1"]
     restored.close()
+
+
+def test_sqlite_repository_detects_tampered_event_payload(tmp_path):
+    db_path = tmp_path / "tamper.db"
+    repository = SQLiteStateRepository(db_path)
+    repository.save_event(accepted_event())
+    repository.close()
+
+    connection = sqlite3.connect(db_path)
+    connection.execute(
+        "UPDATE events SET payload_json = replace(payload_json, 'Funding window opened', 'Altered event') WHERE id = ?",
+        ("evt-persist-1",),
+    )
+    connection.commit()
+    connection.close()
+
+    reopened = SQLiteStateRepository(db_path)
+    with pytest.raises(ValueError, match="integrity check failed for event:evt-persist-1"):
+        reopened.list_events()
+    reopened.close()
