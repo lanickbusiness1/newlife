@@ -63,7 +63,23 @@ const fixture: CandidateContext = {
   },
   verifications: [],
   documents: [
-    { id: 'doc-synth-1', documentType: 'cv', mimeType: 'application/pdf', parsingStatus: 'parsed', parsedClaimStatus: 'declared', uploadedAt: '2026-08-01T00:00:00Z', synthetic: true },
+    {
+      id: 'doc-synth-1',
+      documentType: 'cv',
+      mimeType: 'application/pdf',
+      parsingStatus: 'parsed',
+      parsedClaimStatus: 'declared',
+      uploadedAt: '2026-08-01T00:00:00Z',
+      synthetic: true,
+      atsProfile: {
+        parserReadable: true,
+        standardSections: true,
+        singleColumn: true,
+        noImageOnlyText: true,
+        safeFileFormat: true,
+        evidenceRefs: ['document:doc-synth-1:ats-profile'],
+      },
+    },
   ],
 };
 

@@ -82,6 +82,15 @@ export interface VerificationFact {
   hasEvidenceHash: boolean;
 }
 
+export interface CandidateDocumentAtsProfile {
+  parserReadable: boolean;
+  standardSections: boolean;
+  singleColumn: boolean;
+  noImageOnlyText: boolean;
+  safeFileFormat: boolean;
+  evidenceRefs: string[];
+}
+
 export interface CandidateDocumentSummary {
   id: string;
   documentType: string;
@@ -90,6 +99,7 @@ export interface CandidateDocumentSummary {
   parsedClaimStatus: string;
   uploadedAt: string;
   synthetic: boolean;
+  atsProfile?: CandidateDocumentAtsProfile;
 }
 
 export interface CandidateContext {

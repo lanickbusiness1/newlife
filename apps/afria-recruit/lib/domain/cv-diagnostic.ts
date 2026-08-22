@@ -38,3 +38,13 @@ export function diagnoseCv(context: CandidateContext): DiagnosticFinding[] {
 
   return findings;
 }
+
+export { scoreApplicationReadiness, scoreApplicationReadinessFromCanonicalSources } from './application-readiness.js';
+export type {
+  ApplicationReadinessDimensions,
+  ApplicationReadinessEvidenceSignal,
+  ApplicationReadinessGap,
+  ApplicationReadinessInput,
+  ApplicationReadinessResult,
+  ApplicationReadinessTechnicalSignals,
+} from './application-readiness.js';
