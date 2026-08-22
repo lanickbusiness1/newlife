@@ -13,6 +13,7 @@ declare
     'sovereign_corridor_nodes',
     'sovereign_operator_exposures',
     'sovereign_scenarios',
+    'sovereign_national_interest_methodologies',
     'sovereign_national_interest_assessments',
     'sovereign_decision_records'
   ];
@@ -56,8 +57,20 @@ insert into mining_projects (id, tenant_id, project_code, name, state) values
 on conflict (id) do nothing;
 
 insert into workforce_identities (id, tenant_id, kind, display_name, roles) values
-  ('56000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'HUMAN', 'Synthetic Sovereign Approver', '["SOVEREIGN_DECISION_APPROVER"]'::jsonb),
-  ('56000000-0000-4000-8000-000000000002', '11111111-1111-4111-8111-111111111111', 'AGENT', 'Synthetic Negotiation Agent', '["NEGOTIATION_ADVISOR"]'::jsonb)
+  (
+    '56000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
+    'HUMAN',
+    'Synthetic Sovereign Approver',
+    '["SOVEREIGN_DECISION_APPROVER","SOVEREIGN_METHODOLOGY_APPROVER"]'::jsonb
+  ),
+  (
+    '56000000-0000-4000-8000-000000000002',
+    '11111111-1111-4111-8111-111111111111',
+    'AGENT',
+    'Synthetic Negotiation Agent',
+    '["NEGOTIATION_ADVISOR","SOVEREIGN_METHODOLOGY_APPROVER"]'::jsonb
+  )
 on conflict (id) do nothing;
 
 set role workforce_app;
@@ -77,6 +90,12 @@ insert into sovereign_evidence_artifacts (
     '11111111-1111-4111-8111-111111111111',
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     'EV-SIM-1', 'synthetic://scenario/counter-proposal', repeat('b', 64), now(), 'SIMULATION'
+  ),
+  (
+    '50000000-0000-4000-8000-000000000003',
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'EV-METHOD-APPROVAL', 'synthetic://methodology/approval', repeat('c', 64), now(), 'FACT'
   );
 
 insert into sovereign_resource_assets (
@@ -154,14 +173,64 @@ insert into sovereign_scenarios (
   array['50000000-0000-4000-8000-000000000002'::uuid]
 );
 
+insert into sovereign_national_interest_methodologies (
+  id, tenant_id, project_id, external_id, methodology_version, weights, weight_total,
+  go_threshold, hold_threshold, state, validated_by_identity_id, validated_at, evidence_ids, version
+) values (
+  '53900000-0000-4000-8000-000000000001',
+  '11111111-1111-4111-8111-111111111111',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  'METHOD-A-1', 'B8-v1',
+  '{"nationalValueCapture":20,"fiscalFx":10,"infrastructureSpillover":10,"industrialization":10,"localContentSkills":10,"logisticsControl":10,"concentrationDependency":5,"debtGuarantees":5,"esgCommunity":5,"dataGovernance":5,"reversibility":5,"longTermResilience":5}'::jsonb,
+  100, 75, 55, 'VALIDATED',
+  '56000000-0000-4000-8000-000000000001', now(),
+  array[
+    '50000000-0000-4000-8000-000000000001'::uuid,
+    '50000000-0000-4000-8000-000000000003'::uuid
+  ],
+  2
+);
+
+-- Agents may advise, but cannot validate the sovereign scoring methodology.
+do $$
+begin
+  begin
+    insert into sovereign_national_interest_methodologies (
+      id, tenant_id, project_id, external_id, methodology_version, weights, weight_total,
+      go_threshold, hold_threshold, state, validated_by_identity_id, validated_at, evidence_ids, version
+    ) values (
+      '53900000-0000-4000-8000-000000000002',
+      '11111111-1111-4111-8111-111111111111',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'METHOD-A-AGENT', 'B8-agent-invalid',
+      '{"nationalValueCapture":20,"fiscalFx":10,"infrastructureSpillover":10,"industrialization":10,"localContentSkills":10,"logisticsControl":10,"concentrationDependency":5,"debtGuarantees":5,"esgCommunity":5,"dataGovernance":5,"reversibility":5,"longTermResilience":5}'::jsonb,
+      100, 75, 55, 'VALIDATED',
+      '56000000-0000-4000-8000-000000000002', now(),
+      array[
+        '50000000-0000-4000-8000-000000000001'::uuid,
+        '50000000-0000-4000-8000-000000000003'::uuid
+      ],
+      2
+    );
+    raise exception 'agent-validated methodology unexpectedly succeeded';
+  exception
+    when raise_exception then
+      if sqlerrm = 'agent-validated methodology unexpectedly succeeded' then raise; end if;
+    when others then null;
+  end;
+end
+$$;
+
 insert into sovereign_national_interest_assessments (
-  id, tenant_id, project_id, external_id, weights, weight_total, scores, weighted_score,
+  id, tenant_id, project_id, external_id, methodology_id, methodology_version,
+  weights, weight_total, scores, weighted_score,
   decision, eliminatory_red_flags, evidence_count, evidence_ids
 ) values (
   '54000000-0000-4000-8000-000000000001',
   '11111111-1111-4111-8111-111111111111',
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'NIA-A-1',
+  '53900000-0000-4000-8000-000000000001', 'B8-v1',
   '{"nationalValueCapture":20,"fiscalFx":10,"infrastructureSpillover":10,"industrialization":10,"localContentSkills":10,"logisticsControl":10,"concentrationDependency":5,"debtGuarantees":5,"esgCommunity":5,"dataGovernance":5,"reversibility":5,"longTermResilience":5}'::jsonb,
   100,
   '{"nationalValueCapture":90,"fiscalFx":90,"infrastructureSpillover":90,"industrialization":90,"localContentSkills":90,"logisticsControl":90,"concentrationDependency":90,"debtGuarantees":90,"esgCommunity":90,"dataGovernance":90,"reversibility":90,"longTermResilience":90}'::jsonb,
@@ -212,6 +281,26 @@ begin
   if visible_count <> 1 then
     raise exception 'RLS expected 1 visible concession, got %', visible_count;
   end if;
+  select count(*) into visible_count from sovereign_national_interest_methodologies;
+  if visible_count <> 1 then
+    raise exception 'RLS expected 1 visible methodology, got %', visible_count;
+  end if;
+end
+$$;
+
+-- Validated methodologies are immutable; a new semantic version is required for change.
+do $$
+begin
+  begin
+    update sovereign_national_interest_methodologies
+       set go_threshold = 70
+     where external_id = 'METHOD-A-1';
+    raise exception 'validated methodology mutation unexpectedly succeeded';
+  exception
+    when raise_exception then
+      if sqlerrm = 'validated methodology mutation unexpectedly succeeded' then raise; end if;
+    when others then null;
+  end;
 end
 $$;
 
