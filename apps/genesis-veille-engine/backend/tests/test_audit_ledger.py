@@ -108,7 +108,7 @@ def test_audit_record_is_append_only_persistent_and_integrity_checked(tmp_path):
     tampered.close()
 
 
-def test_audit_api_is_private_and_successful_source_write_is_recorded(tmp_path):
+def test_audit_api_is_private_and_successful_source_write_records_attempt_and_outcome(tmp_path):
     client = TestClient(
         create_app(
             ingest_key=INGEST_KEY,
@@ -124,9 +124,8 @@ def test_audit_api_is_private_and_successful_source_write_is_recorded(tmp_path):
     assert created.status_code == 201
     assert records.status_code == 200
     source_records = [item for item in records.json() if item["action"] == "SOURCE_REGISTER"]
-    assert len(source_records) == 1
-    assert source_records[0]["outcome"] == "SUCCEEDED"
-    assert source_records[0]["source_id"] == "src-audit-1"
+    assert [item["outcome"] for item in source_records] == ["ATTEMPTED", "SUCCEEDED"]
+    assert all(item["source_id"] == "src-audit-1" for item in source_records)
 
 
 def test_wrong_ingest_key_is_audited_without_storing_secret(tmp_path):
