@@ -386,7 +386,7 @@ function sameMethodology(left: NationalInterestMethodology, right: NationalInter
     && left.tenantId === right.tenantId
     && left.projectId === right.projectId
     && left.methodologyVersion === right.methodologyVersion
-    && JSON.stringify(left.weights) === JSON.stringify(right.weights)
+    && sameWeights(left.weights, right.weights)
     && left.goThreshold === right.goThreshold
     && left.holdThreshold === right.holdThreshold
     && left.state === right.state
@@ -394,6 +394,11 @@ function sameMethodology(left: NationalInterestMethodology, right: NationalInter
     && left.validatedByIdentityId === right.validatedByIdentityId
     && left.validatedAt === right.validatedAt
     && JSON.stringify(left.evidence.map((item) => item.id)) === JSON.stringify(right.evidence.map((item) => item.id));
+}
+
+function sameWeights(left: NationalInterestWeights, right: NationalInterestWeights): boolean {
+  const keys = Object.keys(left) as (keyof NationalInterestWeights)[];
+  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
 }
 
 function toIso(value: string | Date): string {
