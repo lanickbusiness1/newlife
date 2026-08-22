@@ -43,3 +43,16 @@ def test_public_shell_calls_relative_world_state_api_and_surfaces_provenance():
     assert "provenance" in content.lower()
     assert "OBSERVATION_ONLY" in content
     assert "Mode dégradé" in content
+
+
+def test_public_shell_has_no_runtime_third_party_map_dependency():
+    content = html().lower()
+
+    assert "unpkg.com" not in content
+    assert "leaflet" not in content
+    assert "tilelayer" not in content
+    assert "openstreetmap.org" not in content
+    assert not re.search(r'<script[^>]+src=["\']https?://', content)
+    assert not re.search(r'<link[^>]+href=["\']https?://', content)
+    assert 'id="africa-field"' in content
+    assert "data-sovereign-map" in content
