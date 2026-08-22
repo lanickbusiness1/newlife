@@ -92,6 +92,7 @@ jobs:
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/005_sovereign_negotiation_down.sql
           test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.sovereign_evidence_artifacts') is null")" = "t"
+          test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.sovereign_national_interest_methodologies') is null")" = "t"
           test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.sovereign_national_interest_assessments') is null")" = "t"
           test "$(psql "$DATABASE_URL" -Atqc "select to_regclass('public.sovereign_decision_records') is null")" = "t"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/005_sovereign_negotiation.sql
