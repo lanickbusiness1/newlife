@@ -33,6 +33,39 @@ class SourceRecord(BaseModel):
         return normalized
 
 
+class CrawlTarget(BaseModel):
+    id: str = Field(min_length=1, max_length=128)
+    source_id: str = Field(min_length=1, max_length=128)
+    url: str = Field(min_length=8, max_length=2048)
+    country_iso3: str = Field(min_length=3, max_length=3)
+    event_type_hint: str = Field(min_length=1, max_length=64)
+    sector: str | None = Field(default=None, max_length=128)
+    sensitive: bool = False
+    enabled: bool = True
+    interval_seconds: int = Field(default=3600, ge=300, le=604800)
+    next_due_at: datetime
+    last_attempt_at: datetime | None = None
+    last_success_at: datetime | None = None
+    failure_count: int = Field(default=0, ge=0, le=1000)
+    last_content_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    last_error: str | None = Field(default=None, max_length=512)
+
+    @field_validator("country_iso3")
+    @classmethod
+    def normalize_country_iso3(cls, value: str) -> str:
+        return value.upper()
+
+    @field_validator("last_content_sha256")
+    @classmethod
+    def validate_content_digest(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.lower()
+        if any(character not in "0123456789abcdef" for character in normalized):
+            raise ValueError("last_content_sha256 must be a hexadecimal SHA-256 digest")
+        return normalized
+
+
 class EventInput(BaseModel):
     id: str = Field(min_length=1, max_length=128)
     event_type: str = Field(min_length=1, max_length=64)
