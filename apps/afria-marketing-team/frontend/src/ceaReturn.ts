@@ -41,6 +41,18 @@ export interface CeaReturnLeadQualification {
   contactAllowed: boolean;
 }
 
+export interface CeaCrmRecord {
+  "Content ID": string;
+  "Narrative Source": string;
+  "Primary Intent": CeaPrimaryIntent;
+  "Next Best Offer": CeaNextBestOffer;
+  "Langue": CeaLanguage;
+  "Consentement Contact": "__YES__" | "__NO__";
+  "Revenue Attributed USD": number;
+  "Payment Status": "Non proposé";
+  "Priorité": CeaPriority;
+}
+
 const OFFER_BY_INTENT: Record<CeaPrimaryIntent, { offer: CeaNextBestOffer; valueUsd: number }> = {
   "Identité": { offer: "Pack Dossier 150 USD", valueUsd: 150 },
   "Voyage": { offer: "Accueil Cotonou 600 USD", valueUsd: 600 },
@@ -95,5 +107,19 @@ export function qualifyCeaReturnLead(input: CeaReturnLeadInput): CeaReturnLeadQu
     paymentStatus: "Non proposé",
     revenueAttributedUsd: 0,
     contactAllowed: input.consentContact
+  };
+}
+
+export function toCeaCrmRecord(qualification: CeaReturnLeadQualification): CeaCrmRecord {
+  return {
+    "Content ID": qualification.contentId,
+    "Narrative Source": qualification.narrativeSource,
+    "Primary Intent": qualification.primaryIntent,
+    "Next Best Offer": qualification.nextBestOffer,
+    "Langue": qualification.language,
+    "Consentement Contact": qualification.contactAllowed ? "__YES__" : "__NO__",
+    "Revenue Attributed USD": qualification.revenueAttributedUsd,
+    "Payment Status": qualification.paymentStatus,
+    "Priorité": qualification.priority
   };
 }
