@@ -9,25 +9,31 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse
 
 from .models import AcceptedEvent, EventInput, SourceRecord
+from .persistence import SQLiteStateRepository
 from .provenance import ProvenanceGate
 from .source_registry import SourceRegistry
 from .world_state import WorldStateStore
 
 
 SERVICE_NAME = "genesis-veille-world-state"
-SERVICE_VERSION = "0.1.0"
+SERVICE_VERSION = "0.2.0"
 FRONTEND_INDEX = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
 
 
-def create_app(ingest_key: str | None = None) -> FastAPI:
-    registry = SourceRegistry()
+def create_app(
+    ingest_key: str | None = None,
+    storage_path: str | Path | None = None,
+) -> FastAPI:
+    repository = SQLiteStateRepository(storage_path) if storage_path is not None else None
+    registry = SourceRegistry(repository.list_sources() if repository else None)
     gate = ProvenanceGate(registry)
-    store = WorldStateStore()
+    store = WorldStateStore(repository.list_events() if repository else None)
 
     app = FastAPI(
         title="Genesis Veille Engine — World State API",
         version=SERVICE_VERSION,
     )
+    app.state.repository = repository
 
     def require_ingest_access(
         supplied_key: Annotated[
@@ -70,6 +76,8 @@ def create_app(ingest_key: str | None = None) -> FastAPI:
     )
     def register_source(source: SourceRecord) -> SourceRecord:
         try:
+            if repository is not None:
+                repository.save_source(source)
             return registry.register(source)
         except ValueError as exc:
             if str(exc) == "source id conflict":
@@ -99,7 +107,11 @@ def create_app(ingest_key: str | None = None) -> FastAPI:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=decision.model_dump(),
             )
+
+        accepted = AcceptedEvent(event=event, provenance=decision)
         try:
+            if repository is not None:
+                repository.save_event(accepted)
             return store.add(event, decision)
         except ValueError as exc:
             if str(exc) == "duplicate event id":
@@ -125,4 +137,7 @@ def create_app(ingest_key: str | None = None) -> FastAPI:
     return app
 
 
-app = create_app(ingest_key=os.getenv("GENESIS_INGEST_KEY"))
+app = create_app(
+    ingest_key=os.getenv("GENESIS_INGEST_KEY"),
+    storage_path=os.getenv("GENESIS_STATE_DB"),
+)
