@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from typing import Any
 
 from .models import AcceptedEvent, EventInput, ProvenanceDecision
@@ -26,9 +27,11 @@ OPPORTUNITY_EVENT_TYPES = {
 
 
 class WorldStateStore:
-    def __init__(self) -> None:
+    def __init__(self, events: Iterable[AcceptedEvent] | None = None) -> None:
         self._events: list[AcceptedEvent] = []
         self._event_ids: set[str] = set()
+        for accepted in events or []:
+            self.add(accepted.event, accepted.provenance)
 
     def add(self, event: EventInput, decision: ProvenanceDecision) -> AcceptedEvent:
         if not decision.accepted:
