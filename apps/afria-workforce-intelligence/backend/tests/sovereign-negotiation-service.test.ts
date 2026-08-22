@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   EvidenceArtifact,
+  NationalInterestMethodology,
   OperatorExposure,
   SovereignScenarioRecord,
   type NationalInterestWeights,
@@ -37,6 +38,16 @@ const factEvidence = new EvidenceArtifact(
   "FACT",
 );
 
+const methodologyApprovalEvidence = new EvidenceArtifact(
+  "ev-method-approval",
+  "tenant-gn",
+  "simandou",
+  "synthetic://methodology/approval",
+  "c".repeat(64),
+  "2026-08-21T00:01:00.000Z",
+  "FACT",
+);
+
 const simulationEvidence = new EvidenceArtifact(
   "ev-sim",
   "tenant-gn",
@@ -47,9 +58,43 @@ const simulationEvidence = new EvidenceArtifact(
   "SIMULATION",
 );
 
+function approvedMethodology(): NationalInterestMethodology {
+  return new NationalInterestMethodology(
+    "method-b8-v1",
+    "tenant-gn",
+    "simandou",
+    "B8-v1",
+    weights,
+    75,
+    55,
+    "DRAFT",
+    [factEvidence],
+  ).validate(
+    {
+      id: "method-approver",
+      tenantId: "tenant-gn",
+      kind: "HUMAN",
+      roles: ["SOVEREIGN_METHODOLOGY_APPROVER"],
+    },
+    methodologyApprovalEvidence,
+  );
+}
+
 class MemoryRepository implements SovereignNegotiationRepository {
+  readonly evidence: EvidenceArtifact[] = [];
+  readonly methodologies: NationalInterestMethodology[] = [];
   readonly assessments: SovereignAssessmentSnapshot[] = [];
   readonly decisions: unknown[] = [];
+
+  async saveEvidence(item: EvidenceArtifact): Promise<EvidenceArtifact> {
+    if (!this.evidence.some((existing) => existing.id === item.id)) this.evidence.push(item);
+    return item;
+  }
+
+  async saveMethodology(methodology: NationalInterestMethodology): Promise<NationalInterestMethodology> {
+    if (!this.methodologies.some((existing) => existing.id === methodology.id)) this.methodologies.push(methodology);
+    return methodology;
+  }
 
   async saveAssessment(snapshot: SovereignAssessmentSnapshot): Promise<SovereignAssessmentSnapshot> {
     this.assessments.push(snapshot);
@@ -65,13 +110,13 @@ class MemoryRepository implements SovereignNegotiationRepository {
 test("persists insufficient-evidence assessment without inventing a score or sovereign decision", async () => {
   const repository = new MemoryRepository();
   const service = new SovereignNegotiationService(repository);
+  const methodology = approvedMethodology();
 
   const evaluation = await service.evaluateOffer({
     tenantId: "tenant-gn",
     projectId: "simandou",
     assessmentId: "nia-no-evidence",
-    methodologyVersion: "B8-v1",
-    weights,
+    methodology,
     scores: Object.fromEntries(Object.keys(weights).map((key) => [key, 85])) as Record<keyof NationalInterestWeights, number>,
     eliminatoryRedFlags: [],
     evidence: [],
@@ -81,13 +126,16 @@ test("persists insufficient-evidence assessment without inventing a score or sov
 
   assert.equal(evaluation.assessment.decision, "INSUFFICIENT_EVIDENCE");
   assert.equal(evaluation.assessment.weightedScore, null);
+  assert.equal(repository.methodologies.length, 1);
   assert.equal(repository.assessments.length, 1);
   assert.equal(repository.decisions.length, 0);
+  assert.equal(evaluation.assessment.methodologyId, methodology.id);
 });
 
 test("returns deterministic concentration and scenario ranking alongside the National Interest assessment", async () => {
   const repository = new MemoryRepository();
   const service = new SovereignNegotiationService(repository);
+  const methodology = approvedMethodology();
 
   const exposures = [
     new OperatorExposure("exp-a", "tenant-gn", "simandou", "operator-a", 0.6, 3, [factEvidence]),
@@ -102,8 +150,7 @@ test("returns deterministic concentration and scenario ranking alongside the Nat
     tenantId: "tenant-gn",
     projectId: "simandou",
     assessmentId: "nia-evaluated",
-    methodologyVersion: "B8-v1",
-    weights,
+    methodology,
     scores: Object.fromEntries(Object.keys(weights).map((key) => [key, 80])) as Record<keyof NationalInterestWeights, number>,
     eliminatoryRedFlags: [],
     evidence: [factEvidence],
@@ -115,6 +162,43 @@ test("returns deterministic concentration and scenario ranking alongside the Nat
   assert.equal(evaluation.concentration.hhi, 5200);
   assert.equal(evaluation.rankedScenarios[0]?.id, "counter");
   assert.equal(repository.assessments[0]?.methodologyVersion, "B8-v1");
+  assert.equal(repository.assessments[0]?.goThreshold, 75);
+  assert.equal(repository.assessments[0]?.holdThreshold, 55);
+});
+
+test("rejects a draft methodology before evidence or assessment persistence", async () => {
+  const repository = new MemoryRepository();
+  const service = new SovereignNegotiationService(repository);
+  const draft = new NationalInterestMethodology(
+    "method-draft",
+    "tenant-gn",
+    "simandou",
+    "B8-draft",
+    weights,
+    75,
+    55,
+    "DRAFT",
+    [factEvidence],
+  );
+
+  await assert.rejects(
+    service.evaluateOffer({
+      tenantId: "tenant-gn",
+      projectId: "simandou",
+      assessmentId: "nia-draft",
+      methodology: draft,
+      scores: Object.fromEntries(Object.keys(weights).map((key) => [key, 90])) as Record<keyof NationalInterestWeights, number>,
+      eliminatoryRedFlags: [],
+      evidence: [factEvidence],
+      operatorExposures: [],
+      scenarios: [],
+    }),
+    /methodology.*approved/i,
+  );
+
+  assert.equal(repository.evidence.length, 0);
+  assert.equal(repository.methodologies.length, 0);
+  assert.equal(repository.assessments.length, 0);
 });
 
 test("keeps final sovereign decision human-only and separate from AI recommendation", async () => {
