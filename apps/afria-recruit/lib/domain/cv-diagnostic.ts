@@ -39,7 +39,7 @@ export function diagnoseCv(context: CandidateContext): DiagnosticFinding[] {
   return findings;
 }
 
-export { scoreApplicationReadiness } from './application-readiness.js';
+export { scoreApplicationReadiness, scoreApplicationReadinessFromCanonicalSources } from './application-readiness.js';
 export type {
   ApplicationReadinessDimensions,
   ApplicationReadinessEvidenceSignal,
