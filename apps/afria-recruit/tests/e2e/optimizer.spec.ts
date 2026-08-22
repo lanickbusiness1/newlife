@@ -44,6 +44,15 @@ test('candidate completes the evidence-safe CV optimization flow', async ({ page
   await expect(financeRow).toContainText(/Aucune compétence correspondante/i);
   await expect(page.getByText(/Conformité financière.*VERIFIED/i)).toHaveCount(0);
 
+  await expect(page.getByRole('heading', { name: 'Application Readiness™' })).toBeVisible();
+  await expect(page.getByTestId('readiness-total')).toContainText('/100');
+  await expect(page.getByTestId('readiness-atsTechnical')).toContainText('/20');
+  await expect(page.getByTestId('readiness-jobMatch')).toContainText('/30');
+  await expect(page.getByTestId('readiness-semanticFit')).toContainText('/20');
+  await expect(page.getByTestId('readiness-evidence')).toContainText('/15');
+  await expect(page.getByTestId('readiness-institutionFit')).toContainText('/15');
+  await expect(page.getByTestId('readiness-atsTechnical')).toContainText('20/20');
+
   await page.getByRole('button', { name: 'Générer les deux versions' }).click();
   await expect(page.getByRole('heading', { name: 'CV ATS' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'CV humain' })).toBeVisible();
