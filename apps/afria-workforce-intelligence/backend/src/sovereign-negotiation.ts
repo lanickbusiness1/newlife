@@ -5,6 +5,7 @@ export type NationalInterestDecision = "GO" | "HOLD" | "NO_GO" | "INSUFFICIENT_E
 export type ResourceType = "IRON_ORE" | "BAUXITE" | "GOLD" | "LITHIUM" | "COBALT" | "COPPER" | "OTHER";
 export type ResourceUnit = "TONNE" | "KILOGRAM" | "BARREL" | "CUBIC_METER";
 export type ObligationPerformanceStatus = "PENDING" | "DUE" | "EVIDENCE_SATISFIED" | "POTENTIAL_BREACH" | "WAIVED_BY_AUTHORITY";
+export type NationalInterestMethodologyState = "DRAFT" | "VALIDATED" | "RETIRED";
 
 export class EvidenceArtifact {
   constructor(
@@ -238,6 +239,71 @@ export type NationalInterestWeights = Readonly<{
 
 export type NationalInterestScores = Readonly<Record<keyof NationalInterestWeights, number>>;
 
+export type MethodologyAuthority = Readonly<{
+  id: string;
+  tenantId: string;
+  kind: "HUMAN" | "AGENT" | "SERVICE";
+  roles: readonly string[];
+}>;
+
+export class NationalInterestMethodology extends SovereignObject {
+  readonly weights: NationalInterestWeights;
+
+  constructor(
+    id: string,
+    tenantId: string,
+    projectId: string,
+    readonly methodologyVersion: string,
+    weights: NationalInterestWeights,
+    readonly goThreshold: number,
+    readonly holdThreshold: number,
+    readonly state: NationalInterestMethodologyState,
+    evidence: readonly EvidenceArtifact[],
+    readonly version = 1,
+    readonly validatedByIdentityId: string | null = null,
+    readonly validatedAt: string | null = null,
+  ) {
+    super(id, tenantId, projectId, evidence);
+    assertRequired(methodologyVersion, "National Interest methodology version");
+    validateWeights(weights);
+    assertScore(goThreshold, "GO threshold");
+    assertScore(holdThreshold, "HOLD threshold");
+    if (goThreshold <= holdThreshold) throw new Error("GO threshold must be greater than HOLD threshold");
+    if (!Number.isInteger(version) || version < 1) throw new Error("National Interest methodology version counter must be positive");
+    if (evidence.length === 0) throw new Error("National Interest methodology requires source evidence");
+    if (state === "VALIDATED") {
+      if (!validatedByIdentityId?.trim()) throw new Error("Validated methodology requires a human approver identity");
+      if (!validatedAt || Number.isNaN(Date.parse(validatedAt))) throw new Error("Validated methodology requires a validation timestamp");
+      if (evidence.length < 2) throw new Error("Validated methodology requires source and approval evidence");
+    }
+    this.weights = Object.freeze({ ...weights });
+  }
+
+  validate(authority: MethodologyAuthority, approvalEvidence: EvidenceArtifact): NationalInterestMethodology {
+    if (this.state !== "DRAFT") throw new Error("Only draft National Interest methodologies can be approved");
+    if (authority.tenantId !== this.tenantId) throw new Error("Methodology approver tenant isolation violation");
+    if (authority.kind !== "HUMAN") throw new Error("A human sovereign methodology approver is required");
+    if (!authority.roles.includes("SOVEREIGN_METHODOLOGY_APPROVER")) {
+      throw new Error("Human approver requires SOVEREIGN_METHODOLOGY_APPROVER role");
+    }
+    if (approvalEvidence.truthClass !== "FACT") throw new Error("Methodology approval evidence must be FACT");
+    return new NationalInterestMethodology(
+      this.id,
+      this.tenantId,
+      this.projectId,
+      this.methodologyVersion,
+      this.weights,
+      this.goThreshold,
+      this.holdThreshold,
+      "VALIDATED",
+      [...this.evidence, approvalEvidence],
+      this.version + 1,
+      authority.id,
+      approvalEvidence.observedAt,
+    );
+  }
+}
+
 export class NationalInterestAssessment extends SovereignObject {
   readonly weights: NationalInterestWeights;
 
@@ -245,17 +311,19 @@ export class NationalInterestAssessment extends SovereignObject {
     id: string,
     tenantId: string,
     projectId: string,
-    weights: NationalInterestWeights,
+    readonly methodology: NationalInterestMethodology,
     evidence: readonly EvidenceArtifact[],
   ) {
     super(id, tenantId, projectId, evidence);
-    validateWeights(weights);
-    this.weights = Object.freeze({ ...weights });
+    assertApprovedMethodology(methodology, tenantId, projectId);
+    this.weights = methodology.weights;
   }
 }
 
 export type NationalInterestResult = Readonly<{
   assessmentId: string;
+  methodologyId: string;
+  methodologyVersion: string;
   weightedScore: number | null;
   decision: NationalInterestDecision;
   eliminatoryRedFlags: readonly string[];
@@ -266,22 +334,25 @@ export function scoreNationalInterest(input: {
   tenantId: string;
   projectId: string;
   assessmentId: string;
-  weights: NationalInterestWeights;
+  methodology: NationalInterestMethodology;
   scores: NationalInterestScores;
   eliminatoryRedFlags: readonly string[];
   evidence: readonly EvidenceArtifact[];
 }): NationalInterestResult {
+  assertApprovedMethodology(input.methodology, input.tenantId, input.projectId);
   const assessment = new NationalInterestAssessment(
     input.assessmentId,
     input.tenantId,
     input.projectId,
-    input.weights,
+    input.methodology,
     input.evidence,
   );
 
   if (assessment.evidence.length === 0) {
     return Object.freeze({
       assessmentId: assessment.id,
+      methodologyId: input.methodology.id,
+      methodologyVersion: input.methodology.methodologyVersion,
       weightedScore: null,
       decision: "INSUFFICIENT_EVIDENCE",
       eliminatoryRedFlags: Object.freeze([...input.eliminatoryRedFlags]),
@@ -290,18 +361,26 @@ export function scoreNationalInterest(input: {
   }
 
   let weighted = 0;
-  for (const key of Object.keys(input.weights) as (keyof NationalInterestWeights)[]) {
+  for (const key of Object.keys(input.methodology.weights) as (keyof NationalInterestWeights)[]) {
     const score = input.scores[key];
     assertScore(score, `Score ${key}`);
-    weighted += score * (input.weights[key] / 100);
+    weighted += score * (input.methodology.weights[key] / 100);
   }
 
   const weightedScore = round2(weighted);
   const redFlags = Object.freeze([...input.eliminatoryRedFlags]);
-  const decision: NationalInterestDecision = redFlags.length > 0 ? "NO_GO" : weightedScore >= 75 ? "GO" : weightedScore >= 55 ? "HOLD" : "NO_GO";
+  const decision: NationalInterestDecision = redFlags.length > 0
+    ? "NO_GO"
+    : weightedScore >= input.methodology.goThreshold
+      ? "GO"
+      : weightedScore >= input.methodology.holdThreshold
+        ? "HOLD"
+        : "NO_GO";
 
   return Object.freeze({
     assessmentId: assessment.id,
+    methodologyId: input.methodology.id,
+    methodologyVersion: input.methodology.methodologyVersion,
     weightedScore,
     decision,
     eliminatoryRedFlags: redFlags,
@@ -378,6 +457,16 @@ export class DecisionRecord extends SovereignObject {
     if (decidedBy.kind !== "HUMAN") throw new Error("A human decision authority is required for sovereign decisions");
     if (evidence.length === 0) throw new Error("Sovereign decision record requires evidence");
   }
+}
+
+function assertApprovedMethodology(
+  methodology: NationalInterestMethodology,
+  tenantId: string,
+  projectId: string,
+): void {
+  if (methodology.state !== "VALIDATED") throw new Error("National Interest methodology must be approved before scoring");
+  if (methodology.tenantId !== tenantId) throw new Error("National Interest methodology tenant isolation violation");
+  if (methodology.projectId !== projectId) throw new Error("National Interest methodology project isolation violation");
 }
 
 function validateWeights(weights: NationalInterestWeights): void {
