@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Callable
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import FileResponse
@@ -16,7 +17,7 @@ from .connectors import (
     PublicHttpConnector,
     PublicUrlPolicy,
 )
-from .models import AcceptedEvent, CrawlTarget, EventInput, SourceRecord
+from .models import AcceptedEvent, AuditRecord, CrawlTarget, EventInput, SourceRecord
 from .persistence import SQLiteStateRepository
 from .provenance import ProvenanceGate
 from .scheduler import CrawlScheduler
@@ -75,6 +76,32 @@ def create_app(
     app.state.http_connector_enabled = http_connector_enabled
     app.state.scheduler_enabled = scheduler_enabled
 
+    def audit(
+        action: str,
+        outcome: str,
+        resource: str,
+        *,
+        reason: str | None = None,
+        source_id: str | None = None,
+        target_id: str | None = None,
+        details: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
+        if repository is None:
+            return
+        repository.save_audit_record(
+            AuditRecord(
+                id=f"audit-{uuid4()}",
+                occurred_at=clock(),
+                action=action,
+                outcome=outcome,
+                resource=resource,
+                reason=reason,
+                source_id=source_id,
+                target_id=target_id,
+                details=details or {},
+            )
+        )
+
     @app.middleware("http")
     async def add_security_headers(request: Request, call_next):
         response = await call_next(request)
@@ -86,17 +113,31 @@ def create_app(
         return response
 
     def require_ingest_access(
+        request: Request,
         supplied_key: Annotated[
             str | None,
             Header(alias="X-Genesis-Ingest-Key"),
         ] = None,
     ) -> None:
+        resource = request.url.path
         if not ingest_key:
+            audit(
+                "AUTHORIZATION",
+                "DENIED",
+                resource,
+                reason="ingestion is disabled until GENESIS_INGEST_KEY is configured",
+            )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="ingestion is disabled until GENESIS_INGEST_KEY is configured",
             )
         if supplied_key is None or not hmac.compare_digest(supplied_key, ingest_key):
+            audit(
+                "AUTHORIZATION",
+                "DENIED",
+                resource,
+                reason="invalid ingest credential",
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="invalid ingest credential",
@@ -133,11 +174,21 @@ def create_app(
         dependencies=[Depends(require_ingest_access)],
     )
     def register_source(source: SourceRecord) -> SourceRecord:
+        audit("SOURCE_REGISTER", "ATTEMPTED", "/api/v1/sources", source_id=source.id)
         try:
             if repository is not None:
                 repository.save_source(source)
-            return registry.register(source)
+            registered = registry.register(source)
+            audit("SOURCE_REGISTER", "SUCCEEDED", "/api/v1/sources", source_id=source.id)
+            return registered
         except ValueError as exc:
+            audit(
+                "SOURCE_REGISTER",
+                "DENIED",
+                "/api/v1/sources",
+                reason=str(exc),
+                source_id=source.id,
+            )
             if str(exc) == "source id conflict":
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -159,8 +210,23 @@ def create_app(
         dependencies=[Depends(require_ingest_access)],
     )
     def ingest_event(event: EventInput) -> AcceptedEvent:
+        audit(
+            "EVENT_INGEST",
+            "ATTEMPTED",
+            "/api/v1/events",
+            source_id=event.source_ids[0] if event.source_ids else None,
+            details={"event_id": event.id, "sensitive": event.sensitive},
+        )
         decision = gate.evaluate(event)
         if not decision.accepted:
+            audit(
+                "EVENT_INGEST",
+                "DENIED",
+                "/api/v1/events",
+                reason=",".join(decision.reasons),
+                source_id=event.source_ids[0] if event.source_ids else None,
+                details={"event_id": event.id, "provenance": decision.status},
+            )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=decision.model_dump(),
@@ -170,8 +236,24 @@ def create_app(
         try:
             if repository is not None:
                 repository.save_event(accepted)
-            return store.add(event, decision)
+            stored = store.add(event, decision)
+            audit(
+                "EVENT_INGEST",
+                "SUCCEEDED",
+                "/api/v1/events",
+                source_id=event.source_ids[0] if event.source_ids else None,
+                details={"event_id": event.id, "provenance": decision.status},
+            )
+            return stored
         except ValueError as exc:
+            audit(
+                "EVENT_INGEST",
+                "DENIED",
+                "/api/v1/events",
+                reason=str(exc),
+                source_id=event.source_ids[0] if event.source_ids else None,
+                details={"event_id": event.id},
+            )
             if str(exc) == "duplicate event id":
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -189,7 +271,15 @@ def create_app(
         dependencies=[Depends(require_ingest_access)],
     )
     def ingest_http_connector(payload: ConnectorIngestRequest) -> AcceptedEvent:
+        resource = "/api/v1/connectors/http/ingest"
         if not http_connector_enabled:
+            audit(
+                "HTTP_CONNECTOR_INGEST",
+                "DENIED",
+                resource,
+                reason="public HTTP connector is disabled",
+                source_id=payload.source_id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="public HTTP connector is disabled",
@@ -197,6 +287,13 @@ def create_app(
 
         source = registry.get(payload.source_id)
         if source is None or not source.active:
+            audit(
+                "HTTP_CONNECTOR_INGEST",
+                "DENIED",
+                resource,
+                reason="unknown or inactive source",
+                source_id=payload.source_id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
@@ -205,6 +302,12 @@ def create_app(
                 },
             )
 
+        audit(
+            "HTTP_CONNECTOR_INGEST",
+            "ATTEMPTED",
+            resource,
+            source_id=payload.source_id,
+        )
         try:
             observation = connector.fetch(
                 source=source,
@@ -214,8 +317,23 @@ def create_app(
                 sector=payload.sector,
                 sensitive=payload.sensitive,
             )
-            return connector_pipeline.process(observation)
+            accepted = connector_pipeline.process(observation)
+            audit(
+                "HTTP_CONNECTOR_INGEST",
+                "SUCCEEDED",
+                resource,
+                source_id=payload.source_id,
+                details={"event_id": accepted.event.id, "provenance": accepted.provenance.status},
+            )
+            return accepted
         except ValueError as exc:
+            audit(
+                "HTTP_CONNECTOR_INGEST",
+                "DENIED",
+                resource,
+                reason=str(exc),
+                source_id=payload.source_id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
@@ -240,8 +358,16 @@ def create_app(
         dependencies=[Depends(require_ingest_access)],
     )
     def register_crawl_target(target: CrawlTarget) -> CrawlTarget:
+        resource = "/api/v1/crawl-targets"
         durable = require_durable_storage()
         source = registry.get(target.source_id)
+        audit(
+            "CRAWL_TARGET_REGISTER",
+            "ATTEMPTED",
+            resource,
+            source_id=target.source_id,
+            target_id=target.id,
+        )
         try:
             if source is None or not source.active:
                 raise ValueError("unknown or inactive source")
@@ -252,8 +378,24 @@ def create_app(
             url_policy.validate(target.url, allowed_hosts=source.allowed_hosts)
             if durable.get_crawl_target(target.id) is not None:
                 raise ValueError("crawl target id already exists")
-            return durable.save_crawl_target(target)
+            saved = durable.save_crawl_target(target)
+            audit(
+                "CRAWL_TARGET_REGISTER",
+                "SUCCEEDED",
+                resource,
+                source_id=target.source_id,
+                target_id=target.id,
+            )
+            return saved
         except ValueError as exc:
+            audit(
+                "CRAWL_TARGET_REGISTER",
+                "DENIED",
+                resource,
+                reason=str(exc),
+                source_id=target.source_id,
+                target_id=target.id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
@@ -267,30 +409,60 @@ def create_app(
         dependencies=[Depends(require_ingest_access)],
     )
     def run_crawler_tick() -> dict[str, int]:
+        resource = "/api/v1/crawler/tick"
         durable = require_durable_storage()
         if not scheduler_enabled:
+            audit("SCHEDULER_TICK", "DENIED", resource, reason="crawl scheduler is disabled")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="crawl scheduler is disabled",
             )
         if not http_connector_enabled:
+            audit("SCHEDULER_TICK", "DENIED", resource, reason="public HTTP connector is disabled")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="public HTTP connector is disabled",
             )
 
+        audit("SCHEDULER_TICK", "ATTEMPTED", resource)
         result = CrawlScheduler(
             repository=durable,
             registry=registry,
             connector=connector,
             pipeline_factory=lambda: connector_pipeline,
         ).tick(clock())
+        outcome = "FAILED" if result.failed else "SUCCEEDED"
+        audit(
+            "SCHEDULER_TICK",
+            outcome,
+            resource,
+            reason="one or more targets failed" if result.failed else None,
+            details={
+                "attempted": result.attempted,
+                "succeeded": result.succeeded,
+                "unchanged": result.unchanged,
+                "failed": result.failed,
+            },
+        )
         return {
             "attempted": result.attempted,
             "succeeded": result.succeeded,
             "unchanged": result.unchanged,
             "failed": result.failed,
         }
+
+    @app.get(
+        "/api/v1/audit",
+        response_model=list[AuditRecord],
+        dependencies=[Depends(require_ingest_access)],
+    )
+    def list_audit_records() -> list[AuditRecord]:
+        if repository is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="durable storage is required for audit evidence",
+            )
+        return repository.list_audit_records()
 
     @app.get("/api/v1/world-state/countries/{iso3}")
     def country_world_state(iso3: str) -> dict:
