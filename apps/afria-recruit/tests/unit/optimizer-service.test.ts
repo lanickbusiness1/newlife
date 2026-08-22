@@ -101,22 +101,7 @@ test('job analysis preserves unsupported requirements as GAP and uses match_reco
 });
 
 test('application readiness is derived from canonical evidence and persisted as an assessment artifact', async () => {
-  const base = new FixtureCandidateRepository();
-  const readinessRepository = {
-    async loadContext(candidateId: string) {
-      const context = await base.loadContext(candidateId);
-      context.documents[0].atsProfile = {
-        parserReadable: true,
-        standardSections: true,
-        singleColumn: true,
-        noImageOnlyText: true,
-        safeFileFormat: true,
-        evidenceRefs: [`document:${context.documents[0].id}:ats-profile`],
-      };
-      return context;
-    },
-  };
-  const fixture = service(readinessRepository);
+  const fixture = service();
 
   const result = await fixture.service.applicationReadiness(SYNTHETIC_CANDIDATE_ID, JOB_ID);
 
@@ -128,7 +113,15 @@ test('application readiness is derived from canonical evidence and persisted as 
 });
 
 test('application readiness fails closed before persistence when canonical signals are incomplete', async () => {
-  const fixture = service();
+  const base = new FixtureCandidateRepository();
+  const incompleteRepository = {
+    async loadContext(candidateId: string) {
+      const context = await base.loadContext(candidateId);
+      delete context.documents[0].atsProfile;
+      return context;
+    },
+  };
+  const fixture = service(incompleteRepository);
 
   await assert.rejects(
     () => fixture.service.applicationReadiness(SYNTHETIC_CANDIDATE_ID, JOB_ID),
