@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 ProvenanceStatus = Literal["VERIFIED", "CORROBORATED", "OBSERVATION_ONLY", "REJECTED"]
+AuditOutcome = Literal["ATTEMPTED", "SUCCEEDED", "DENIED", "FAILED"]
 
 
 class SourceRecord(BaseModel):
@@ -105,3 +106,27 @@ class ProvenanceDecision(BaseModel):
 class AcceptedEvent(BaseModel):
     event: EventInput
     provenance: ProvenanceDecision
+
+
+class AuditRecord(BaseModel):
+    id: str = Field(min_length=1, max_length=128)
+    occurred_at: datetime
+    action: str = Field(min_length=1, max_length=64)
+    outcome: AuditOutcome
+    resource: str = Field(min_length=1, max_length=512)
+    reason: str | None = Field(default=None, max_length=512)
+    source_id: str | None = Field(default=None, max_length=128)
+    target_id: str | None = Field(default=None, max_length=128)
+    details: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+
+    @field_validator("details")
+    @classmethod
+    def bound_details(cls, value: dict[str, str | int | float | bool | None]):
+        if len(value) > 16:
+            raise ValueError("audit details support at most 16 fields")
+        for key, item in value.items():
+            if not key or len(key) > 64:
+                raise ValueError("audit detail keys must be 1-64 characters")
+            if isinstance(item, str) and len(item) > 256:
+                raise ValueError("audit detail string values must be at most 256 characters")
+        return value
