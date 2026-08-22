@@ -275,6 +275,9 @@ export class NationalInterestMethodology extends SovereignObject {
       if (!validatedByIdentityId?.trim()) throw new Error("Validated methodology requires a human approver identity");
       if (!validatedAt || Number.isNaN(Date.parse(validatedAt))) throw new Error("Validated methodology requires a validation timestamp");
       if (evidence.length < 2) throw new Error("Validated methodology requires source and approval evidence");
+      if (evidence.some((item) => item.truthClass !== "FACT")) {
+        throw new Error("National Interest methodology source evidence and approval evidence must be FACT");
+      }
     }
     this.weights = Object.freeze({ ...weights });
   }
@@ -285,6 +288,9 @@ export class NationalInterestMethodology extends SovereignObject {
     if (authority.kind !== "HUMAN") throw new Error("A human sovereign methodology approver is required");
     if (!authority.roles.includes("SOVEREIGN_METHODOLOGY_APPROVER")) {
       throw new Error("Human approver requires SOVEREIGN_METHODOLOGY_APPROVER role");
+    }
+    if (this.evidence.some((item) => item.truthClass !== "FACT")) {
+      throw new Error("National Interest methodology source evidence must be FACT before approval");
     }
     if (approvalEvidence.truthClass !== "FACT") throw new Error("Methodology approval evidence must be FACT");
     return new NationalInterestMethodology(
@@ -437,7 +443,12 @@ export function compareSovereignScenarios(scenarios: readonly SovereignScenario[
   return Object.freeze([...scenarios].sort((a, b) => b.sovereignNpv - a.sovereignNpv || a.dependencyScore - b.dependencyScore || a.id.localeCompare(b.id)));
 }
 
-export type DecisionAuthority = Readonly<{ id: string; kind: "HUMAN" | "AGENT" | "SERVICE" }>;
+export type DecisionAuthority = Readonly<{
+  id: string;
+  tenantId: string;
+  kind: "HUMAN" | "AGENT" | "SERVICE";
+  roles: readonly string[];
+}>;
 
 export class DecisionRecord extends SovereignObject {
   constructor(
@@ -454,7 +465,11 @@ export class DecisionRecord extends SovereignObject {
     assertRequired(assessmentId, "Decision assessment id");
     assertRequired(rationale, "Decision rationale");
     assertRequired(decidedBy.id, "Decision authority id");
+    if (decidedBy.tenantId !== tenantId) throw new Error("Decision authority tenant isolation violation");
     if (decidedBy.kind !== "HUMAN") throw new Error("A human decision authority is required for sovereign decisions");
+    if (!decidedBy.roles.includes("SOVEREIGN_DECISION_APPROVER")) {
+      throw new Error("Human decision authority requires SOVEREIGN_DECISION_APPROVER role");
+    }
     if (evidence.length === 0) throw new Error("Sovereign decision record requires evidence");
   }
 }
