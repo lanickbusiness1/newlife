@@ -42,6 +42,9 @@ const approvalEvidence = new EvidenceArtifact(
   "FACT",
 );
 
+const scores = (score: number): Record<keyof NationalInterestWeights, number> =>
+  Object.fromEntries(Object.keys(weights).map((key) => [key, score])) as Record<keyof NationalInterestWeights, number>;
+
 test("requires a human sovereign methodology approver before National Interest scoring", () => {
   const draft = new NationalInterestMethodology(
     "method-1",
@@ -62,7 +65,7 @@ test("requires a human sovereign methodology approver before National Interest s
         projectId: "simandou",
         assessmentId: "nia-draft",
         methodology: draft,
-        scores: Object.fromEntries(Object.keys(weights).map((key) => [key, 90])) as Record<keyof NationalInterestWeights, number>,
+        scores: scores(90),
         eliminatoryRedFlags: [],
         evidence: [sourceEvidence],
       }),
@@ -70,7 +73,12 @@ test("requires a human sovereign methodology approver before National Interest s
   );
 
   const validated = draft.validate(
-    { id: "human-method", kind: "HUMAN", roles: ["SOVEREIGN_METHODOLOGY_APPROVER"] },
+    {
+      id: "human-method",
+      tenantId: "tenant-gn",
+      kind: "HUMAN",
+      roles: ["SOVEREIGN_METHODOLOGY_APPROVER"],
+    },
     approvalEvidence,
   );
   const result = scoreNationalInterest({
@@ -78,7 +86,7 @@ test("requires a human sovereign methodology approver before National Interest s
     projectId: "simandou",
     assessmentId: "nia-approved",
     methodology: validated,
-    scores: Object.fromEntries(Object.keys(weights).map((key) => [key, 90])) as Record<keyof NationalInterestWeights, number>,
+    scores: scores(90),
     eliminatoryRedFlags: [],
     evidence: [sourceEvidence],
   });
@@ -86,10 +94,13 @@ test("requires a human sovereign methodology approver before National Interest s
   assert.equal(validated.state, "VALIDATED");
   assert.equal(validated.version, 2);
   assert.equal(validated.validatedByIdentityId, "human-method");
+  assert.equal(validated.validatedAt, approvalEvidence.observedAt);
   assert.equal(result.decision, "GO");
+  assert.equal(result.methodologyId, validated.id);
+  assert.equal(result.methodologyVersion, validated.methodologyVersion);
 });
 
-test("rejects agent or unauthorized human methodology approval", () => {
+test("rejects agent, unauthorized human, and cross-tenant methodology approval", () => {
   const draft = new NationalInterestMethodology(
     "method-2",
     "tenant-gn",
@@ -103,12 +114,24 @@ test("rejects agent or unauthorized human methodology approval", () => {
   );
 
   assert.throws(
-    () => draft.validate({ id: "agent-1", kind: "AGENT", roles: ["SOVEREIGN_METHODOLOGY_APPROVER"] }, approvalEvidence),
+    () =>
+      draft.validate(
+        { id: "agent-1", tenantId: "tenant-gn", kind: "AGENT", roles: ["SOVEREIGN_METHODOLOGY_APPROVER"] },
+        approvalEvidence,
+      ),
     /human sovereign methodology approver/i,
   );
   assert.throws(
-    () => draft.validate({ id: "human-1", kind: "HUMAN", roles: [] }, approvalEvidence),
+    () => draft.validate({ id: "human-1", tenantId: "tenant-gn", kind: "HUMAN", roles: [] }, approvalEvidence),
     /SOVEREIGN_METHODOLOGY_APPROVER/i,
+  );
+  assert.throws(
+    () =>
+      draft.validate(
+        { id: "human-other", tenantId: "tenant-other", kind: "HUMAN", roles: ["SOVEREIGN_METHODOLOGY_APPROVER"] },
+        approvalEvidence,
+      ),
+    /tenant isolation/i,
   );
 });
 
@@ -128,4 +151,46 @@ test("keeps GO and HOLD thresholds configurable and internally coherent", () => 
       ),
     /GO threshold must be greater than HOLD threshold/i,
   );
+
+  const methodology = new NationalInterestMethodology(
+    "method-thresholds",
+    "tenant-gn",
+    "simandou",
+    "NIS-thresholds",
+    weights,
+    85,
+    65,
+    "DRAFT",
+    [sourceEvidence],
+  ).validate(
+    {
+      id: "human-method",
+      tenantId: "tenant-gn",
+      kind: "HUMAN",
+      roles: ["SOVEREIGN_METHODOLOGY_APPROVER"],
+    },
+    approvalEvidence,
+  );
+
+  const hold = scoreNationalInterest({
+    tenantId: "tenant-gn",
+    projectId: "simandou",
+    assessmentId: "nia-hold",
+    methodology,
+    scores: scores(70),
+    eliminatoryRedFlags: [],
+    evidence: [sourceEvidence],
+  });
+  const go = scoreNationalInterest({
+    tenantId: "tenant-gn",
+    projectId: "simandou",
+    assessmentId: "nia-go",
+    methodology,
+    scores: scores(90),
+    eliminatoryRedFlags: [],
+    evidence: [sourceEvidence],
+  });
+
+  assert.equal(hold.decision, "HOLD");
+  assert.equal(go.decision, "GO");
 });
