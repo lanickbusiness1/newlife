@@ -4,16 +4,19 @@ import hashlib
 import hmac
 import json
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from threading import RLock
 
-from .models import AcceptedEvent, SourceRecord
+from pydantic import BaseModel
+
+from .models import AcceptedEvent, CrawlTarget, SourceRecord
 
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 
-def _canonical_json(model: SourceRecord | AcceptedEvent) -> str:
+def _canonical_json(model: BaseModel) -> str:
     return json.dumps(
         model.model_dump(mode="json"),
         ensure_ascii=False,
@@ -27,7 +30,7 @@ def _sha256(payload: str) -> str:
 
 
 class SQLiteStateRepository:
-    """Durable append-oriented store for trusted sources and accepted events."""
+    """Durable state store for trusted sources, accepted events and crawl operations."""
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -71,14 +74,60 @@ class SQLiteStateRepository:
                 "SELECT value FROM metadata WHERE key = 'schema_version'"
             ).fetchone()
             if current is None:
+                self._create_v2_tables()
                 self._connection.execute(
                     "INSERT INTO metadata(key, value) VALUES('schema_version', ?)",
                     (SCHEMA_VERSION,),
                 )
-            elif current[0] != SCHEMA_VERSION:
+            elif current[0] == "1":
+                self._migrate_v1_to_v2()
+            elif current[0] == SCHEMA_VERSION:
+                self._create_v2_tables()
+            else:
                 raise RuntimeError(
                     f"unsupported state schema version: {current[0]}"
                 )
+
+    def _create_v2_tables(self) -> None:
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS crawl_targets (
+                id TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL,
+                payload_sha256 TEXT NOT NULL
+            )
+            """
+        )
+
+    def _migrate_v1_to_v2(self) -> None:
+        self._create_v2_tables()
+        self._connection.execute(
+            "UPDATE metadata SET value = ? WHERE key = 'schema_version'",
+            (SCHEMA_VERSION,),
+        )
+
+    def schema_version(self) -> str:
+        row = self._connection.execute(
+            "SELECT value FROM metadata WHERE key = 'schema_version'"
+        ).fetchone()
+        if row is None:
+            raise RuntimeError("state schema version is missing")
+        return str(row[0])
+
+    def rollback_schema_to_v1(self) -> None:
+        """Revert the additive v2 schema only when no crawl state would be lost."""
+        with self._lock, self._connection:
+            if self.schema_version() != "2":
+                raise RuntimeError("schema rollback requires version 2")
+            count = self._connection.execute(
+                "SELECT COUNT(*) FROM crawl_targets"
+            ).fetchone()[0]
+            if count:
+                raise RuntimeError("cannot rollback schema with crawl targets present")
+            self._connection.execute("DROP TABLE crawl_targets")
+            self._connection.execute(
+                "UPDATE metadata SET value = '1' WHERE key = 'schema_version'"
+            )
 
     def save_source(self, source: SourceRecord) -> SourceRecord:
         payload = _canonical_json(source)
@@ -115,6 +164,29 @@ class SQLiteStateRepository:
             )
         return accepted
 
+    def save_crawl_target(self, target: CrawlTarget) -> CrawlTarget:
+        if self.schema_version() != "2":
+            raise RuntimeError("crawl target persistence requires schema version 2")
+        payload = _canonical_json(target)
+        digest = _sha256(payload)
+        with self._lock, self._connection:
+            existing = self._connection.execute(
+                "SELECT payload_json, payload_sha256 FROM crawl_targets WHERE id = ?",
+                (target.id,),
+            ).fetchone()
+            if existing is not None:
+                self._verify_payload(existing[0], existing[1], "crawl_target", target.id)
+                self._connection.execute(
+                    "UPDATE crawl_targets SET payload_json = ?, payload_sha256 = ? WHERE id = ?",
+                    (payload, digest, target.id),
+                )
+            else:
+                self._connection.execute(
+                    "INSERT INTO crawl_targets(id, payload_json, payload_sha256) VALUES(?, ?, ?)",
+                    (target.id, payload, digest),
+                )
+        return target
+
     def list_sources(self) -> list[SourceRecord]:
         rows = self._connection.execute(
             "SELECT id, payload_json, payload_sha256 FROM sources ORDER BY rowid"
@@ -134,6 +206,38 @@ class SQLiteStateRepository:
             self._verify_payload(payload, digest, "event", event_id)
             result.append(AcceptedEvent.model_validate_json(payload))
         return result
+
+    def list_crawl_targets(self) -> list[CrawlTarget]:
+        if self.schema_version() != "2":
+            return []
+        rows = self._connection.execute(
+            "SELECT id, payload_json, payload_sha256 FROM crawl_targets ORDER BY rowid"
+        ).fetchall()
+        result: list[CrawlTarget] = []
+        for target_id, payload, digest in rows:
+            self._verify_payload(payload, digest, "crawl_target", target_id)
+            result.append(CrawlTarget.model_validate_json(payload))
+        return result
+
+    def get_crawl_target(self, target_id: str) -> CrawlTarget | None:
+        if self.schema_version() != "2":
+            return None
+        row = self._connection.execute(
+            "SELECT payload_json, payload_sha256 FROM crawl_targets WHERE id = ?",
+            (target_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        self._verify_payload(row[0], row[1], "crawl_target", target_id)
+        return CrawlTarget.model_validate_json(row[0])
+
+    def list_due_crawl_targets(self, now: datetime) -> list[CrawlTarget]:
+        due = [
+            target
+            for target in self.list_crawl_targets()
+            if target.enabled and target.next_due_at <= now
+        ]
+        return sorted(due, key=lambda target: (target.next_due_at, target.id))
 
     def backup(self, destination: str | Path) -> Path:
         destination_path = Path(destination)
