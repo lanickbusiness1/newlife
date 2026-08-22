@@ -135,6 +135,43 @@ test("rejects agent, unauthorized human, and cross-tenant methodology approval",
   );
 });
 
+test("rejects approval when methodology source evidence is not factual", () => {
+  const hypothesisSource = new EvidenceArtifact(
+    "method-hypothesis",
+    "tenant-gn",
+    "simandou",
+    "synthetic://methodology/hypothesis",
+    "d".repeat(64),
+    "2026-08-21T00:00:00.000Z",
+    "HYPOTHESIS",
+  );
+  const draft = new NationalInterestMethodology(
+    "method-hypothesis",
+    "tenant-gn",
+    "simandou",
+    "NIS-hypothesis",
+    weights,
+    75,
+    55,
+    "DRAFT",
+    [hypothesisSource],
+  );
+
+  assert.throws(
+    () =>
+      draft.validate(
+        {
+          id: "human-method",
+          tenantId: "tenant-gn",
+          kind: "HUMAN",
+          roles: ["SOVEREIGN_METHODOLOGY_APPROVER"],
+        },
+        approvalEvidence,
+      ),
+    /methodology source evidence.*FACT/i,
+  );
+});
+
 test("keeps GO and HOLD thresholds configurable and internally coherent", () => {
   assert.throws(
     () =>
