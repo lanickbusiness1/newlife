@@ -16,6 +16,21 @@ class SourceRecord(BaseModel):
     license_class: str = Field(min_length=1, max_length=64)
     reliability_tier: int = Field(ge=1, le=5)
     active: bool = True
+    allowed_hosts: list[str] = Field(default_factory=list, max_length=16)
+
+    @field_validator("allowed_hosts")
+    @classmethod
+    def normalize_allowed_hosts(cls, value: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for host in value:
+            candidate = host.strip().lower().rstrip(".")
+            if not candidate or len(candidate) > 253:
+                raise ValueError("allowed hosts must be valid DNS host names")
+            if "/" in candidate or "://" in candidate or "@" in candidate:
+                raise ValueError("allowed hosts must contain host names only")
+            if candidate not in normalized:
+                normalized.append(candidate)
+        return normalized
 
 
 class EventInput(BaseModel):
