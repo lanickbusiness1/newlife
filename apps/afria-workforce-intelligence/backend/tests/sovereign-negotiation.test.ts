@@ -290,30 +290,75 @@ test("requires scenario records to remain explicitly classified as simulations",
   );
 });
 
-test("rejects agent-authored sovereign decision records", () => {
+test("enforces human, role-scoped and tenant-scoped sovereign decision records", () => {
   assert.throws(
     () =>
       new DecisionRecord(
-        "decision-1",
+        "decision-agent",
         "tenant-gn",
         "simandou",
         "nia-1",
         "NO_GO",
         "Synthetic sovereign decision",
-        { id: "agent-1", kind: "AGENT" },
+        {
+          id: "agent-1",
+          tenantId: "tenant-gn",
+          kind: "AGENT",
+          roles: ["SOVEREIGN_DECISION_APPROVER"],
+        },
         [evidence],
       ),
     /human decision authority/i,
   );
 
+  assert.throws(
+    () =>
+      new DecisionRecord(
+        "decision-no-role",
+        "tenant-gn",
+        "simandou",
+        "nia-1",
+        "HOLD",
+        "Synthetic unauthorized human decision",
+        { id: "human-no-role", tenantId: "tenant-gn", kind: "HUMAN", roles: [] },
+        [evidence],
+      ),
+    /SOVEREIGN_DECISION_APPROVER/i,
+  );
+
+  assert.throws(
+    () =>
+      new DecisionRecord(
+        "decision-cross-tenant",
+        "tenant-gn",
+        "simandou",
+        "nia-1",
+        "HOLD",
+        "Synthetic cross-tenant decision",
+        {
+          id: "human-other",
+          tenantId: "tenant-other",
+          kind: "HUMAN",
+          roles: ["SOVEREIGN_DECISION_APPROVER"],
+        },
+        [evidence],
+      ),
+    /tenant isolation/i,
+  );
+
   const decision = new DecisionRecord(
-    "decision-2",
+    "decision-human",
     "tenant-gn",
     "simandou",
     "nia-1",
     "NO_GO",
     "Synthetic sovereign decision",
-    { id: "human-1", kind: "HUMAN" },
+    {
+      id: "human-1",
+      tenantId: "tenant-gn",
+      kind: "HUMAN",
+      roles: ["SOVEREIGN_DECISION_APPROVER"],
+    },
     [evidence],
   );
   assert.equal(decision.decidedBy.id, "human-1");
