@@ -36,6 +36,20 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --upgrade pip && pip install -r requirements.txt
 
+      - name: Dependency consistency
+        run: python -m pip check
+
+      - name: Compile application
+        run: python -m compileall -q app
+
+      - name: Application secret pattern scan
+        working-directory: ${{ github.workspace }}
+        run: |
+          if git grep -nE '(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY)' -- apps/genesis-veille-engine/backend/app apps/genesis-veille-engine/frontend apps/genesis-veille-engine/Dockerfile; then
+            echo 'Potential production secret material detected in application paths.'
+            exit 1
+          fi
+
       - name: Run tests
         run: python -m pytest -q
 
@@ -56,6 +70,12 @@ jobs:
 
       - name: Boot first container
         run: docker run -d --rm --name genesis-veille-smoke -p 8000:8000 -e GENESIS_INGEST_KEY=ci-ingest-key -v genesis-veille-state:/data genesis-veille-world-state:ci
+
+      - name: Verify non-root runtime
+        run: |
+          runtime_uid="$(docker exec genesis-veille-smoke id -u)"
+          test "$runtime_uid" != "0"
+          test "$runtime_uid" = "10001"
 
       - name: Verify health and public shell
         run: |
@@ -85,6 +105,7 @@ jobs:
             sleep 1
           done
           grep -q '"status":"ok"' /tmp/restart-health.json
+          test "$(docker exec genesis-veille-smoke id -u)" = "10001"
 
       - name: Verify state survived replacement
         run: |
