@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import sqlite3
 from pathlib import Path
@@ -157,7 +158,7 @@ class SQLiteStateRepository:
         object_id: str,
     ) -> None:
         actual = _sha256(payload)
-        if not hashlib.compare_digest(actual, expected_digest):
+        if not hmac.compare_digest(actual, expected_digest):
             raise ValueError(
                 f"integrity check failed for {object_type}:{object_id}"
             )
