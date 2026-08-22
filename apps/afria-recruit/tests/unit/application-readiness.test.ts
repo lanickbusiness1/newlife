@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreApplicationReadiness, type ApplicationReadinessInput } from '../../lib/domain/cv-diagnostic.js';
+import {
+  scoreApplicationReadiness,
+  scoreApplicationReadinessFromCanonicalSources,
+  type ApplicationReadinessInput,
+} from '../../lib/domain/cv-diagnostic.js';
 import type { CandidateContext } from '../../lib/repositories/candidate-context.js';
 import type { JobSpec } from '../../lib/domain/types.js';
 
@@ -129,4 +133,73 @@ test('canonical score refuses incomplete semantic or institution signal sets', (
   const noInstitution = completeInput();
   noInstitution.institutionSignals = [];
   assert.throws(() => scoreApplicationReadiness(noInstitution), /institution signals/i);
+});
+
+test('canonical sources produce a fully evidence-backed readiness score', () => {
+  const context = syntheticContext();
+  context.documents[0].atsProfile = {
+    parserReadable: true,
+    standardSections: true,
+    singleColumn: true,
+    noImageOnlyText: true,
+    safeFileFormat: true,
+    evidenceRefs: ['document:doc-1:ats-profile'],
+  };
+  const jobSpec: JobSpec = {
+    ...targetJob,
+    semanticCriteria: [{
+      id: 'sem-regional-compliance',
+      label: 'Pilotage de conformité régionale',
+      anchors: ['conformité', 'régionale'],
+      sourceRef: 'job:job-1:semantic:1',
+    }],
+    institutionCriteria: [{
+      id: 'inst-regional-coordination',
+      label: 'Expérience de coordination régionale',
+      anchors: ['coordination', 'régionale'],
+      sourceRef: 'job:job-1:institution:1',
+    }],
+  };
+
+  const result = scoreApplicationReadinessFromCanonicalSources(context, jobSpec);
+
+  assert.equal(result.total, 100);
+  assert.deepEqual(result.dimensions, {
+    atsTechnical: 20,
+    jobMatch: 30,
+    semanticFit: 20,
+    evidence: 15,
+    institutionFit: 15,
+  });
+  assert.deepEqual(result.gaps, []);
+});
+
+test('canonical sources fail closed when the CV ATS profile is absent', () => {
+  const jobSpec: JobSpec = {
+    ...targetJob,
+    semanticCriteria: [{ id: 'sem-1', label: 'Conformité', anchors: ['conformité'], sourceRef: 'job:job-1:semantic:1' }],
+    institutionCriteria: [{ id: 'inst-1', label: 'Coordination', anchors: ['coordination'], sourceRef: 'job:job-1:institution:1' }],
+  };
+
+  assert.throws(
+    () => scoreApplicationReadinessFromCanonicalSources(syntheticContext(), jobSpec),
+    /ATS profile/i,
+  );
+});
+
+test('canonical sources fail closed when sourced job criteria are absent', () => {
+  const context = syntheticContext();
+  context.documents[0].atsProfile = {
+    parserReadable: true,
+    standardSections: true,
+    singleColumn: true,
+    noImageOnlyText: true,
+    safeFileFormat: true,
+    evidenceRefs: ['document:doc-1:ats-profile'],
+  };
+
+  assert.throws(
+    () => scoreApplicationReadinessFromCanonicalSources(context, targetJob),
+    /semantic criteria/i,
+  );
 });
