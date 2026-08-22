@@ -1,7 +1,7 @@
 import type { CandidateContext } from '../repositories/candidate-context.js';
 import { normalizeEvidenceLevel } from './evidence.js';
 import { classifyRequirementCoverage } from './gap-matching.js';
-import type { JobSpec, RequirementCoverage } from './types.js';
+import type { JobReadinessCriterion, JobSpec, RequirementCoverage } from './types.js';
 
 export interface ApplicationReadinessTechnicalSignals {
   parserReadable: boolean;
@@ -16,6 +16,7 @@ export interface ApplicationReadinessEvidenceSignal {
   label: string;
   matched: boolean;
   evidenceRefs: string[];
+  criterionSourceRef?: string;
 }
 
 export interface ApplicationReadinessInput {
@@ -46,6 +47,11 @@ export interface ApplicationReadinessResult {
   total: number;
   dimensions: ApplicationReadinessDimensions;
   gaps: ApplicationReadinessGap[];
+}
+
+interface CandidateEvidenceFact {
+  ref: string;
+  text: string;
 }
 
 const COVERAGE_RATIO: Record<RequirementCoverage['coverage'], number> = {
@@ -172,6 +178,85 @@ function assertCompleteCanonicalSignalSets(input: ApplicationReadinessInput): vo
   }
 }
 
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function candidateEvidenceFacts(context: CandidateContext): CandidateEvidenceFact[] {
+  const facts: CandidateEvidenceFact[] = [];
+  const add = (ref: string, status: string, parts: Array<string | number | null | undefined>) => {
+    if (normalizeEvidenceLevel(status) === 'DECLARED') return;
+    const text = normalizeSearchText(parts.filter((part) => part !== null && part !== undefined).join(' '));
+    if (text) facts.push({ ref, text });
+  };
+
+  for (const fact of context.experiences) {
+    add(`experience:${fact.id}`, fact.evidenceStatus, [fact.title, fact.organization, fact.description, fact.country]);
+  }
+  for (const fact of context.educations) {
+    add(`education:${fact.id}`, fact.evidenceStatus, [fact.qualification, fact.fieldOfStudy, fact.institution, fact.country]);
+  }
+  for (const fact of context.skills) {
+    add(`skill:${fact.skillId}`, fact.evidenceStatus, [fact.name, fact.proficiency, fact.yearsExperience]);
+  }
+  for (const fact of context.languages) {
+    add(`language:${fact.code}`, fact.evidenceStatus, [fact.code, fact.level]);
+  }
+  for (const fact of context.certifications) {
+    add(`certification:${fact.id}`, fact.evidenceStatus, [fact.name, fact.issuer]);
+  }
+
+  return facts;
+}
+
+function validateCriteria(criteria: JobReadinessCriterion[] | undefined, label: 'semantic' | 'institution'): JobReadinessCriterion[] {
+  if (!criteria?.length) throw new Error(`Canonical application readiness score requires sourced ${label} criteria.`);
+  for (const criterion of criteria) {
+    if (!criterion.id.trim() || !criterion.label.trim() || !criterion.sourceRef.trim() || !criterion.anchors.length) {
+      throw new Error(`Canonical application readiness score requires sourced ${label} criteria.`);
+    }
+    if (criterion.anchors.some((anchor) => !normalizeSearchText(anchor))) {
+      throw new Error(`Canonical application readiness score requires sourced ${label} criteria.`);
+    }
+  }
+  return criteria;
+}
+
+function buildCriterionSignals(criteria: JobReadinessCriterion[], facts: CandidateEvidenceFact[]): ApplicationReadinessEvidenceSignal[] {
+  return criteria.map((criterion) => {
+    const anchors = criterion.anchors.map(normalizeSearchText);
+    const matchingFacts = facts.filter((fact) => anchors.every((anchor) => fact.text.includes(anchor)));
+    return {
+      id: criterion.id,
+      label: criterion.label,
+      matched: matchingFacts.length > 0,
+      evidenceRefs: matchingFacts.map((fact) => fact.ref),
+      criterionSourceRef: criterion.sourceRef,
+    };
+  });
+}
+
+function canonicalTechnicalSignals(context: CandidateContext): ApplicationReadinessTechnicalSignals {
+  const cv = context.documents
+    .filter((document) => document.documentType.trim().toLowerCase() === 'cv')
+    .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt))[0];
+  if (!cv?.atsProfile || !cv.atsProfile.evidenceRefs.length) {
+    throw new Error('Canonical application readiness score requires a proven CV ATS profile.');
+  }
+  return {
+    parserReadable: cv.atsProfile.parserReadable,
+    standardSections: cv.atsProfile.standardSections,
+    singleColumn: cv.atsProfile.singleColumn,
+    noImageOnlyText: cv.atsProfile.noImageOnlyText,
+    safeFileFormat: cv.atsProfile.safeFileFormat,
+  };
+}
+
 export function scoreApplicationReadiness(input: ApplicationReadinessInput): ApplicationReadinessResult {
   assertCompleteCanonicalSignalSets(input);
   const coverage = classifyRequirementCoverage(input.context, input.jobSpec);
@@ -200,4 +285,20 @@ export function scoreApplicationReadiness(input: ApplicationReadinessInput): App
       ...signalGaps('institutionFit', input.institutionSignals),
     ],
   };
+}
+
+export function scoreApplicationReadinessFromCanonicalSources(
+  context: CandidateContext,
+  jobSpec: JobSpec,
+): ApplicationReadinessResult {
+  const facts = candidateEvidenceFacts(context);
+  const semanticCriteria = validateCriteria(jobSpec.semanticCriteria, 'semantic');
+  const institutionCriteria = validateCriteria(jobSpec.institutionCriteria, 'institution');
+  return scoreApplicationReadiness({
+    context,
+    jobSpec,
+    technical: canonicalTechnicalSignals(context),
+    semanticSignals: buildCriterionSignals(semanticCriteria, facts),
+    institutionSignals: buildCriterionSignals(institutionCriteria, facts),
+  });
 }
