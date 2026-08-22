@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { qualifyCeaReturnLead } from "./ceaReturn";
+import { qualifyCeaReturnLead, toCeaCrmRecord } from "./ceaReturn";
 
 describe("CEA_RETURN revenue qualification", () => {
   test("preserves campaign attribution and routes an identity lead to the 150 USD dossier offer", () => {
@@ -80,5 +80,34 @@ describe("CEA_RETURN revenue qualification", () => {
     });
 
     expect(result.contactAllowed).toBe(false);
+  });
+
+  test("maps qualification to the exact CRM property contract without inventing missing fields", () => {
+    const qualification = qualifyCeaReturnLead({
+      contentId: "BEN-SUR-001",
+      narrativeSource: "instagram/benin-surprise-return",
+      primaryIntent: "Identité",
+      horizon: "3-12m",
+      budgetUsd: 500,
+      consentContact: true,
+      language: "FR"
+    });
+
+    const record = toCeaCrmRecord(qualification);
+
+    expect(record).toEqual({
+      "Content ID": "BEN-SUR-001",
+      "Narrative Source": "instagram/benin-surprise-return",
+      "Primary Intent": "Identité",
+      "Next Best Offer": "Pack Dossier 150 USD",
+      "Langue": "FR",
+      "Consentement Contact": "__YES__",
+      "Revenue Attributed USD": 0,
+      "Payment Status": "Non proposé",
+      "Priorité": "P1 - Cette semaine"
+    });
+    expect(record).not.toHaveProperty("Trust Gap");
+    expect(record).not.toHaveProperty("Emotional Trigger");
+    expect(record).not.toHaveProperty("Referral Potential");
   });
 });
