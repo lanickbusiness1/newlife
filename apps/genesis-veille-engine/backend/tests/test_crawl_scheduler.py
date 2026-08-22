@@ -78,7 +78,7 @@ def build_scheduler(repository: SQLiteStateRepository, connector: FakeConnector)
     ), store
 
 
-def test_v1_database_is_migrated_to_v2_without_losing_existing_state(tmp_path):
+def test_v1_database_is_migrated_through_v2_to_latest_without_losing_crawl_state(tmp_path):
     db_path = tmp_path / "legacy-v1.db"
     connection = sqlite3.connect(db_path)
     connection.executescript(
@@ -94,16 +94,19 @@ def test_v1_database_is_migrated_to_v2_without_losing_existing_state(tmp_path):
 
     repository = SQLiteStateRepository(db_path)
 
-    assert repository.schema_version() == "2"
+    assert repository.schema_version() == "3"
     assert repository.list_crawl_targets() == []
+    assert repository.list_audit_records() == []
     repository.close()
 
 
-def test_v2_schema_can_be_rolled_back_to_v1_when_no_targets_exist(tmp_path):
+def test_latest_schema_can_roll_back_v3_to_v2_then_v1_when_no_new_state_exists(tmp_path):
     db_path = tmp_path / "rollback.db"
     repository = SQLiteStateRepository(db_path)
-    assert repository.schema_version() == "2"
+    assert repository.schema_version() == "3"
 
+    repository.rollback_schema_to_v2()
+    assert repository.schema_version() == "2"
     repository.rollback_schema_to_v1()
 
     assert repository.schema_version() == "1"
