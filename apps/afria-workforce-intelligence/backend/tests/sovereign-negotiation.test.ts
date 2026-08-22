@@ -7,7 +7,7 @@ import {
   CorridorNode,
   DecisionRecord,
   EvidenceArtifact,
-  NationalInterestAssessment,
+  NationalInterestMethodology,
   OperatorExposure,
   ResourceAsset,
   SovereignScenarioRecord,
@@ -24,6 +24,16 @@ const evidence = new EvidenceArtifact(
   "synthetic://offer-a/concession",
   "a".repeat(64),
   "2026-08-21T00:00:00.000Z",
+  "FACT",
+);
+
+const methodologyApprovalEvidence = new EvidenceArtifact(
+  "ev-method-approval",
+  "tenant-gn",
+  "simandou",
+  "synthetic://methodology/approval",
+  "c".repeat(64),
+  "2026-08-21T00:01:00.000Z",
   "FACT",
 );
 
@@ -52,12 +62,34 @@ const weights: NationalInterestWeights = {
   longTermResilience: 5,
 };
 
+function approvedMethodology(): NationalInterestMethodology {
+  return new NationalInterestMethodology(
+    "method-b8-v1",
+    "tenant-gn",
+    "simandou",
+    "B8-v1",
+    weights,
+    75,
+    55,
+    "DRAFT",
+    [evidence],
+  ).validate(
+    {
+      id: "method-approver",
+      tenantId: "tenant-gn",
+      kind: "HUMAN",
+      roles: ["SOVEREIGN_METHODOLOGY_APPROVER"],
+    },
+    methodologyApprovalEvidence,
+  );
+}
+
 test("blocks a GO when an eliminatory red flag is present", () => {
   const result = scoreNationalInterest({
     tenantId: "tenant-gn",
     projectId: "simandou",
     assessmentId: "nia-1",
-    weights,
+    methodology: approvedMethodology(),
     scores: Object.fromEntries(Object.keys(weights).map((key) => [key, 90])) as Record<keyof NationalInterestWeights, number>,
     eliminatoryRedFlags: ["UNBOUNDED_SOVEREIGN_GUARANTEE"],
     evidence: [evidence],
@@ -73,7 +105,7 @@ test("returns insufficient evidence instead of a false-precision score", () => {
     tenantId: "tenant-gn",
     projectId: "simandou",
     assessmentId: "nia-2",
-    weights,
+    methodology: approvedMethodology(),
     scores: Object.fromEntries(Object.keys(weights).map((key) => [key, 80])) as Record<keyof NationalInterestWeights, number>,
     eliminatoryRedFlags: [],
     evidence: [],
@@ -139,15 +171,19 @@ test("compares scenarios deterministically and identifies the highest sovereign 
   assert.equal(ranking[1]?.id, "offer-a");
 });
 
-test("rejects an invalid National Interest weight total", () => {
+test("rejects an invalid National Interest methodology weight total", () => {
   assert.throws(
     () =>
-      new NationalInterestAssessment(
-        "nia-invalid",
+      new NationalInterestMethodology(
+        "method-invalid",
         "tenant-gn",
         "simandou",
+        "B8-invalid",
         { ...weights, nationalValueCapture: 19 },
-        [],
+        75,
+        55,
+        "DRAFT",
+        [evidence],
       ),
     /weights must total 100/i,
   );
