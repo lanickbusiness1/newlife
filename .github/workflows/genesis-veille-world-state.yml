@@ -51,8 +51,11 @@ jobs:
         working-directory: apps/genesis-veille-engine
         run: docker build -t genesis-veille-world-state:ci .
 
-      - name: Boot container
-        run: docker run -d --rm --name genesis-veille-smoke -p 8000:8000 genesis-veille-world-state:ci
+      - name: Create persistent volume
+        run: docker volume create genesis-veille-state
+
+      - name: Boot first container
+        run: docker run -d --rm --name genesis-veille-smoke -p 8000:8000 -e GENESIS_INGEST_KEY=ci-ingest-key -v genesis-veille-state:/data genesis-veille-world-state:ci
 
       - name: Verify health and public shell
         run: |
@@ -65,10 +68,36 @@ jobs:
           grep -q '"status":"ok"' /tmp/health.json
           curl --fail --silent http://127.0.0.1:8000/ | grep -q 'Genesis Veille — Africa World State'
 
+      - name: Write durable source and event
+        run: |
+          curl --fail --silent -X POST http://127.0.0.1:8000/api/v1/sources -H 'Content-Type: application/json' -H 'X-Genesis-Ingest-Key: ci-ingest-key' --data '{"id":"src-ci-1","name":"CI Official Source","source_type":"official","license_class":"public","reliability_tier":1,"active":true}'
+          curl --fail --silent -X POST http://127.0.0.1:8000/api/v1/events -H 'Content-Type: application/json' -H 'X-Genesis-Ingest-Key: ci-ingest-key' --data '{"id":"evt-ci-1","event_type":"funding","title":"CI durable event","country_iso3":"MLI","observed_at":"2026-08-22T02:55:00Z","source_ids":["src-ci-1"],"confidence":0.91,"corroboration_count":1,"sensitive":false,"sector":"funding"}'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/world-state/countries/MLI | grep -q '"event_count":1'
+
+      - name: Replace container
+        run: |
+          docker stop genesis-veille-smoke
+          docker run -d --rm --name genesis-veille-smoke -p 8000:8000 -e GENESIS_INGEST_KEY=ci-ingest-key -v genesis-veille-state:/data genesis-veille-world-state:ci
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/health > /tmp/restart-health.json; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/restart-health.json
+
+      - name: Verify state survived replacement
+        run: |
+          curl --fail --silent http://127.0.0.1:8000/api/v1/sources | grep -q 'src-ci-1'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/events | grep -q 'evt-ci-1'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/world-state/countries/MLI | grep -q '"event_count":1'
+
       - name: Container logs on failure
         if: failure()
         run: docker logs genesis-veille-smoke || true
 
-      - name: Stop container
+      - name: Cleanup
         if: always()
-        run: docker stop genesis-veille-smoke || true
+        run: |
+          docker stop genesis-veille-smoke || true
+          docker volume rm genesis-veille-state || true
