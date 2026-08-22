@@ -53,6 +53,19 @@ def test_root_serves_public_africa_shell():
     assert "Africa World State · Public Intelligence" in response.text
 
 
+def test_public_responses_include_security_headers():
+    response = client().get("/")
+
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+    policy = response.headers["content-security-policy"]
+    assert "default-src 'self'" in policy
+    assert "connect-src 'self'" in policy
+    assert "frame-ancestors 'none'" in policy
+
+
 def test_write_endpoints_require_internal_ingest_key():
     api = client()
     missing = api.post("/api/v1/sources", json=source_payload())
