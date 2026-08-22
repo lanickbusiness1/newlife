@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { CandidateContext } from '../../lib/repositories/candidate-context.js';
 import type { JobSpec } from '../../lib/domain/types.js';
-import { candidateApi, CandidateApiError, type DiagnosticResponse, type GapAnalysisResponse, type VariantsResponse } from '../../lib/http/api-client.js';
+import { candidateApi, CandidateApiError, type DiagnosticResponse, type GapAnalysisResponse, type ReadinessResponse, type VariantsResponse } from '../../lib/http/api-client.js';
 import { EvidenceBadge } from '../evidence/EvidenceBadge';
 import { CandidateHeader } from './CandidateHeader';
 import { DiagnosticPanel } from './DiagnosticPanel';
@@ -18,6 +18,8 @@ export function CvOptimizerFlow() {
   const [showJobs, setShowJobs] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [gap, setGap] = useState<GapAnalysisResponse | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessResponse | null>(null);
+  const [readinessUnavailable, setReadinessUnavailable] = useState<string | null>(null);
   const [rewrite, setRewrite] = useState<string | null>(null);
   const [rewriteConsent, setRewriteConsent] = useState(false);
   const [variants, setVariants] = useState<VariantsResponse | null>(null);
@@ -60,6 +62,33 @@ export function CvOptimizerFlow() {
 
   async function chooseJob() {
     await act('jobs', candidateApi.jobs, ({ jobs: values }) => { setJobs(values); setShowJobs(true); });
+  }
+
+  async function analyzeSelectedJob() {
+    if (!selectedJobId) return;
+    setBusy('gap');
+    setError(null);
+    setReadiness(null);
+    setReadinessUnavailable(null);
+    try {
+      const gapValue = await candidateApi.gapAnalysis(selectedJobId);
+      setGap(gapValue);
+      setRewriteConsent(false);
+      setRewrite(null);
+      try {
+        setReadiness(await candidateApi.readiness(selectedJobId));
+      } catch (reason) {
+        if (reason instanceof CandidateApiError && reason.status === 409) {
+          setReadinessUnavailable('Score non publié : les signaux ATS, sémantiques et institutionnels sourcés ne sont pas encore tous disponibles.');
+        } else {
+          throw reason;
+        }
+      }
+    } catch (reason) {
+      setError(reason instanceof CandidateApiError ? reason.message : 'La demande a échoué de manière sûre.');
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (
@@ -113,7 +142,7 @@ export function CvOptimizerFlow() {
                     <span><strong>{job.title}</strong><small>{job.countryCode ?? 'Pays à préciser'} · {job.requirements.length} exigences structurées</small></span>
                   </label>
                 ))}</div>}
-                <button className="candidate-button primary" disabled={!selectedJobId || busy !== null} onClick={() => act('gap', () => candidateApi.gapAnalysis(selectedJobId), (value) => { setGap(value); setRewriteConsent(false); setRewrite(null); })}>{busy === 'gap' ? 'Comparaison…' : 'Analyser les écarts'}</button>
+                <button className="candidate-button primary" disabled={!selectedJobId || busy !== null} onClick={analyzeSelectedJob}>{busy === 'gap' ? 'Comparaison…' : 'Analyser les écarts'}</button>
               </section>
             ) : null}
 
@@ -121,6 +150,37 @@ export function CvOptimizerFlow() {
               <section className="flow-panel" aria-labelledby="gap-heading">
                 <div className="flow-panel-head"><span className="step-number">04</span><div><h2 id="gap-heading">Matrice exigences ↔ preuves</h2><p>Un GAP reste visible : AfrIA Recruit™ ne le transforme jamais en compétence du candidat.</p></div></div>
                 <GapMatrix rows={gap.analysis.requirements} />
+
+                {readiness ? (
+                  <div className="rewrite-box" aria-labelledby="readiness-heading">
+                    <div>
+                      <h3 id="readiness-heading">Application Readiness™</h3>
+                      <p>Score publié uniquement à partir de signaux sourcés et de preuves candidates admissibles.</p>
+                    </div>
+                    <div className="fact-card" data-testid="readiness-total">
+                      <div><strong>Score global</strong><span>Compatibilité de candidature vérifiable</span></div>
+                      <strong>{readiness.readiness.total}/100</strong>
+                    </div>
+                    <div className="fact-grid">
+                      <article className="fact-card" data-testid="readiness-atsTechnical"><div><strong>ATS technique</strong><span>Parsing et lisibilité machine</span></div><strong>{readiness.readiness.dimensions.atsTechnical}/20</strong></article>
+                      <article className="fact-card" data-testid="readiness-jobMatch"><div><strong>Compatibilité offre</strong><span>Exigences structurées</span></div><strong>{readiness.readiness.dimensions.jobMatch}/30</strong></article>
+                      <article className="fact-card" data-testid="readiness-semanticFit"><div><strong>Fit sémantique</strong><span>Responsabilités réellement prouvées</span></div><strong>{readiness.readiness.dimensions.semanticFit}/20</strong></article>
+                      <article className="fact-card" data-testid="readiness-evidence"><div><strong>Preuves</strong><span>Faits étayés dans le Talent Passport™</span></div><strong>{readiness.readiness.dimensions.evidence}/15</strong></article>
+                      <article className="fact-card" data-testid="readiness-institutionFit"><div><strong>Fit institutionnel</strong><span>Critères sourcés de l’organisation cible</span></div><strong>{readiness.readiness.dimensions.institutionFit}/15</strong></article>
+                    </div>
+                    {readiness.readiness.gaps.length ? (
+                      <div>
+                        <strong>Actions prioritaires</strong>
+                        <ul>
+                          {readiness.readiness.gaps.map((item) => <li key={item.code}><strong>{item.label}</strong> — {item.action}</li>)}
+                        </ul>
+                      </div>
+                    ) : <p>Aucun gap de readiness n’est détecté sur les signaux actuellement prouvés.</p>}
+                  </div>
+                ) : readinessUnavailable ? (
+                  <div className="candidate-alert" role="status">{readinessUnavailable}</div>
+                ) : null}
+
                 {firstExperience ? (
                   <div className="rewrite-box">
                     <div><strong>Achievement Writer™</strong><p>{firstExperience.description}</p></div>
