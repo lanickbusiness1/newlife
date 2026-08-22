@@ -158,12 +158,44 @@ create table if not exists sovereign_scenarios (
   foreign key (project_id, tenant_id) references mining_projects (id, tenant_id)
 );
 
+create table if not exists sovereign_national_interest_methodologies (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references workforce_tenants(id),
+  project_id uuid not null,
+  external_id text not null,
+  methodology_version text not null,
+  weights jsonb not null check (jsonb_typeof(weights) = 'object'),
+  weight_total numeric(8,4) not null check (weight_total = 100),
+  go_threshold numeric(7,4) not null check (go_threshold between 0 and 100),
+  hold_threshold numeric(7,4) not null check (hold_threshold between 0 and 100),
+  state text not null check (state in ('DRAFT','VALIDATED','RETIRED')),
+  validated_by_identity_id uuid,
+  validated_at timestamptz,
+  evidence_ids uuid[] not null check (cardinality(evidence_ids) > 0),
+  version integer not null default 1 check (version > 0),
+  created_at timestamptz not null default now(),
+  unique (tenant_id, project_id, external_id),
+  unique (tenant_id, project_id, methodology_version),
+  unique (id, tenant_id, project_id),
+  foreign key (project_id, tenant_id) references mining_projects (id, tenant_id),
+  foreign key (validated_by_identity_id, tenant_id) references workforce_identities (id, tenant_id),
+  check (go_threshold > hold_threshold),
+  check (
+    (state = 'VALIDATED'
+      and validated_by_identity_id is not null
+      and validated_at is not null
+      and cardinality(evidence_ids) >= 2)
+    or state <> 'VALIDATED'
+  )
+);
+
 create table if not exists sovereign_national_interest_assessments (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references workforce_tenants(id),
   project_id uuid not null,
   external_id text not null,
-  methodology_version text not null default 'B8-v1',
+  methodology_id uuid not null,
+  methodology_version text not null,
   weights jsonb not null check (jsonb_typeof(weights) = 'object'),
   weight_total numeric(8,4) not null check (weight_total = 100),
   scores jsonb not null check (jsonb_typeof(scores) = 'object'),
@@ -178,6 +210,8 @@ create table if not exists sovereign_national_interest_assessments (
   unique (tenant_id, project_id, external_id, methodology_version),
   unique (id, tenant_id, project_id),
   foreign key (project_id, tenant_id) references mining_projects (id, tenant_id),
+  foreign key (methodology_id, tenant_id, project_id)
+    references sovereign_national_interest_methodologies (id, tenant_id, project_id),
   check (
     (decision = 'INSUFFICIENT_EVIDENCE' and weighted_score is null and evidence_count = 0 and cardinality(evidence_ids) = 0)
     or
@@ -220,6 +254,8 @@ create index if not exists sovereign_operator_exposures_operator_idx
   on sovereign_operator_exposures (tenant_id, project_id, operator_id, controlled_capacity_ratio desc);
 create index if not exists sovereign_scenarios_type_idx
   on sovereign_scenarios (tenant_id, project_id, scenario_type, methodology_version);
+create index if not exists sovereign_national_interest_methodology_state_idx
+  on sovereign_national_interest_methodologies (tenant_id, project_id, state, methodology_version);
 create index if not exists sovereign_national_interest_decision_idx
   on sovereign_national_interest_assessments (tenant_id, project_id, decision, assessed_at desc);
 create index if not exists sovereign_decision_records_assessment_idx
@@ -268,7 +304,57 @@ create trigger sovereign_decision_human_authority
 before insert on sovereign_decision_records
 for each row execute function sovereign_require_human_decision_authority();
 
--- Evidence IDs are arrays because an assessment can depend on many heterogeneous artifacts.
+create or replace function sovereign_require_human_methodology_approver()
+returns trigger
+language plpgsql
+as $$
+declare
+  authority_kind text;
+  authority_roles jsonb;
+begin
+  if new.state <> 'VALIDATED' then
+    return new;
+  end if;
+
+  select identity.kind, identity.roles
+    into authority_kind, authority_roles
+  from workforce_identities identity
+  where identity.id = new.validated_by_identity_id
+    and identity.tenant_id = new.tenant_id;
+
+  if authority_kind is distinct from 'HUMAN' then
+    raise exception 'validated sovereign methodology requires a human methodology approver';
+  end if;
+  if not (coalesce(authority_roles, '[]'::jsonb) ? 'SOVEREIGN_METHODOLOGY_APPROVER') then
+    raise exception 'human methodology approver lacks SOVEREIGN_METHODOLOGY_APPROVER role';
+  end if;
+  return new;
+end
+$$;
+
+drop trigger if exists sovereign_methodology_human_authority on sovereign_national_interest_methodologies;
+create trigger sovereign_methodology_human_authority
+before insert or update on sovereign_national_interest_methodologies
+for each row execute function sovereign_require_human_methodology_approver();
+
+create or replace function sovereign_reject_validated_methodology_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.state = 'VALIDATED' then
+    raise exception 'validated sovereign methodology is immutable; create a new methodology version';
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end
+$$;
+
+drop trigger if exists sovereign_methodology_immutable on sovereign_national_interest_methodologies;
+create trigger sovereign_methodology_immutable
+before update or delete on sovereign_national_interest_methodologies
+for each row execute function sovereign_reject_validated_methodology_mutation();
+
+-- Evidence IDs are arrays because one sovereign object can depend on many heterogeneous artifacts.
 -- Enforce that every referenced evidence UUID resolves inside the same tenant/project.
 create or replace function sovereign_validate_evidence_lineage()
 returns trigger
@@ -291,6 +377,66 @@ begin
   return new;
 end
 $$;
+
+create or replace function sovereign_validate_methodology_evidence()
+returns trigger
+language plpgsql
+as $$
+declare
+  bad_count integer;
+begin
+  if new.state <> 'VALIDATED' then
+    return new;
+  end if;
+
+  select count(*) into bad_count
+  from unnest(new.evidence_ids) evidence_id
+  left join sovereign_evidence_artifacts evidence
+    on evidence.id = evidence_id
+   and evidence.tenant_id = new.tenant_id
+   and evidence.project_id = new.project_id
+  where evidence.id is null or evidence.truth_class <> 'FACT';
+
+  if bad_count <> 0 then
+    raise exception 'validated sovereign methodology requires FACT evidence only';
+  end if;
+  return new;
+end
+$$;
+
+create or replace function sovereign_validate_assessment_methodology()
+returns trigger
+language plpgsql
+as $$
+declare
+  methodology_state text;
+  persisted_version text;
+  persisted_weights jsonb;
+begin
+  select methodology.state, methodology.methodology_version, methodology.weights
+    into methodology_state, persisted_version, persisted_weights
+  from sovereign_national_interest_methodologies methodology
+  where methodology.id = new.methodology_id
+    and methodology.tenant_id = new.tenant_id
+    and methodology.project_id = new.project_id;
+
+  if methodology_state is distinct from 'VALIDATED' then
+    raise exception 'National Interest assessment requires a validated methodology';
+  end if;
+  if persisted_version is distinct from new.methodology_version then
+    raise exception 'National Interest assessment methodology version mismatch';
+  end if;
+  if persisted_weights is distinct from new.weights then
+    raise exception 'National Interest assessment weights differ from approved methodology';
+  end if;
+  return new;
+end
+$$;
+
+drop trigger if exists sovereign_assessment_methodology_gate on sovereign_national_interest_assessments;
+create trigger sovereign_assessment_methodology_gate
+before insert or update on sovereign_national_interest_assessments
+for each row execute function sovereign_validate_assessment_methodology();
 
 create or replace function sovereign_validate_scenario_evidence()
 returns trigger
@@ -325,6 +471,7 @@ declare
     'sovereign_corridor_nodes',
     'sovereign_operator_exposures',
     'sovereign_scenarios',
+    'sovereign_national_interest_methodologies',
     'sovereign_national_interest_assessments',
     'sovereign_decision_records'
   ];
@@ -339,6 +486,11 @@ begin
   end loop;
 end
 $$;
+
+drop trigger if exists sovereign_methodology_fact_evidence on sovereign_national_interest_methodologies;
+create trigger sovereign_methodology_fact_evidence
+before insert or update on sovereign_national_interest_methodologies
+for each row execute function sovereign_validate_methodology_evidence();
 
 drop trigger if exists sovereign_scenario_simulation_evidence on sovereign_scenarios;
 create trigger sovereign_scenario_simulation_evidence
@@ -358,6 +510,7 @@ declare
     'sovereign_corridor_nodes',
     'sovereign_operator_exposures',
     'sovereign_scenarios',
+    'sovereign_national_interest_methodologies',
     'sovereign_national_interest_assessments',
     'sovereign_decision_records'
   ];
