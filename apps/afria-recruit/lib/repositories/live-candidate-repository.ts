@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../supabase/database.types.js';
 import type { CandidateContext, CandidateRepository } from './candidate-context.js';
+import { parseCandidateAtsProfile } from './readiness-source-parser.js';
 
 function assertOk<T>(result: { data: T | null; error: unknown }, label: string): T {
   if (result.error || result.data === null) throw new Error(`Candidate repository read failed: ${label}`);
@@ -125,6 +126,7 @@ export class LiveCandidateRepository implements CandidateRepository {
         parsedClaimStatus: row.parsed_claim_status,
         uploadedAt: row.uploaded_at,
         synthetic: false,
+        atsProfile: parseCandidateAtsProfile(row.parsed_data),
       })),
     };
   }
