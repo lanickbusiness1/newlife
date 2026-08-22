@@ -42,7 +42,7 @@ def event_payload(source_ids: list[str] | None = None, **overrides) -> dict:
 def test_health_contract():
     response = client().get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "genesis-veille-world-state", "version": "0.1.0"}
+    assert response.json() == {"status": "ok", "service": "genesis-veille-world-state", "version": "0.2.0"}
 
 
 def test_root_serves_public_africa_shell():
