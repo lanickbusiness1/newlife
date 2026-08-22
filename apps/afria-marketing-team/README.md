@@ -24,11 +24,31 @@ Les éléments suivants sont des tâches d’activation commerciale, pas des blo
 - CRM pipeline : Signal → Lead qualifié → Diagnostic → Proposition → Paiement → Livraison → Cas client → Upsell / Referral.
 - Revenue Cockpit : loi des moyennes, ventes attendues, revenu attendu, cash activation.
 - Cash Activation : message WhatsApp, objectif jour 1, séquence de 100 prospects, 4 ventes et 199 600 FCFA.
-- R.E.M.E : objections, messages gagnants, preuves, lessons réutilisables.
-- Export Center : Markdown plan, JSON evidence, HTML report.
+- AfrIA AI Visibility Intelligence™ : Enterprise Visibility Profile™, African Enterprise Visibility Gap™, recommandations de découvrabilité et preuve exportable.
+- R.E.M.E : objections, messages gagnants, preuves, lessons réutilisables et évolution du Visibility Gap.
+- Export Center : Markdown plan, JSON evidence, HTML report et evidence de visibilité.
 - S7+ policy gate : SEND, PAY, DELETE, EXPORT nécessitent validation humaine.
-- FastAPI backend boundary : health, product intake, policy simulation, evidence validation.
+- FastAPI backend boundary : health, product intake, visibility assessment, policy simulation, evidence validation.
 - CI production : frontend tests/build, backend tests, static anchors.
+
+## AfrIA AI Visibility Intelligence™
+
+Cette capability reste interne à `PRD-MKT-TEAM-001` : **aucun nouveau produit n’est créé**.
+
+Le cockpit mesure deux indicateurs complémentaires :
+
+- **Visibility Score** : 0–100, plus élevé = entreprise plus découvrable et mieux prouvée ;
+- **African Enterprise Visibility Gap™** : `100 - Visibility Score`, plus élevé = déficit de découvrabilité plus important.
+
+Le modèle `AEVG-1.0` pondère identité/sources, site et search, moteurs IA/AEO-GEO, médias, réseaux professionnels, marketplaces, sources institutionnelles et sources investisseurs. Une observation absente vaut conservativement zéro pour le calcul et reste explicitement marquée comme manquante selon `mark_missing_never_invent`.
+
+API backend :
+
+```text
+POST /visibility/assess
+```
+
+La réponse contient le score, le gap, la priorité, le niveau de confiance, les dimensions manquantes et jusqu’à cinq actions classées par déficit pondéré.
 
 ## Offres commerciales
 
@@ -45,6 +65,7 @@ Produit
 → Offre
 → ICP
 → Preuve
+→ Visibilité mesurée
 → Canal
 → Script
 → CRM
