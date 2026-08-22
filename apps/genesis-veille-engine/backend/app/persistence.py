@@ -10,10 +10,10 @@ from threading import RLock
 
 from pydantic import BaseModel
 
-from .models import AcceptedEvent, CrawlTarget, SourceRecord
+from .models import AcceptedEvent, AuditRecord, CrawlTarget, SourceRecord
 
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 
 
 def _canonical_json(model: BaseModel) -> str:
@@ -30,7 +30,7 @@ def _sha256(payload: str) -> str:
 
 
 class SQLiteStateRepository:
-    """Durable state store for trusted sources, accepted events and crawl operations."""
+    """Durable state store for trusted sources, accepted events, crawl operations and audit evidence."""
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -75,14 +75,19 @@ class SQLiteStateRepository:
             ).fetchone()
             if current is None:
                 self._create_v2_tables()
+                self._create_v3_tables()
                 self._connection.execute(
                     "INSERT INTO metadata(key, value) VALUES('schema_version', ?)",
                     (SCHEMA_VERSION,),
                 )
             elif current[0] == "1":
                 self._migrate_v1_to_v2()
+                self._migrate_v2_to_v3()
+            elif current[0] == "2":
+                self._migrate_v2_to_v3()
             elif current[0] == SCHEMA_VERSION:
                 self._create_v2_tables()
+                self._create_v3_tables()
             else:
                 raise RuntimeError(
                     f"unsupported state schema version: {current[0]}"
@@ -99,11 +104,27 @@ class SQLiteStateRepository:
             """
         )
 
+    def _create_v3_tables(self) -> None:
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_records (
+                id TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL,
+                payload_sha256 TEXT NOT NULL
+            )
+            """
+        )
+
     def _migrate_v1_to_v2(self) -> None:
         self._create_v2_tables()
         self._connection.execute(
-            "UPDATE metadata SET value = ? WHERE key = 'schema_version'",
-            (SCHEMA_VERSION,),
+            "UPDATE metadata SET value = '2' WHERE key = 'schema_version'"
+        )
+
+    def _migrate_v2_to_v3(self) -> None:
+        self._create_v3_tables()
+        self._connection.execute(
+            "UPDATE metadata SET value = '3' WHERE key = 'schema_version'"
         )
 
     def schema_version(self) -> str:
@@ -114,8 +135,23 @@ class SQLiteStateRepository:
             raise RuntimeError("state schema version is missing")
         return str(row[0])
 
+    def rollback_schema_to_v2(self) -> None:
+        """Revert v3 only when no append-only audit evidence would be lost."""
+        with self._lock, self._connection:
+            if self.schema_version() != "3":
+                raise RuntimeError("schema rollback requires version 3")
+            count = self._connection.execute(
+                "SELECT COUNT(*) FROM audit_records"
+            ).fetchone()[0]
+            if count:
+                raise RuntimeError("cannot rollback schema with audit records present")
+            self._connection.execute("DROP TABLE audit_records")
+            self._connection.execute(
+                "UPDATE metadata SET value = '2' WHERE key = 'schema_version'"
+            )
+
     def rollback_schema_to_v1(self) -> None:
-        """Revert the additive v2 schema only when no crawl state would be lost."""
+        """Revert v2 only when no crawl state would be lost."""
         with self._lock, self._connection:
             if self.schema_version() != "2":
                 raise RuntimeError("schema rollback requires version 2")
@@ -165,8 +201,8 @@ class SQLiteStateRepository:
         return accepted
 
     def save_crawl_target(self, target: CrawlTarget) -> CrawlTarget:
-        if self.schema_version() != "2":
-            raise RuntimeError("crawl target persistence requires schema version 2")
+        if self.schema_version() not in {"2", "3"}:
+            raise RuntimeError("crawl target persistence requires schema version 2+")
         payload = _canonical_json(target)
         digest = _sha256(payload)
         with self._lock, self._connection:
@@ -186,6 +222,24 @@ class SQLiteStateRepository:
                     (target.id, payload, digest),
                 )
         return target
+
+    def save_audit_record(self, record: AuditRecord) -> AuditRecord:
+        if self.schema_version() != "3":
+            raise RuntimeError("audit persistence requires schema version 3")
+        payload = _canonical_json(record)
+        digest = _sha256(payload)
+        with self._lock, self._connection:
+            existing = self._connection.execute(
+                "SELECT 1 FROM audit_records WHERE id = ?",
+                (record.id,),
+            ).fetchone()
+            if existing is not None:
+                raise ValueError("duplicate audit id")
+            self._connection.execute(
+                "INSERT INTO audit_records(id, payload_json, payload_sha256) VALUES(?, ?, ?)",
+                (record.id, payload, digest),
+            )
+        return record
 
     def list_sources(self) -> list[SourceRecord]:
         rows = self._connection.execute(
@@ -208,7 +262,7 @@ class SQLiteStateRepository:
         return result
 
     def list_crawl_targets(self) -> list[CrawlTarget]:
-        if self.schema_version() != "2":
+        if self.schema_version() not in {"2", "3"}:
             return []
         rows = self._connection.execute(
             "SELECT id, payload_json, payload_sha256 FROM crawl_targets ORDER BY rowid"
@@ -220,7 +274,7 @@ class SQLiteStateRepository:
         return result
 
     def get_crawl_target(self, target_id: str) -> CrawlTarget | None:
-        if self.schema_version() != "2":
+        if self.schema_version() not in {"2", "3"}:
             return None
         row = self._connection.execute(
             "SELECT payload_json, payload_sha256 FROM crawl_targets WHERE id = ?",
@@ -238,6 +292,18 @@ class SQLiteStateRepository:
             if target.enabled and target.next_due_at <= now
         ]
         return sorted(due, key=lambda target: (target.next_due_at, target.id))
+
+    def list_audit_records(self) -> list[AuditRecord]:
+        if self.schema_version() != "3":
+            return []
+        rows = self._connection.execute(
+            "SELECT id, payload_json, payload_sha256 FROM audit_records ORDER BY rowid"
+        ).fetchall()
+        result: list[AuditRecord] = []
+        for record_id, payload, digest in rows:
+            self._verify_payload(payload, digest, "audit", record_id)
+            result.append(AuditRecord.model_validate_json(payload))
+        return result
 
     def backup(self, destination: str | Path) -> Path:
         destination_path = Path(destination)
