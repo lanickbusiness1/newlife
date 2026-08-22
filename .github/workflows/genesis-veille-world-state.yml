@@ -1,0 +1,183 @@
+name: Genesis Veille World State CI
+
+on:
+  push:
+    branches:
+      - feature/genesis-veille-world-state-v1
+    paths:
+      - 'apps/genesis-veille-engine/**'
+      - '.github/workflows/genesis-veille-world-state.yml'
+  pull_request:
+    paths:
+      - 'apps/genesis-veille-engine/**'
+      - '.github/workflows/genesis-veille-world-state.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/genesis-veille-engine/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/genesis-veille-engine/backend/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Dependency consistency
+        run: python -m pip check
+
+      - name: Compile application
+        run: python -m compileall -q app
+
+      - name: Application secret pattern scan
+        working-directory: ${{ github.workspace }}
+        run: |
+          if git grep -nE '(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY)' -- apps/genesis-veille-engine/backend/app apps/genesis-veille-engine/frontend apps/genesis-veille-engine/Dockerfile; then
+            echo 'Potential production secret material detected in application paths.'
+            exit 1
+          fi
+
+      - name: Run tests
+        run: python -m pytest -q
+
+  live-public-http-transport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: backend-tests
+    defaults:
+      run:
+        working-directory: apps/genesis-veille-engine/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/genesis-veille-engine/backend/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Fetch real public HTTPS document through SafeHttpTransport
+        run: |
+          for attempt in 1 2 3; do
+            if python - <<'PY'
+          from app.connectors import SafeHttpTransport
+
+          document = SafeHttpTransport(
+              timeout_seconds=10.0,
+              max_document_bytes=200000,
+          ).fetch(
+              'https://example.org/',
+              allowed_hosts=['example.org'],
+          )
+
+          assert document.final_url.startswith('https://example.org')
+          assert document.content_type == 'text/html'
+          assert 'Example Domain' in document.title or 'Example Domain' in document.text
+          assert document.text.strip()
+          print({
+              'final_url': document.final_url,
+              'content_type': document.content_type,
+              'title': document.title,
+              'text_length': len(document.text),
+          })
+          PY
+            then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: backend-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build container
+        working-directory: apps/genesis-veille-engine
+        run: docker build -t genesis-veille-world-state:ci .
+
+      - name: Create persistent volume
+        run: docker volume create genesis-veille-state
+
+      - name: Boot first container
+        run: docker run -d --name genesis-veille-smoke -p 8000:8000 -e GENESIS_INGEST_KEY=ci-ingest-key -v genesis-veille-state:/data genesis-veille-world-state:ci
+
+      - name: Verify non-root runtime
+        run: |
+          runtime_uid="$(docker exec genesis-veille-smoke id -u)"
+          test "$runtime_uid" != "0"
+          test "$runtime_uid" = "10001"
+
+      - name: Verify health and public shell
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/health > /tmp/health.json; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/health.json
+          curl --fail --silent http://127.0.0.1:8000/ | grep -q 'Genesis Veille — Africa World State'
+
+      - name: Write durable source and event
+        run: |
+          curl --fail --silent -X POST http://127.0.0.1:8000/api/v1/sources -H 'Content-Type: application/json' -H 'X-Genesis-Ingest-Key: ci-ingest-key' --data '{"id":"src-ci-1","name":"CI Official Source","source_type":"official","license_class":"public","reliability_tier":1,"active":true}'
+          curl --fail --silent -X POST http://127.0.0.1:8000/api/v1/events -H 'Content-Type: application/json' -H 'X-Genesis-Ingest-Key: ci-ingest-key' --data '{"id":"evt-ci-1","event_type":"funding","title":"CI durable event","country_iso3":"MLI","observed_at":"2026-08-22T02:55:00Z","source_ids":["src-ci-1"],"confidence":0.91,"corroboration_count":1,"sensitive":false,"sector":"funding"}'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/world-state/countries/MLI | grep -q '"event_count":1'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/audit -H 'X-Genesis-Ingest-Key: ci-ingest-key' | grep -q 'SOURCE_REGISTER'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/audit -H 'X-Genesis-Ingest-Key: ci-ingest-key' | grep -q 'EVENT_INGEST'
+
+      - name: Replace container
+        run: |
+          docker stop genesis-veille-smoke
+          docker rm genesis-veille-smoke
+          docker run -d --rm --name genesis-veille-smoke -p 8000:8000 -e GENESIS_INGEST_KEY=ci-ingest-key -v genesis-veille-state:/data genesis-veille-world-state:ci
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/health > /tmp/restart-health.json; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/restart-health.json
+          test "$(docker exec genesis-veille-smoke id -u)" = "10001"
+
+      - name: Verify state survived replacement
+        run: |
+          curl --fail --silent http://127.0.0.1:8000/api/v1/sources | grep -q 'src-ci-1'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/events | grep -q 'evt-ci-1'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/world-state/countries/MLI | grep -q '"event_count":1'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/audit -H 'X-Genesis-Ingest-Key: ci-ingest-key' | grep -q 'SOURCE_REGISTER'
+          curl --fail --silent http://127.0.0.1:8000/api/v1/audit -H 'X-Genesis-Ingest-Key: ci-ingest-key' | grep -q 'EVENT_INGEST'
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs genesis-veille-smoke || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop genesis-veille-smoke || true
+          docker rm genesis-veille-smoke || true
+          docker volume rm genesis-veille-state || true

@@ -1,0 +1,56 @@
+name: Genesis Veille Live Connector Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/genesis-veille-world-state-v1
+    paths:
+      - '.github/workflows/genesis-veille-live-connector-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  live-public-http-transport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: apps/genesis-veille-engine/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/genesis-veille-engine/backend/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Fetch a real public HTTPS document through SafeHttpTransport
+        run: |
+          python - <<'PY'
+          from app.connectors import SafeHttpTransport
+
+          transport = SafeHttpTransport(timeout_seconds=10.0, max_document_bytes=200000)
+          document = transport.fetch(
+              'https://example.org/',
+              allowed_hosts=['example.org'],
+          )
+
+          assert document.final_url.startswith('https://example.org')
+          assert document.content_type == 'text/html'
+          assert 'Example Domain' in document.title or 'Example Domain' in document.text
+          assert document.text.strip()
+          print({
+              'final_url': document.final_url,
+              'content_type': document.content_type,
+              'title': document.title,
+              'text_length': len(document.text),
+          })
+          PY
