@@ -122,7 +122,7 @@ jobs:
         run: docker volume create genesis-veille-state
 
       - name: Boot first container
-        run: docker run -d --rm --name genesis-veille-smoke -p 8000:8000 -e GENESIS_INGEST_KEY=ci-ingest-key -v genesis-veille-state:/data genesis-veille-world-state:ci
+        run: docker run -d --name genesis-veille-smoke -p 8000:8000 -e GENESIS_INGEST_KEY=ci-ingest-key -v genesis-veille-state:/data genesis-veille-world-state:ci
 
       - name: Verify non-root runtime
         run: |
@@ -150,6 +150,7 @@ jobs:
       - name: Replace container
         run: |
           docker stop genesis-veille-smoke
+          docker rm genesis-veille-smoke
           docker run -d --rm --name genesis-veille-smoke -p 8000:8000 -e GENESIS_INGEST_KEY=ci-ingest-key -v genesis-veille-state:/data genesis-veille-world-state:ci
           for attempt in {1..20}; do
             if curl --fail --silent http://127.0.0.1:8000/health > /tmp/restart-health.json; then
@@ -174,4 +175,5 @@ jobs:
         if: always()
         run: |
           docker stop genesis-veille-smoke || true
+          docker rm genesis-veille-smoke || true
           docker volume rm genesis-veille-state || true
