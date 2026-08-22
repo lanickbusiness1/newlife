@@ -1,6 +1,7 @@
 from typing import Literal
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from visibility import VisibilityAssessment, assess_visibility
 
 PRODUCT_STANDARD = "Production Product"
 ASSET_ID = "PRD-MKT-TEAM-001"
@@ -60,6 +61,10 @@ def policy_simulate(payload: PolicyRequest):
     if payload.capability in SENSITIVE and not payload.human_approved:
         return {"state": "needs_human", "reason": f"{payload.capability}: human approval required before execution", "human_approval_required": True}
     return {"state": "allowed", "reason": f"{payload.capability}: allowed by policy simulation", "human_approval_required": False}
+
+@app.post("/visibility/assess")
+def visibility_assess(payload: VisibilityAssessment):
+    return assess_visibility(payload)
 
 @app.post("/export/evidence")
 def export_evidence(payload: EvidenceRequest):
