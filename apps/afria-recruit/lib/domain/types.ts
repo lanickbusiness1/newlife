@@ -11,11 +11,20 @@ export interface JobRequirement {
   minimumLevel?: string;
 }
 
+export interface JobReadinessCriterion {
+  id: string;
+  label: string;
+  anchors: string[];
+  sourceRef: string;
+}
+
 export interface JobSpec {
   id: string;
   title: string;
   countryCode: string | null;
   requirements: JobRequirement[];
+  semanticCriteria?: JobReadinessCriterion[];
+  institutionCriteria?: JobReadinessCriterion[];
 }
 
 export interface RequirementCoverage {
@@ -47,4 +56,6 @@ export interface CanonicalJobInput {
   countryCode?: string | null;
   skills?: Array<{ skillId: string; label: string; required: boolean; minimumYears?: number | null }>;
   languages?: Array<{ languageCode: string; label: string; required: boolean; minimumLevel?: string }>;
+  semanticCriteria?: JobReadinessCriterion[];
+  institutionCriteria?: JobReadinessCriterion[];
 }
