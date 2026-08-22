@@ -64,6 +64,8 @@ type DecisionRow = Readonly<{
   decision: NationalInterestDecision;
   rationale: string;
   decided_by_identity_id: string;
+  decided_by_kind: "HUMAN" | "AGENT" | "SERVICE";
+  decided_by_roles: string[];
   evidence_ids: string[];
 }>;
 
@@ -226,10 +228,17 @@ export class PostgresSovereignNegotiationRepository implements SovereignNegotiat
   async getDecision(tenantId: string, projectId: string, decisionId: string): Promise<DecisionRecord | undefined> {
     return this.withTenant(tenantId, async (client) => {
       const result = await client.query<DecisionRow>(
-        `select id, tenant_id, project_id, assessment_id, decision, rationale,
-                decided_by_identity_id, evidence_ids
-         from sovereign_decision_records
-         where tenant_id = $1 and project_id = $2 and id = $3`,
+        `select decision_record.id, decision_record.tenant_id, decision_record.project_id,
+                decision_record.assessment_id, decision_record.decision, decision_record.rationale,
+                decision_record.decided_by_identity_id, identity.kind as decided_by_kind,
+                identity.roles as decided_by_roles, decision_record.evidence_ids
+         from sovereign_decision_records decision_record
+         join workforce_identities identity
+           on identity.id = decision_record.decided_by_identity_id
+          and identity.tenant_id = decision_record.tenant_id
+         where decision_record.tenant_id = $1
+           and decision_record.project_id = $2
+           and decision_record.id = $3`,
         [tenantId, projectId, decisionId],
       );
       const row = result.rows[0];
@@ -242,7 +251,12 @@ export class PostgresSovereignNegotiationRepository implements SovereignNegotiat
         row.assessment_id,
         row.decision,
         row.rationale,
-        { id: row.decided_by_identity_id, kind: "HUMAN" },
+        {
+          id: row.decided_by_identity_id,
+          tenantId: row.tenant_id,
+          kind: row.decided_by_kind,
+          roles: row.decided_by_roles,
+        },
         evidence,
       );
     });
