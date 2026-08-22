@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import FileResponse
 
 from .models import AcceptedEvent, EventInput, SourceRecord
@@ -18,6 +18,19 @@ from .world_state import WorldStateStore
 SERVICE_NAME = "genesis-veille-world-state"
 SERVICE_VERSION = "0.2.0"
 FRONTEND_INDEX = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
+CONTENT_SECURITY_POLICY = "; ".join(
+    [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "connect-src 'self'",
+        "img-src 'self' data:",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'none'",
+    ]
+)
 
 
 def create_app(
@@ -34,6 +47,16 @@ def create_app(
         version=SERVICE_VERSION,
     )
     app.state.repository = repository
+
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+        return response
 
     def require_ingest_access(
         supplied_key: Annotated[
