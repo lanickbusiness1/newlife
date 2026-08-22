@@ -3,6 +3,7 @@ import {
   type DecisionAuthority,
   type EvidenceArtifact,
   type NationalInterestDecision,
+  type NationalInterestMethodology,
   type NationalInterestScores,
   type NationalInterestWeights,
   type OperatorConcentration,
@@ -18,7 +19,10 @@ export type SovereignAssessmentSnapshot = Readonly<{
   assessmentId: string;
   tenantId: string;
   projectId: string;
+  methodologyId: string;
   methodologyVersion: string;
+  goThreshold: number;
+  holdThreshold: number;
   weights: NationalInterestWeights;
   scores: NationalInterestScores;
   weightedScore: number | null;
@@ -35,6 +39,8 @@ export type SovereignNegotiationEvaluation = Readonly<{
 }>;
 
 export interface SovereignNegotiationRepository {
+  saveEvidence(evidence: EvidenceArtifact): Promise<EvidenceArtifact>;
+  saveMethodology(methodology: NationalInterestMethodology): Promise<NationalInterestMethodology>;
   saveAssessment(snapshot: SovereignAssessmentSnapshot): Promise<SovereignAssessmentSnapshot>;
   saveDecision<T extends DecisionRecord>(decision: T): Promise<T>;
 }
@@ -46,23 +52,28 @@ export class SovereignNegotiationService {
     tenantId: string;
     projectId: string;
     assessmentId: string;
-    methodologyVersion: string;
-    weights: NationalInterestWeights;
+    methodology: NationalInterestMethodology;
     scores: NationalInterestScores;
     eliminatoryRedFlags: readonly string[];
     evidence: readonly EvidenceArtifact[];
     operatorExposures: readonly OperatorExposure[];
     scenarios: readonly SovereignScenarioRecord[];
   }): Promise<SovereignNegotiationEvaluation> {
-    assertRequired(input.methodologyVersion, "National Interest methodology version");
+    assertApprovedMethodologyScope(input.methodology, input.tenantId, input.projectId);
     validateScope(input.tenantId, input.projectId, input.operatorExposures, "Operator exposure");
     validateScope(input.tenantId, input.projectId, input.scenarios, "Scenario");
+    validateScope(input.tenantId, input.projectId, input.evidence, "Assessment evidence");
+
+    const evidenceById = new Map<string, EvidenceArtifact>();
+    for (const item of [...input.methodology.evidence, ...input.evidence]) evidenceById.set(item.id, item);
+    for (const item of evidenceById.values()) await this.repository.saveEvidence(item);
+    const persistedMethodology = await this.repository.saveMethodology(input.methodology);
 
     const result = scoreNationalInterest({
       tenantId: input.tenantId,
       projectId: input.projectId,
       assessmentId: input.assessmentId,
-      weights: input.weights,
+      methodology: persistedMethodology,
       scores: input.scores,
       eliminatoryRedFlags: input.eliminatoryRedFlags,
       evidence: input.evidence,
@@ -72,8 +83,11 @@ export class SovereignNegotiationService {
       assessmentId: result.assessmentId,
       tenantId: input.tenantId,
       projectId: input.projectId,
-      methodologyVersion: input.methodologyVersion,
-      weights: Object.freeze({ ...input.weights }),
+      methodologyId: persistedMethodology.id,
+      methodologyVersion: persistedMethodology.methodologyVersion,
+      goThreshold: persistedMethodology.goThreshold,
+      holdThreshold: persistedMethodology.holdThreshold,
+      weights: Object.freeze({ ...persistedMethodology.weights }),
       scores: Object.freeze({ ...input.scores }),
       weightedScore: result.weightedScore,
       decision: result.decision,
@@ -103,6 +117,7 @@ export class SovereignNegotiationService {
     authority: DecisionAuthority;
     evidence: readonly EvidenceArtifact[];
   }): Promise<DecisionRecord> {
+    validateScope(input.tenantId, input.projectId, input.evidence, "Decision evidence");
     const decision = new DecisionRecord(
       input.id,
       input.tenantId,
@@ -113,8 +128,19 @@ export class SovereignNegotiationService {
       input.authority,
       input.evidence,
     );
+    for (const item of input.evidence) await this.repository.saveEvidence(item);
     return this.repository.saveDecision(decision);
   }
+}
+
+function assertApprovedMethodologyScope(
+  methodology: NationalInterestMethodology,
+  tenantId: string,
+  projectId: string,
+): void {
+  if (methodology.state !== "VALIDATED") throw new Error("National Interest methodology must be approved before evaluation");
+  if (methodology.tenantId !== tenantId) throw new Error("National Interest methodology tenant isolation violation");
+  if (methodology.projectId !== projectId) throw new Error("National Interest methodology project isolation violation");
 }
 
 function validateScope(
@@ -127,8 +153,4 @@ function validateScope(
     if (item.tenantId !== tenantId) throw new Error(`${label} tenant isolation violation`);
     if (item.projectId !== projectId) throw new Error(`${label} project isolation violation`);
   }
-}
-
-function assertRequired(value: string, label: string): void {
-  if (!value.trim()) throw new Error(`${label} is required`);
 }
