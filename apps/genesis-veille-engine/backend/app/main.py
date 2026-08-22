@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import FileResponse
 
+from .connectors import ConnectorIngestRequest, ConnectorPipeline, PublicHttpConnector
 from .models import AcceptedEvent, EventInput, SourceRecord
 from .persistence import SQLiteStateRepository
 from .provenance import ProvenanceGate
@@ -33,20 +34,30 @@ CONTENT_SECURITY_POLICY = "; ".join(
 )
 
 
+def _env_enabled(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def create_app(
     ingest_key: str | None = None,
     storage_path: str | Path | None = None,
+    *,
+    http_connector_enabled: bool = False,
+    http_connector: PublicHttpConnector | None = None,
 ) -> FastAPI:
     repository = SQLiteStateRepository(storage_path) if storage_path is not None else None
     registry = SourceRegistry(repository.list_sources() if repository else None)
     gate = ProvenanceGate(registry)
     store = WorldStateStore(repository.list_events() if repository else None)
+    connector = http_connector or PublicHttpConnector()
+    connector_pipeline = ConnectorPipeline(registry, gate, store, repository)
 
     app = FastAPI(
         title="Genesis Veille Engine — World State API",
         version=SERVICE_VERSION,
     )
     app.state.repository = repository
+    app.state.http_connector_enabled = http_connector_enabled
 
     @app.middleware("http")
     async def add_security_headers(request: Request, call_next):
@@ -147,6 +158,48 @@ def create_app(
                 ) from exc
             raise
 
+    @app.post(
+        "/api/v1/connectors/http/ingest",
+        response_model=AcceptedEvent,
+        status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_ingest_access)],
+    )
+    def ingest_http_connector(payload: ConnectorIngestRequest) -> AcceptedEvent:
+        if not http_connector_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="public HTTP connector is disabled",
+            )
+
+        source = registry.get(payload.source_id)
+        if source is None or not source.active:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "CONNECTOR_REJECTED",
+                    "message": "unknown or inactive source",
+                },
+            )
+
+        try:
+            observation = connector.fetch(
+                source=source,
+                url=payload.url,
+                country_iso3=payload.country_iso3,
+                event_type_hint=payload.event_type_hint,
+                sector=payload.sector,
+                sensitive=payload.sensitive,
+            )
+            return connector_pipeline.process(observation)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "CONNECTOR_REJECTED",
+                    "message": str(exc),
+                },
+            ) from exc
+
     @app.get("/api/v1/world-state/countries/{iso3}")
     def country_world_state(iso3: str) -> dict:
         normalized = iso3.upper()
@@ -163,4 +216,5 @@ def create_app(
 app = create_app(
     ingest_key=os.getenv("GENESIS_INGEST_KEY"),
     storage_path=os.getenv("GENESIS_STATE_DB"),
+    http_connector_enabled=_env_enabled("GENESIS_HTTP_CONNECTOR_ENABLED"),
 )
