@@ -166,6 +166,33 @@ test("returns deterministic concentration and scenario ranking alongside the Nat
   assert.equal(repository.assessments[0]?.holdThreshold, 55);
 });
 
+test("rejects invalid operator concentration before persisting any evaluation state", async () => {
+  const repository = new MemoryRepository();
+  const service = new SovereignNegotiationService(repository);
+
+  await assert.rejects(
+    service.evaluateOffer({
+      tenantId: "tenant-gn",
+      projectId: "simandou",
+      assessmentId: "nia-invalid-concentration",
+      methodology: approvedMethodology(),
+      scores: Object.fromEntries(Object.keys(weights).map((key) => [key, 80])) as Record<keyof NationalInterestWeights, number>,
+      eliminatoryRedFlags: [],
+      evidence: [factEvidence],
+      operatorExposures: [
+        new OperatorExposure("exp-over-a", "tenant-gn", "simandou", "operator-a", 0.7, 3, [factEvidence]),
+        new OperatorExposure("exp-over-b", "tenant-gn", "simandou", "operator-b", 0.5, 2, [factEvidence]),
+      ],
+      scenarios: [],
+    }),
+    /cannot exceed 100 percent/i,
+  );
+
+  assert.equal(repository.evidence.length, 0);
+  assert.equal(repository.methodologies.length, 0);
+  assert.equal(repository.assessments.length, 0);
+});
+
 test("rejects a draft methodology before evidence or assessment persistence", async () => {
   const repository = new MemoryRepository();
   const service = new SovereignNegotiationService(repository);
@@ -201,7 +228,7 @@ test("rejects a draft methodology before evidence or assessment persistence", as
   assert.equal(repository.assessments.length, 0);
 });
 
-test("keeps final sovereign decision human-only and separate from AI recommendation", async () => {
+test("keeps final sovereign decision role-scoped, tenant-scoped and separate from AI recommendation", async () => {
   const repository = new MemoryRepository();
   const service = new SovereignNegotiationService(repository);
 
@@ -213,11 +240,51 @@ test("keeps final sovereign decision human-only and separate from AI recommendat
       assessmentId: "nia-evaluated",
       finalDecision: "NO_GO",
       rationale: "Synthetic agent attempt",
-      authority: { id: "agent-1", kind: "AGENT" },
+      authority: {
+        id: "agent-1",
+        tenantId: "tenant-gn",
+        kind: "AGENT",
+        roles: ["SOVEREIGN_DECISION_APPROVER"],
+      },
       evidence: [factEvidence],
     }),
     /human decision authority/i,
   );
+
+  await assert.rejects(
+    service.recordSovereignDecision({
+      id: "decision-human-unauthorized",
+      tenantId: "tenant-gn",
+      projectId: "simandou",
+      assessmentId: "nia-evaluated",
+      finalDecision: "HOLD",
+      rationale: "Unauthorized human attempt",
+      authority: { id: "human-no-role", tenantId: "tenant-gn", kind: "HUMAN", roles: [] },
+      evidence: [factEvidence],
+    }),
+    /SOVEREIGN_DECISION_APPROVER/i,
+  );
+
+  await assert.rejects(
+    service.recordSovereignDecision({
+      id: "decision-human-cross-tenant",
+      tenantId: "tenant-gn",
+      projectId: "simandou",
+      assessmentId: "nia-evaluated",
+      finalDecision: "HOLD",
+      rationale: "Cross-tenant human attempt",
+      authority: {
+        id: "human-other",
+        tenantId: "tenant-other",
+        kind: "HUMAN",
+        roles: ["SOVEREIGN_DECISION_APPROVER"],
+      },
+      evidence: [factEvidence],
+    }),
+    /tenant isolation/i,
+  );
+
+  assert.equal(repository.evidence.length, 0);
   assert.equal(repository.decisions.length, 0);
 
   const decision = await service.recordSovereignDecision({
@@ -227,7 +294,12 @@ test("keeps final sovereign decision human-only and separate from AI recommendat
     assessmentId: "nia-evaluated",
     finalDecision: "HOLD",
     rationale: "Human authority requests renegotiation before signature.",
-    authority: { id: "human-1", kind: "HUMAN" },
+    authority: {
+      id: "human-1",
+      tenantId: "tenant-gn",
+      kind: "HUMAN",
+      roles: ["SOVEREIGN_DECISION_APPROVER"],
+    },
     evidence: [factEvidence],
   });
 
