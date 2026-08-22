@@ -21,6 +21,18 @@ const job: JobSpec = {
     { id: 'skill:skill-project', kind: 'skill', label: 'Gestion de projets', required: true, skillId: 'skill-project', minimumYears: 5 },
     { id: 'skill:skill-finance', kind: 'skill', label: 'Conformité financière', required: true, skillId: 'skill-finance', minimumYears: 2 },
   ],
+  semanticCriteria: [{
+    id: 'semantic-project-management',
+    label: 'Maîtrise de la gestion de projets',
+    anchors: ['gestion', 'projets'],
+    sourceRef: `job:${JOB_ID}:semantic:1`,
+  }],
+  institutionCriteria: [{
+    id: 'institution-english',
+    label: 'Capacité à travailler en anglais B2',
+    anchors: ['en', 'b2'],
+    sourceRef: `job:${JOB_ID}:institution:1`,
+  }],
 };
 
 class FakeDecisionStore implements DecisionStore {
@@ -86,6 +98,43 @@ test('job analysis preserves unsupported requirements as GAP and uses match_reco
   assert.equal(fixture.decisionStore.writes[0]?.jobId, JOB_ID);
   assert.equal(fixture.decisionStore.writes[0]?.decisionType, 'match_recommendation');
   assert.equal((fixture.decisionStore.writes[0]?.output as { artifactKind?: string }).artifactKind, 'candidate_job_gap_analysis_v1');
+});
+
+test('application readiness is derived from canonical evidence and persisted as an assessment artifact', async () => {
+  const base = new FixtureCandidateRepository();
+  const readinessRepository = {
+    async loadContext(candidateId: string) {
+      const context = await base.loadContext(candidateId);
+      context.documents[0].atsProfile = {
+        parserReadable: true,
+        standardSections: true,
+        singleColumn: true,
+        noImageOnlyText: true,
+        safeFileFormat: true,
+        evidenceRefs: [`document:${context.documents[0].id}:ats-profile`],
+      };
+      return context;
+    },
+  };
+  const fixture = service(readinessRepository);
+
+  const result = await fixture.service.applicationReadiness(SYNTHETIC_CANDIDATE_ID, JOB_ID);
+
+  assert.ok(result.readiness.total > 0);
+  assert.equal(result.readiness.dimensions.atsTechnical, 20);
+  assert.equal(fixture.decisionStore.writes[0]?.decisionType, 'assessment_score');
+  assert.equal((fixture.decisionStore.writes[0]?.output as { artifactKind?: string }).artifactKind, 'candidate_application_readiness_v1');
+  assert.equal(fixture.decisionStore.writes[0]?.jobId, JOB_ID);
+});
+
+test('application readiness fails closed before persistence when canonical signals are incomplete', async () => {
+  const fixture = service();
+
+  await assert.rejects(
+    () => fixture.service.applicationReadiness(SYNTHETIC_CANDIDATE_ID, JOB_ID),
+    /readiness signals are incomplete/i,
+  );
+  assert.equal(fixture.decisionStore.writes.length, 0);
 });
 
 test('dual CV variants have identical fact fingerprints and use canonical assessment_score storage', async () => {
