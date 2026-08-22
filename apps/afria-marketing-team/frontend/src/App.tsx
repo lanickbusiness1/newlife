@@ -6,6 +6,7 @@ import { exportEvidenceJson, exportHtmlReport, exportMarketingPlanMarkdown } fro
 import { simulatePolicy } from "./policy";
 import { assessProductionReadiness, calculateRevenueMath } from "./revenueEngine";
 import { saveWorkspace } from "./storage";
+import { assessEnterpriseVisibility, VISIBILITY_CAPABILITY, type VisibilityAssessment } from "./visibility";
 import "./styles.css";
 
 const initialContext: AgentContext = {
@@ -16,12 +17,51 @@ const initialContext: AgentContext = {
   price: "49 900 FCFA"
 };
 
+type VisibilityScoreField =
+  | "searchPresence"
+  | "aiPresence"
+  | "mediaPresence"
+  | "professionalPresence"
+  | "marketplacePresence"
+  | "institutionalPresence"
+  | "investorPresence";
+
+const VISIBILITY_SCORE_FIELDS: Array<{ key: VisibilityScoreField; label: string }> = [
+  { key: "searchPresence", label: "Search / SEO" },
+  { key: "aiPresence", label: "Moteurs IA / AEO-GEO" },
+  { key: "mediaPresence", label: "Médias" },
+  { key: "professionalPresence", label: "Réseaux professionnels" },
+  { key: "marketplacePresence", label: "Marketplaces / répertoires" },
+  { key: "institutionalPresence", label: "Sources institutionnelles" },
+  { key: "investorPresence", label: "Sources investisseurs" }
+];
+
+const initialVisibility: VisibilityAssessment = {
+  enterpriseName: "Entreprise cible",
+  country: "Bénin",
+  verifiedIdentity: true,
+  verifiedSourceCount: 2,
+  websitePresent: true,
+  searchPresence: 45,
+  aiPresence: 20,
+  mediaPresence: 15,
+  professionalPresence: 35,
+  marketplacePresence: 10,
+  institutionalPresence: 25,
+  investorPresence: 5
+};
+
 export default function App() {
   const [context, setContext] = useState(initialContext);
+  const [visibilityInput, setVisibilityInput] = useState(initialVisibility);
   const [humanApproved, setHumanApproved] = useState(false);
   const [saved, setSaved] = useState("");
 
   const leadPlan = useMemo(() => generateLeadEnginePlan(context), [context]);
+  const visibility = useMemo(
+    () => assessEnterpriseVisibility({ ...visibilityInput, country: context.country }),
+    [visibilityInput, context.country]
+  );
   const revenue = calculateRevenueMath({ presentations: 10000, expectedSalesPerHundred: 4, averagePrice: 49900 });
   const readiness = assessProductionReadiness({
     offerReady: true,
@@ -44,8 +84,19 @@ export default function App() {
     setContext(current => ({ ...current, [field]: value }));
   }
 
+  function updateVisibilityScore(field: VisibilityScoreField, value: string) {
+    setVisibilityInput(current => ({ ...current, [field]: Number(value) }));
+  }
+
   function persist() {
-    const record = saveWorkspace("afria-marketing-team-production", { context, leadPlan, revenue, readiness, cashActivation: CASH_ACTIVATION });
+    const record = saveWorkspace("afria-marketing-team-production", {
+      context,
+      leadPlan,
+      revenue,
+      readiness,
+      visibility,
+      cashActivation: CASH_ACTIVATION
+    });
     setSaved(`Sauvegardé ${record.savedAt}`);
   }
 
@@ -55,7 +106,7 @@ export default function App() {
         <div>
           <p className="eyebrow">{CANONICAL_PRODUCT.assetId} · {CANONICAL_PRODUCT.baseline}</p>
           <h1>AfrIA Marketing Team™</h1>
-          <p className="lead">Production Product propriétaire pour transformer offres, ICP, campagnes, CRM, relances et revenus mesurables.</p>
+          <p className="lead">Production Product propriétaire pour transformer offres, ICP, campagnes, CRM, visibilité économique, relances et revenus mesurables.</p>
           <div className="hero-actions">
             <button onClick={persist}>Sauvegarder le workspace</button>
             <a className="button-link" href={buildWhatsAppActivationLink()} target="_blank" rel="noreferrer">Lancer WhatsApp cash</a>
@@ -90,6 +141,31 @@ export default function App() {
             <li>M8: {readiness.gates.m8}</li>
             <li>Big4: {readiness.gates.big4}</li>
           </ul>
+        </article>
+      </section>
+
+      <section className="grid">
+        <article className="panel wide">
+          <h2>{VISIBILITY_CAPABILITY.capability}</h2>
+          <p><b>{VISIBILITY_CAPABILITY.metric}</b> · scoring {VISIBILITY_CAPABILITY.scoringVersion}</p>
+          <div className="form-grid">
+            <label>Entreprise<input value={visibilityInput.enterpriseName} onChange={event => setVisibilityInput(current => ({ ...current, enterpriseName: event.target.value }))} /></label>
+            <label>Sources vérifiées<input type="number" min="0" value={visibilityInput.verifiedSourceCount} onChange={event => setVisibilityInput(current => ({ ...current, verifiedSourceCount: Number(event.target.value) }))} /></label>
+            <label className="approval"><input type="checkbox" checked={visibilityInput.verifiedIdentity} onChange={event => setVisibilityInput(current => ({ ...current, verifiedIdentity: event.target.checked }))} /> Identité vérifiée</label>
+            <label className="approval"><input type="checkbox" checked={visibilityInput.websitePresent} onChange={event => setVisibilityInput(current => ({ ...current, websitePresent: event.target.checked }))} /> Site canonique présent</label>
+            {VISIBILITY_SCORE_FIELDS.map(field => (
+              <label key={field.key}>{field.label}<input type="number" min="0" max="100" value={visibilityInput[field.key] ?? ""} onChange={event => updateVisibilityScore(field.key, event.target.value)} /></label>
+            ))}
+          </div>
+        </article>
+        <article className="panel">
+          <h2>Visibility Cockpit</h2>
+          <p>Score visibilité : <b>{visibility.visibilityScore}/100</b></p>
+          <p>Visibility Gap : <b>{visibility.visibilityGap}/100</b></p>
+          <p>Priorité : <b>{visibility.priority.toUpperCase()}</b></p>
+          <p>Confiance : <b>{visibility.confidence}</b> · couverture {Math.round(visibility.observedDimensionRatio * 100)} %</p>
+          <p>Données manquantes : {visibility.missingDimensions.length ? visibility.missingDimensions.join(" · ") : "aucune"}</p>
+          <ol>{visibility.recommendedActions.map(action => <li key={action}>{action}</li>)}</ol>
         </article>
       </section>
 
@@ -130,7 +206,7 @@ export default function App() {
         </article>
         <article className="panel">
           <h2>R.E.M.E</h2>
-          <ul><li>Objections enregistrées</li><li>Messages gagnants</li><li>Preuves client</li><li>Leçons réutilisables</li></ul>
+          <ul><li>Objections enregistrées</li><li>Messages gagnants</li><li>Preuves client</li><li>Leçons réutilisables</li><li>Visibility Gap avant/après et attribution revenu</li></ul>
         </article>
       </section>
 
@@ -141,6 +217,7 @@ export default function App() {
           <textarea readOnly value={exportMarketingPlanMarkdown(exportPayload)} />
           <details><summary>JSON evidence</summary><pre>{exportEvidenceJson(exportPayload)}</pre></details>
           <details><summary>HTML report</summary><pre>{exportHtmlReport(exportPayload)}</pre></details>
+          <details><summary>Enterprise visibility evidence</summary><pre>{JSON.stringify(visibility, null, 2)}</pre></details>
         </article>
       </section>
 

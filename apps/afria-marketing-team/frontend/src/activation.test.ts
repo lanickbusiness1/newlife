@@ -9,9 +9,9 @@ describe("cash activation operating kit", () => {
     expect(CASH_ACTIVATION.dayOneTarget.revenueFcfa).toBe(199600);
   });
 
-  test("generates a WhatsApp activation link", () => {
+  test("generates a WhatsApp activation link from the canonical primary number", () => {
     const link = buildWhatsAppActivationLink("Test AfrIA Marketing Team");
-    expect(link).toContain("https://wa.me/2290161107373");
+    expect(link).toContain("https://wa.me/22961107373");
     expect(link).toContain("Test%20AfrIA%20Marketing%20Team");
   });
 
