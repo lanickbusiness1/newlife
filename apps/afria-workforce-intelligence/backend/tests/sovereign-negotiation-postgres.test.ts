@@ -192,7 +192,12 @@ test("persists immutable human sovereign decision records linked to an assessmen
       snapshot.assessmentId,
       "HOLD",
       "Renegotiate step-in rights and sovereign guarantee cap before signature.",
-      { id: approverId, kind: "HUMAN" },
+      {
+        id: approverId,
+        tenantId,
+        kind: "HUMAN",
+        roles: ["SOVEREIGN_DECISION_APPROVER"],
+      },
       [evidence],
     );
     await repo.saveDecision(decision);
@@ -201,6 +206,8 @@ test("persists immutable human sovereign decision records linked to an assessmen
     assert.ok(reloaded);
     assert.equal(reloaded.decision, "HOLD");
     assert.equal(reloaded.decidedBy.id, approverId);
+    assert.equal(reloaded.decidedBy.tenantId, tenantId);
+    assert.deepEqual(reloaded.decidedBy.roles, ["SOVEREIGN_DECISION_APPROVER", "SOVEREIGN_METHODOLOGY_APPROVER"]);
     assert.match(reloaded.rationale, /renegotiate/i);
   } finally {
     await app.end();
