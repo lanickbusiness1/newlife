@@ -64,20 +64,24 @@ export class SovereignNegotiationService {
     validateScope(input.tenantId, input.projectId, input.scenarios, "Scenario");
     validateScope(input.tenantId, input.projectId, input.evidence, "Assessment evidence");
 
-    const evidenceById = new Map<string, EvidenceArtifact>();
-    for (const item of [...input.methodology.evidence, ...input.evidence]) evidenceById.set(item.id, item);
-    for (const item of evidenceById.values()) await this.repository.saveEvidence(item);
-    const persistedMethodology = await this.repository.saveMethodology(input.methodology);
-
+    // All deterministic validation runs before any write, so an invalid evaluation
+    // cannot leave partial evidence, methodology or assessment state behind.
+    const concentration = computeOperatorConcentration(input.operatorExposures);
+    const rankedScenarios = compareSovereignScenarios(input.scenarios);
     const result = scoreNationalInterest({
       tenantId: input.tenantId,
       projectId: input.projectId,
       assessmentId: input.assessmentId,
-      methodology: persistedMethodology,
+      methodology: input.methodology,
       scores: input.scores,
       eliminatoryRedFlags: input.eliminatoryRedFlags,
       evidence: input.evidence,
     });
+
+    const evidenceById = new Map<string, EvidenceArtifact>();
+    for (const item of [...input.methodology.evidence, ...input.evidence]) evidenceById.set(item.id, item);
+    for (const item of evidenceById.values()) await this.repository.saveEvidence(item);
+    const persistedMethodology = await this.repository.saveMethodology(input.methodology);
 
     const assessment = Object.freeze({
       assessmentId: result.assessmentId,
@@ -97,8 +101,6 @@ export class SovereignNegotiationService {
     }) satisfies SovereignAssessmentSnapshot;
 
     const persistedAssessment = await this.repository.saveAssessment(assessment);
-    const concentration = computeOperatorConcentration(input.operatorExposures);
-    const rankedScenarios = compareSovereignScenarios(input.scenarios);
 
     return Object.freeze({
       assessment: persistedAssessment,
