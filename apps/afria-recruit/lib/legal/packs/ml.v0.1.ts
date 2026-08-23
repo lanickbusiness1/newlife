@@ -1,0 +1,73 @@
+import type { CountryLegalPack } from '../types.js';
+
+export const ML_LEGAL_PACK_V0_1: CountryLegalPack = {
+  countryCode: 'ML',
+  version: '0.1.0',
+  integrityHash: 'sha256:57fd3f3b78796375a268dd69ab4a3174e03560e3e9b71c4b22ff3d5568ff2de7',
+  status: 'SOURCE_VERIFIED',
+  legalRegimes: [
+    'private_employment',
+    'state_public_service',
+    'territorial_public_service',
+    'special_regime',
+  ],
+  regionalLayers: [],
+  sources: [
+    {
+      id: 'ML-LAB-001',
+      title: 'Loi n°92-020 du 23 septembre 1992 portant Code du travail en République du Mali, dans sa teneur modifiée',
+      authority: 'République du Mali / ILO NATLEX index',
+      sourceUrl: 'https://natlex.ilo.org/dyn/natlex2/r/natlex/fe/details?p3_isn=32274',
+      effectiveStatus: 'VERIFIED',
+      effectiveFrom: '1992-09-23',
+    },
+    {
+      id: 'ML-LAB-002',
+      title: 'Décret n°96-178/P-RM du 13 juin 1996 portant application de diverses dispositions du Code du travail',
+      authority: 'République du Mali / ILO NATLEX index',
+      sourceUrl: 'https://www.ilo.org/dyn/natlex/natlex4.detail?p_isn=44399&p_lang=fr',
+      effectiveStatus: 'VERIFIED',
+      effectiveFrom: '1996-06-13',
+    },
+    {
+      id: 'ML-LAB-003',
+      title: 'Arrêté n°2024-4363/MTFPDS-SG du 27 décembre 2024 modifiant les modalités d’application du Code du travail',
+      authority: 'Journal officiel de la République du Mali',
+      sourceUrl: 'https://sgg-mali.ml/JO/2024/mali-jo-2024-30.pdf',
+      effectiveStatus: 'VERIFIED',
+      effectiveFrom: '2024-12-27',
+    },
+    {
+      id: 'ML-PUB-001',
+      title: 'Ordonnance n°2026-003/PT-RM du 2 mars 2026 portant Statut général des fonctionnaires',
+      authority: 'Journal officiel de la République du Mali',
+      sourceUrl: 'https://sgg-mali.ml/JO/2026/mali-jo-2026-04.pdf',
+      effectiveStatus: 'VERIFIED',
+      effectiveFrom: '2026-03-02',
+    },
+    {
+      id: 'ML-TERR-001',
+      title: 'Loi n°2018-035 du 27 juin 2018 portant Statut des fonctionnaires des Collectivités territoriales',
+      authority: 'Journal officiel de la République du Mali',
+      sourceUrl: 'https://sgg-mali.ml/JO/2018/mali-jo-2018-26.pdf',
+      effectiveStatus: 'VERIFIED',
+      effectiveFrom: '2018-06-27',
+    },
+    {
+      id: 'ML-DIS-001',
+      title: 'Loi n°2018-027 du 12 juin 2018 et Décret n°2021-0662/PT-RM du 23 septembre 2021 relatifs aux droits des personnes vivant avec un handicap',
+      authority: 'Journal officiel de la République du Mali',
+      sourceUrl: 'https://sgg-mali.ml/JO/2021/mali-jo-2021-31.pdf',
+      effectiveStatus: 'VERIFIED',
+      effectiveFrom: '2021-09-23',
+    },
+    {
+      id: 'ML-DATA-001',
+      title: 'Loi n°2013-015 du 21 mai 2013 portant protection des données à caractère personnel',
+      authority: 'Journal officiel de la République du Mali',
+      sourceUrl: 'https://sgg-mali.ml/JO/2013/mali-jo-2013-26.pdf',
+      effectiveStatus: 'VERIFIED',
+      effectiveFrom: '2013-05-21',
+    },
+  ],
+};
