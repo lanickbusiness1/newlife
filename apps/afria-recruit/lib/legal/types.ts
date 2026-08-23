@@ -43,6 +43,25 @@ export type LegalRuleLifecycleStatus =
   | 'REVIEW_REQUIRED'
   | 'REJECTED';
 
+export type LegalConditionOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'gte'
+  | 'lte'
+  | 'gt'
+  | 'lt'
+  | 'in'
+  | 'present'
+  | 'absent';
+
+export type LegalConditionValue = string | number | boolean | string[] | number[];
+
+export interface LegalCondition {
+  fact: string;
+  operator: LegalConditionOperator;
+  value?: LegalConditionValue;
+}
+
 export interface LegalSource {
   id: string;
   title: string;
@@ -88,10 +107,12 @@ export interface LegalRule {
   version: string;
   effectiveStatus: LegalSourceEffectiveStatus;
   lifecycleStatus: LegalRuleLifecycleStatus;
-  conditions: unknown[];
-  exceptions: unknown[];
+  conditions: LegalCondition[];
+  exceptions: LegalCondition[];
   requiredFacts: string[];
   verdicts: LegalVerdict[];
+  onMatch?: LegalVerdict;
+  onNoMatch?: LegalVerdict;
 }
 
 export interface DecisionTrace {
