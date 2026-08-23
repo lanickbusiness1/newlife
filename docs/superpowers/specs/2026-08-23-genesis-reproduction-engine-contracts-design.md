@@ -1,7 +1,7 @@
 # GENESIS V4 — Reproduction Engine Contracts Design
 
 **Date:** 2026-08-23  
-**Status:** DESIGN APPROVED IN CHAT — WRITTEN SPEC PENDING FINAL REVIEW  
+**Status:** DESIGN APPROVED IN CHAT — WRITTEN SPEC READY FOR FINAL REVIEW  
 **Branch:** `feat/genesis-reproduction-engine-contracts`  
 **Base:** `genesis-v4-continental-skill-factory`  
 **Canonical authority:** GENESIS V4 Genome™ — Référence opérationnelle vivante, décision « GENESIS™ Valuation & Reproduction Thesis — 23 août 2026 ».
@@ -144,6 +144,7 @@ export interface SovereignContextPack {
   sectorCode?: string;
   context: Stratex99Context;
   provenance: ContextPackProvenance;
+  paymentCapability: "enabled" | "not_applicable";
   legalJurisdictionRefs: string[];
   paymentRailRefs: string[];
   dataSovereigntyRefs: string[];
@@ -174,7 +175,7 @@ The following extra reference sets must be non-empty for a `country` child:
 - `institutionalRefs`
 - `localKnowledgeRefs`
 
-`paymentRailRefs` may be empty only when the child explicitly declares that it has no payment capability.
+When `paymentCapability = "enabled"`, `paymentRailRefs` must be non-empty. When `paymentCapability = "not_applicable"`, an empty `paymentRailRefs` array is valid.
 
 A child localized by language alone fails with:
 
@@ -191,6 +192,7 @@ export interface ReproductionContract {
   parentEntityType: GenesisEntityType;
   childEntityId: string;
   childEntityType: Exclude<GenesisEntityType, "core">;
+  jurisdictionCode?: string;
   inheritedGenomeVersion: string;
   inheritedInvariantKeys: string[];
   allowedAdaptations: string[];
@@ -209,6 +211,7 @@ Rules:
 
 - every continental child must have `parentEntityId = GENESIS`;
 - every country child must have a parent of type `continental` or `core` and must retain GENESIS lineage;
+- every country child must have `jurisdictionCode` matching `sovereignContext.countryCode`;
 - every sector child must have a valid parent of type `continental` or `country`;
 - `inheritedGenomeVersion` must equal the active parent Genome version used for compilation;
 - `inheritedInvariantKeys` must contain all universal invariants required by the parent;
@@ -224,6 +227,7 @@ Stable failure codes:
 
 - `REPRODUCTION_PARENT_INVALID`
 - `REPRODUCTION_LINEAGE_BROKEN`
+- `REPRODUCTION_JURISDICTION_MISMATCH`
 - `REPRODUCTION_GENOME_VERSION_MISMATCH`
 - `REPRODUCTION_INVARIANT_MISSING:<key>`
 - `REPRODUCTION_ADAPTATION_CONFLICT:<key>`
@@ -249,6 +253,7 @@ export interface ReplicationEvidence {
   reusedSkillRefs: Array<{ id: string; version: string }>;
   newSkillRefs: Array<{ id: string; version: string }>;
   evidenceRefs: string[];
+  secondContextEvidenceRefs: string[];
   measuredAt: string;
 }
 
@@ -261,11 +266,12 @@ export interface ReplicationScore {
 
 Scoring rules:
 
-- `reusableShare = inheritedComponents / total unique components`;
-- `rebuildShare = rebuiltComponents / total unique components`;
-- empty evidence refs make the score `insufficient` regardless of ratios;
-- `proven` requires `reusableShare >= 0.80`, `rebuildShare <= 0.20`, at least one reused registered skill, and evidence from a distinct second context;
-- `emerging` requires `reusableShare >= 0.50` with evidence;
+- the denominator is the count of unique component IDs across `inheritedComponents`, `adaptedComponents` and `rebuiltComponents`;
+- `reusableShare = unique inherited component count / total unique component count`;
+- `rebuildShare = unique rebuilt component count / total unique component count`;
+- empty `evidenceRefs` make the score `insufficient` regardless of ratios;
+- `proven` requires `reusableShare >= 0.80`, `rebuildShare <= 0.20`, at least one reused registered skill, and non-empty `secondContextEvidenceRefs`;
+- `emerging` requires `reusableShare >= 0.50` with non-empty `evidenceRefs`;
 - otherwise status is `insufficient`.
 
 This score is an operational evidence classification, not a monetary valuation.
@@ -284,6 +290,8 @@ export interface ValuationClaim {
   evidenceRefs: string[];
   productionProven: boolean;
   revenueProven: boolean;
+  platformPremiumClaimed: boolean;
+  mergeIntoEquityValue: boolean;
 }
 ```
 
@@ -291,9 +299,9 @@ Rules:
 
 - a future continental entity cannot be represented as current operating revenue without production and revenue evidence;
 - `option_value` is allowed for unlaunched children but must remain explicitly labeled as option value;
-- `impact_value` must never be merged into enterprise equity value automatically;
+- `impact_value` with `mergeIntoEquityValue = true` is rejected;
 - AfrIAgenesis operating metrics and GENESIS IP/platform metrics remain separate perimeters;
-- a platform-premium claim requires `ReplicationEvidence.platformEvidenceStatus = proven`.
+- `platformPremiumClaimed = true` requires `ReplicationEvidence.platformEvidenceStatus = proven`.
 
 Stable failure codes:
 
@@ -310,6 +318,7 @@ export interface RemeInheritanceRecord {
   reproductionId: string;
   childEntityId: string;
   localEvidenceRefs: string[];
+  secondContextEvidenceRefs: string[];
   learnedPatterns: string[];
   reusableAssets: string[];
   excludedLocalRules: string[];
@@ -322,7 +331,8 @@ Rules:
 
 - every released reproduction contract must produce at least one R.E.M.E inheritance record;
 - local rules must be explicitly separated from reusable assets;
-- a record cannot promote a local rule into the Genome unless second-context evidence exists;
+- any asset listed in both `reusableAssets` and `excludedLocalRules` fails as local-rule leakage;
+- a record cannot promote a local rule into the Genome unless `secondContextEvidenceRefs` is non-empty;
 - an entity cannot be considered `reproduction_complete` while its R.E.M.E return is missing.
 
 Stable failure codes:
@@ -345,8 +355,8 @@ reproductionContract: ReproductionContract;
 Before skill composition, `compileCountrySkill()` validates:
 
 1. child type is `country`;
-2. `childEntityId` maps to the requested country;
-3. sovereign context country code equals `CountryCompileInput.countryCode`;
+2. `reproductionContract.jurisdictionCode` equals the requested country code;
+3. `sovereignContext.countryCode` equals the requested country code;
 4. parent lineage is valid;
 5. active Genome version and inherited Genome version match;
 6. reproduction gates permit compilation;
@@ -361,6 +371,7 @@ reproduction: {
   reproductionId: string;
   parentEntityId: string;
   childEntityId: string;
+  jurisdictionCode: string;
   inheritedGenomeVersion: string;
 };
 ```
@@ -452,21 +463,26 @@ Required test cases:
 3. country child without parent lineage fails;
 4. country localization with only `languageSemantic` covered fails as translation-only;
 5. country context with legal, institutional, sovereignty and local knowledge evidence passes;
-6. missing inherited Genome invariant fails;
-7. Genome version mismatch fails;
-8. M6 fail blocks;
-9. S7+ fail blocks;
-10. M8 conditional without approval blocks release;
-11. M8 conditional with valid approval passes;
-12. 80%+ reusable second-context reproduction becomes `proven`;
-13. high rebuild reproduction remains `insufficient` or `emerging`;
-14. future AsiaGENESIS revenue claim without evidence fails;
-15. future AsiaGENESIS option-value claim with evidence is accepted as option value only;
-16. impact value cannot be auto-merged into equity value;
-17. released child without R.E.M.E return is incomplete;
-18. R.E.M.E record leaking a country-only rule into reusable assets fails;
-19. country compiler rejects a contract whose country differs from the requested country;
-20. integrity tampering in persisted reproduction evidence is detected.
+6. payment-enabled country context without payment rail evidence fails;
+7. payment-not-applicable country context may omit payment rails;
+8. missing inherited Genome invariant fails;
+9. Genome version mismatch fails;
+10. country jurisdiction mismatch fails;
+11. M6 fail blocks;
+12. S7+ fail blocks;
+13. M8 conditional without approval blocks release;
+14. M8 conditional with valid approval passes;
+15. 80%+ reusable reproduction with second-context evidence becomes `proven`;
+16. high rebuild reproduction remains `insufficient` or `emerging`;
+17. future AsiaGENESIS current-value/revenue claim without evidence fails;
+18. future AsiaGENESIS option-value claim with evidence is accepted as option value only;
+19. impact value with `mergeIntoEquityValue = true` fails;
+20. platform premium without `proven` replication evidence fails;
+21. released child without R.E.M.E return is incomplete;
+22. R.E.M.E record leaking a country-only rule into reusable assets fails;
+23. R.E.M.E promotion requiring second-context evidence fails when that evidence is absent;
+24. country compiler rejects a contract whose jurisdiction differs from the requested country;
+25. integrity tampering in persisted reproduction evidence is detected.
 
 Verification commands after implementation:
 
@@ -499,12 +515,14 @@ The feature is complete only when:
 
 - GENESIS parentage and lineage are machine-enforced;
 - Country Genesis cannot compile with translation-only localization;
+- payment applicability is represented explicitly and validated;
 - Genome invariants cannot silently drift during reproduction;
 - M6/S7+/M8 gate failures cannot be bypassed;
 - AfrIAgenesis operating valuation and GENESIS platform valuation are machine-separated;
 - future continental children cannot be counted as proven operating revenue;
 - platform premium is tied to measured second-context reuse evidence;
 - every released child is incomplete until its R.E.M.E return is recorded;
+- local rules cannot silently become reusable GENESIS DNA without second-context evidence;
 - existing country compiler and skill factory behavior remains backward-compatible except where the new canonical reproduction contract intentionally makes previously ungoverned calls invalid;
 - `npm test`, `npm run typecheck`, `npm run build`, and `npm run smoke:mcp` all pass.
 
