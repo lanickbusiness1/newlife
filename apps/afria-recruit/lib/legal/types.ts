@@ -21,6 +21,17 @@ export type LegalSourceEffectiveStatus =
   | 'REPLACED'
   | 'FUTURE_EFFECTIVE';
 
+export type LegalNormLevel =
+  | 'constitution'
+  | 'treaty'
+  | 'special_statute'
+  | 'statute'
+  | 'ordinance'
+  | 'decree'
+  | 'order'
+  | 'collective_agreement'
+  | 'other';
+
 export type LegalVerdict = 'PASS' | 'FAIL' | 'REVIEW_REQUIRED' | 'NOT_APPLICABLE';
 
 export type LegalRuleLifecycleStatus =
@@ -43,6 +54,11 @@ export interface LegalSource {
   amends?: string[];
   repeals?: string[];
   replaces?: string[];
+  regimes?: LegalRegime[];
+  subjects?: string[];
+  normLevel?: LegalNormLevel;
+  specificity?: 'general' | 'special';
+  conflictsWith?: string[];
 }
 
 export interface RegionalLayerRef {
