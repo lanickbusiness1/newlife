@@ -5,6 +5,10 @@ import {
   verifyAiEconomicsCertificate,
   type AiEconomicsCertificate
 } from "./computeEconomics.js";
+import {
+  verifyIndependentAssurance,
+  type IndependentAssuranceEvidence
+} from "./independentAssurance.js";
 
 export type ReleaseRiskClass = "low" | "moderate" | "high" | "regulated";
 export type ReleaseTargetDeliverable = "url" | "apk" | "aab" | "service" | "infrastructure";
@@ -27,7 +31,7 @@ const RELEASE_TARGET_DELIVERABLES = new Set<ReleaseTargetDeliverable>([
 ]);
 
 export interface ReleaseEvidenceBundle {
-  schemaVersion: "1.1.0";
+  schemaVersion: "1.1.0" | "1.2.0";
   releaseId: string;
   assetId: string;
   version: string;
@@ -38,10 +42,12 @@ export interface ReleaseEvidenceBundle {
     m6: Pass;
     s7plus: Pass;
     m8: Pass;
+    /** @deprecated Legacy read-compatibility only. New high/regulated releases require independentAssurance. */
     big4?: Pass;
   };
   sovereigntyDecisionRef: string;
   aiEconomicsCertificate: AiEconomicsCertificate;
+  independentAssurance?: IndependentAssuranceEvidence;
   provider: ProviderDeploymentEvidence;
   domain?: DomainEvidence;
   finalUrlOrArtifact: string;
@@ -130,7 +136,7 @@ export function compileReleaseEvidenceBundle(input: ReleaseEvidenceInput): Relea
   }
 
   const withoutHash: Omit<ReleaseEvidenceBundle, "sha256"> = {
-    schemaVersion: "1.1.0",
+    schemaVersion: "1.2.0",
     ...input
   };
 
@@ -143,8 +149,13 @@ export function compileReleaseEvidenceBundle(input: ReleaseEvidenceInput): Relea
 export function verifyReleaseEvidenceBundle(
   bundle: ReleaseEvidenceBundle,
   policy: { riskClass: ReleaseRiskClass; targetDeliverable: ReleaseTargetDeliverable }
-): { valid: true; sha256: string; aiEconomicsCertificateSha256: string } {
-  if (bundle.schemaVersion !== "1.1.0") {
+): {
+  valid: true;
+  sha256: string;
+  aiEconomicsCertificateSha256: string;
+  independentAssuranceSha256?: string;
+} {
+  if (bundle.schemaVersion !== "1.1.0" && bundle.schemaVersion !== "1.2.0") {
     throw new Error("DEPLOYBOT_RELEASE_SCHEMA_UNSUPPORTED");
   }
 
@@ -169,13 +180,32 @@ export function verifyReleaseEvidenceBundle(
   required(bundle.remeRef, "remeRef");
 
   const economicsVerification = verifyAiEconomicsCertificate(bundle.aiEconomicsCertificate);
+  let assuranceSha256: string | undefined;
 
   if (bundle.gates.m6 !== "pass" || bundle.gates.s7plus !== "pass" || bundle.gates.m8 !== "pass") {
     throw new Error("DEPLOYBOT_RELEASE_GATES_INCOMPLETE: M6, S7+ and M8 must pass");
   }
 
-  if ((riskClass === "high" || riskClass === "regulated") && bundle.gates.big4 !== "pass") {
-    throw new Error("DEPLOYBOT_RELEASE_BIG4_REQUIRED: Big4 must pass for high/regulated release policy");
+  if (riskClass === "high" || riskClass === "regulated") {
+    const assurance = bundle.independentAssurance;
+    if (!assurance) {
+      throw new Error("DEPLOYBOT_RELEASE_ASSURANCE_REQUIRED: Independent Assurance Council evidence is required for high/regulated release policy");
+    }
+
+    const verifiedAssurance = verifyIndependentAssurance(assurance);
+    assuranceSha256 = verifiedAssurance.sha256;
+
+    if (assurance.snapshotSha !== bundle.commitSha) {
+      throw new Error("DEPLOYBOT_RELEASE_ASSURANCE_SNAPSHOT_MISMATCH: assurance snapshot differs from release commit");
+    }
+
+    if (assurance.externalMandate) {
+      if (assurance.mode !== "external" || assurance.verdict !== "EXTERNAL_PASS") {
+        throw new Error("DEPLOYBOT_RELEASE_EXTERNAL_ASSURANCE_REQUIRED: explicit external mandate is not yet satisfied");
+      }
+    } else if (assurance.verdict !== "INTERNAL_BIG4_PASS") {
+      throw new Error(`DEPLOYBOT_RELEASE_ASSURANCE_NOT_PASSED: council verdict is ${assurance.verdict}`);
+    }
   }
 
   if (bundle.provider.providerStatus !== "live") {
@@ -219,6 +249,7 @@ export function verifyReleaseEvidenceBundle(
   return {
     valid: true,
     sha256: bundle.sha256,
-    aiEconomicsCertificateSha256: economicsVerification.sha256
+    aiEconomicsCertificateSha256: economicsVerification.sha256,
+    independentAssuranceSha256: assuranceSha256
   };
 }
