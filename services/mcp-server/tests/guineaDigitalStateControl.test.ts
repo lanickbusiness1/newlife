@@ -41,7 +41,6 @@ describe("V4-DEC-018 Guinea Sovereign Digital Public Service Control Plane", () 
 
   test("accepts only Guinea events with the canonical evidence envelope", () => {
     expect(validateGovernmentEvent(validEvent)).toEqual({ ok: true, errors: [] });
-
     const invalid = { ...validEvent, countryCode: "ML", evidenceHash: "" };
     expect(validateGovernmentEvent(invalid)).toEqual({
       ok: false,
@@ -59,12 +58,7 @@ describe("V4-DEC-018 Guinea Sovereign Digital Public Service Control Plane", () 
       medianProcessingTimeMinutes: 18,
       targetProcessingTimeMinutes: 30
     };
-
-    expect(scoreDigitalService(observation)).toEqual({
-      score: 91,
-      state: "HEALTHY",
-      breaches: []
-    });
+    expect(scoreDigitalService(observation)).toEqual({ score: 91, state: "HEALTHY", breaches: [] });
   });
 
   test("summarizes X-Road availability, failures, p95 latency and evidence lineage", () => {
@@ -75,7 +69,6 @@ describe("V4-DEC-018 Guinea Sovereign Digital Public Service Control Plane", () 
       { serviceId: "tax-id", status: "success", latencyMs: 200, evidenceRef: "ev:xr:4" },
       { serviceId: "tax-id", status: "success", latencyMs: 220, evidenceRef: "ev:xr:5" }
     ];
-
     expect(summarizeXRoadHealth(calls)).toEqual({
       availabilityPct: 100,
       failureRatePct: 0,
@@ -95,7 +88,6 @@ describe("V4-DEC-018 Guinea Sovereign Digital Public Service Control Plane", () 
       procurementMethod: "restricted",
       evidenceRefs: ["ev:proc:notice", "ev:proc:award"]
     };
-
     expect(assessProcurementIntegrity(observation)).toEqual({
       riskScore: 75,
       riskBand: "HIGH",
@@ -113,24 +105,16 @@ describe("V4-DEC-018 Guinea Sovereign Digital Public Service Control Plane", () 
       rollbackTested: false,
       runtimeProofVerified: false
     };
-
     expect(evaluateReleaseTruth(incomplete)).toEqual({
       status: "CODE_VERIFIED",
       missing: ["rollbackTested", "runtimeProofVerified"]
     });
-
-    expect(
-      evaluateReleaseTruth({
-        ...incomplete,
-        rollbackTested: true,
-        runtimeProofVerified: true
-      })
-    ).toEqual({ status: "PRODUCTION_PROVEN", missing: [] });
+    expect(evaluateReleaseTruth({ ...incomplete, rollbackTested: true, runtimeProofVerified: true }))
+      .toEqual({ status: "PRODUCTION_PROVEN", missing: [] });
   });
 
   test("exposes the Guinea control plane through governed MCP tools and health metadata", () => {
     const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
-
     expect(indexSource).toContain('register("guinea.service.score"');
     expect(indexSource).toContain('"guinea:service:score"');
     expect(indexSource).toContain('register("guinea.xroad.observe"');
@@ -144,7 +128,6 @@ describe("V4-DEC-018 Guinea Sovereign Digital Public Service Control Plane", () 
     const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
     const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
     const renderSource = readFileSync(new URL("../render.yaml", import.meta.url), "utf8");
-
     expect(indexSource).toContain('register("guinea.event.ingest"');
     expect(indexSource).toContain('"guinea:event:write"');
     expect(indexSource).toContain("persistGovernmentEvent");
@@ -152,5 +135,16 @@ describe("V4-DEC-018 Guinea Sovereign Digital Public Service Control Plane", () 
     expect(packageJson.dependencies.pg).toBe("8.23.0");
     expect(renderSource).toContain("GENESIS_GUINEA_DATABASE_URL");
     expect(renderSource).toContain("sync: false");
+  });
+
+  test("exposes sandbox normalization, process mining and executive cockpit as separate governed capabilities", () => {
+    const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+    expect(indexSource).toContain('register("guinea.sandbox.normalize"');
+    expect(indexSource).toContain('"guinea:sandbox:normalize"');
+    expect(indexSource).toContain('register("guinea.process_mining.analyze"');
+    expect(indexSource).toContain('"guinea:process:analyze"');
+    expect(indexSource).toContain('register("guinea.executive.cockpit"');
+    expect(indexSource).toContain('"guinea:executive:read"');
+    expect(indexSource).toContain("guineaInstitutionAdapters");
   });
 });
