@@ -1,9 +1,12 @@
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+
 export const GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR = Object.freeze({
   decisionId: "V4-DEC-016",
   assetId: "GENESIS-V4-LIVING-INTELLECTUAL-CAPITALIZATION-LOOP",
-  version: "1.0.0",
+  version: "1.1.0",
   mode: "extension_not_framework",
   editorialGate: "Editorial Signal Gate™",
+  receiptTrust: "HMAC-SHA256 connector attestation",
   destinations: [
     "notion_canonical",
     "genesis_v4",
@@ -16,6 +19,7 @@ export const GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR = Object.freez
 export type VerificationStatus = "unverified" | "verified" | "decision_validated";
 
 export type ChatSignalInput = {
+  tenantId: string;
   signalId?: string;
   conversationId: string;
   sourceRef: string;
@@ -32,6 +36,7 @@ export type ChatSignalInput = {
 };
 
 export type NormalizedChatSignal = {
+  tenantId: string;
   signalId: string;
   conversationId: string;
   sourceRef: string;
@@ -41,6 +46,7 @@ export type NormalizedChatSignal = {
   content: string;
   normalizedContent: string;
   fingerprint: string;
+  bindingHash: string;
   evidenceRefs: string[];
   canonicalDecisionRef: string | null;
   bookSectionHint: string | null;
@@ -60,7 +66,10 @@ export type EditorialScores = {
 };
 
 export type EditorialGateResult = {
+  tenantId: string;
   signalId: string;
+  signalFingerprint: string;
+  signalBindingHash: string;
   status: EditorialGateStatus;
   scores: EditorialScores;
   totalScore: number;
@@ -74,21 +83,27 @@ export type CapitalizationTargetType =
   | "notion_canonical"
   | "genesis_v4"
   | "book_manuscript"
-  | "product_execution";
+  | "product_execution"
+  | "reme";
 
 export type CapitalizationTarget = {
+  tenantId: string;
   targetId: string;
   type: CapitalizationTargetType;
   destinationRef: string;
-  action: "append" | "link" | "create_execution_item";
+  action: "append" | "link" | "create_execution_item" | "promote_candidate";
   requiredEvidenceType: "connector_receipt" | "repository_receipt";
   idempotencyKey: string;
+  executionNonce: string;
+  allowedConnectorIds: string[];
   status: "PLANNED";
 };
 
 export type CapitalizationPlan = {
+  tenantId: string;
   planId: string;
   signalId: string;
+  signalBindingHash: string;
   fingerprint: string;
   status: "READY" | "BLOCKED";
   targets: CapitalizationTarget[];
@@ -102,9 +117,18 @@ export type CapitalizationReceipt = {
   executedAt: string;
   status: "success" | "failed";
   artifactHash?: string;
+  connectorId: string;
+  nonce: string;
+  attestation: string;
+};
+
+export type CapitalizationReceiptVerifier = {
+  hmacSecret: string;
+  allowedConnectorIds?: string[];
 };
 
 export type CapitalizationProof = {
+  tenantId: string;
   proofId: string;
   planId: string;
   status: "COMPLETE" | "PARTIAL" | "FAILED";
@@ -114,6 +138,8 @@ export type CapitalizationProof = {
   failedTargetIds: string[];
   missingTargetIds: string[];
 };
+
+type UnsignedCapitalizationReceipt = Omit<CapitalizationReceipt, "attestation">;
 
 function required(value: unknown, code: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -135,17 +161,19 @@ function uniqueStrings(values: unknown): string[] {
   )];
 }
 
+function canonicalStrings(values: string[]): string[] {
+  return [...values].sort((a, b) => a.localeCompare(b));
+}
+
 function normalizeText(value: string): string {
   return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("fr");
 }
 
-function stableId(prefix: string, parts: string[]): string {
-  let hash = 2166136261;
-  for (const char of parts.join("|")) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `${prefix}-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+function digest(prefix: string, parts: unknown[], fullWidth = false): string {
+  const hex = createHash("sha256")
+    .update(JSON.stringify(parts))
+    .digest("hex");
+  return `${prefix}-${fullWidth ? hex : hex.slice(0, 32)}`;
 }
 
 function round3(value: number): number {
@@ -166,11 +194,38 @@ function assertTimestamp(value: string): string {
   return timestamp;
 }
 
+function buildSignalBinding(fields: {
+  tenantId: string;
+  signalId: string;
+  fingerprint: string;
+  verificationStatus: VerificationStatus;
+  confidence: number;
+  evidenceRefs: string[];
+  canonicalDecisionRef: string | null;
+  bookSectionHint: string | null;
+  productRefs: string[];
+  tags: string[];
+}): string {
+  return digest("sigbind", [
+    fields.tenantId,
+    fields.signalId,
+    fields.fingerprint,
+    fields.verificationStatus,
+    fields.confidence.toFixed(6),
+    canonicalStrings(fields.evidenceRefs),
+    fields.canonicalDecisionRef,
+    fields.bookSectionHint,
+    canonicalStrings(fields.productRefs),
+    canonicalStrings(fields.tags)
+  ], true);
+}
+
 export function compileChatSignal(input: ChatSignalInput): NormalizedChatSignal {
   if (!input || typeof input !== "object") {
     throw new Error("CAPITALIZATION_SIGNAL_INVALID_INPUT");
   }
 
+  const tenantId = required(input.tenantId, "CAPITALIZATION_SIGNAL_TENANT_REQUIRED");
   const conversationId = required(input.conversationId, "CAPITALIZATION_SIGNAL_CONVERSATION_REQUIRED");
   const sourceRef = required(input.sourceRef, "CAPITALIZATION_SIGNAL_SOURCE_REQUIRED");
   const sourceTimestamp = assertTimestamp(input.sourceTimestamp);
@@ -182,15 +237,36 @@ export function compileChatSignal(input: ChatSignalInput): NormalizedChatSignal 
   }
 
   const normalizedContent = normalizeText(content);
-  const fingerprint = stableId("sigfp", [normalizedContent]);
-  const signalId = optional(input.signalId) ?? stableId("signal", [
+  const fingerprint = digest("sigfp", [tenantId, normalizedContent], true);
+  const callerSignalRef = optional(input.signalId);
+  const signalId = digest("signal", [
+    tenantId,
+    callerSignalRef,
     conversationId,
     sourceRef,
     sourceTimestamp,
     fingerprint
   ]);
+  const evidenceRefs = uniqueStrings(input.evidenceRefs);
+  const canonicalDecisionRef = optional(input.canonicalDecisionRef);
+  const bookSectionHint = optional(input.bookSectionHint);
+  const productRefs = uniqueStrings(input.productRefs);
+  const tags = uniqueStrings(input.tags).map(tag => tag.toLocaleLowerCase("en"));
+  const bindingHash = buildSignalBinding({
+    tenantId,
+    signalId,
+    fingerprint,
+    verificationStatus: input.verificationStatus,
+    confidence: input.confidence,
+    evidenceRefs,
+    canonicalDecisionRef,
+    bookSectionHint,
+    productRefs,
+    tags
+  });
 
   return {
+    tenantId,
     signalId,
     conversationId,
     sourceRef,
@@ -200,11 +276,12 @@ export function compileChatSignal(input: ChatSignalInput): NormalizedChatSignal 
     content: content.replace(/\s+/g, " ").trim(),
     normalizedContent,
     fingerprint,
-    evidenceRefs: uniqueStrings(input.evidenceRefs),
-    canonicalDecisionRef: optional(input.canonicalDecisionRef),
-    bookSectionHint: optional(input.bookSectionHint),
-    productRefs: uniqueStrings(input.productRefs),
-    tags: uniqueStrings(input.tags).map(tag => tag.toLocaleLowerCase("en")),
+    bindingHash,
+    evidenceRefs,
+    canonicalDecisionRef,
+    bookSectionHint,
+    productRefs,
+    tags,
     existingFingerprints: uniqueStrings(input.existingFingerprints)
   };
 }
@@ -278,12 +355,19 @@ export function evaluateEditorialSignal(
       + scores.executionRelevance) / 5
   );
 
+  const base = {
+    tenantId: signal.tenantId,
+    signalId: signal.signalId,
+    signalFingerprint: signal.fingerprint,
+    signalBindingHash: signal.bindingHash,
+    scores,
+    totalScore
+  };
+
   if (fingerprints.has(signal.fingerprint)) {
     return {
-      signalId: signal.signalId,
+      ...base,
       status: "DUPLICATE",
-      scores,
-      totalScore,
       bookCandidate: false,
       executionCandidate: false,
       reasons: ["duplicate_fingerprint"],
@@ -314,34 +398,53 @@ export function evaluateEditorialSignal(
     && signal.productRefs.length > 0;
 
   return {
-    signalId: signal.signalId,
+    ...base,
     status,
-    scores,
-    totalScore,
     bookCandidate,
     executionCandidate,
     reasons,
     requiredGates: status === "APPROVED"
-      ? ["CANONICAL_WRITE_RECEIPT", "EVIDENCE_CLOSURE"]
+      ? ["CANONICAL_WRITE_RECEIPT", "CONNECTOR_ATTESTATION", "EVIDENCE_CLOSURE"]
       : ["EDITORIAL_SIGNAL_REPAIR"]
   };
 }
 
+function sameGateResult(a: EditorialGateResult, b: EditorialGateResult): boolean {
+  return a.tenantId === b.tenantId
+    && a.signalId === b.signalId
+    && a.signalFingerprint === b.signalFingerprint
+    && a.signalBindingHash === b.signalBindingHash
+    && a.status === b.status
+    && a.totalScore === b.totalScore
+    && a.bookCandidate === b.bookCandidate
+    && a.executionCandidate === b.executionCandidate
+    && JSON.stringify(a.scores) === JSON.stringify(b.scores)
+    && JSON.stringify(a.reasons) === JSON.stringify(b.reasons);
+}
+
+function allowedConnectors(type: CapitalizationTargetType): string[] {
+  if (type === "product_execution") return ["github", "deploybot"];
+  return ["notion"];
+}
+
 function target(
   signal: NormalizedChatSignal,
-  type: CapitalizationTargetType,
+  type: Exclude<CapitalizationTargetType, "reme">,
   destinationRef: string,
   action: CapitalizationTarget["action"],
   requiredEvidenceType: CapitalizationTarget["requiredEvidenceType"]
 ): CapitalizationTarget {
-  const targetId = stableId("target", [signal.signalId, type, destinationRef]);
+  const targetId = digest("target", [signal.tenantId, signal.signalId, type, destinationRef]);
   return {
+    tenantId: signal.tenantId,
     targetId,
     type,
     destinationRef,
     action,
     requiredEvidenceType,
-    idempotencyKey: stableId("idem", [signal.fingerprint, type, destinationRef]),
+    idempotencyKey: digest("idem", [signal.tenantId, signal.fingerprint, type, destinationRef]),
+    executionNonce: digest("nonce", [signal.tenantId, signal.bindingHash, type, destinationRef]),
+    allowedConnectorIds: allowedConnectors(type),
     status: "PLANNED"
   };
 }
@@ -350,14 +453,25 @@ export function compileCapitalizationPlan(
   signal: NormalizedChatSignal,
   gate: EditorialGateResult
 ): CapitalizationPlan {
-  if (!signal || !gate || signal.signalId !== gate.signalId) {
-    throw new Error("CAPITALIZATION_PLAN_SIGNAL_GATE_MISMATCH");
+  if (!signal || !gate) {
+    throw new Error("CAPITALIZATION_PLAN_INVALID_INPUT");
+  }
+
+  const recomputedGate = evaluateEditorialSignal(signal, signal.existingFingerprints);
+  if (gate.tenantId !== signal.tenantId
+    || gate.signalId !== signal.signalId
+    || gate.signalFingerprint !== signal.fingerprint
+    || gate.signalBindingHash !== signal.bindingHash
+    || !sameGateResult(gate, recomputedGate)) {
+    throw new Error("CAPITALIZATION_PLAN_GATE_BINDING_MISMATCH");
   }
 
   if (gate.status !== "APPROVED") {
     return {
-      planId: stableId("capplan", [signal.signalId, gate.status]),
+      tenantId: signal.tenantId,
+      planId: digest("capplan", [signal.tenantId, signal.signalId, gate.status, signal.bindingHash]),
       signalId: signal.signalId,
+      signalBindingHash: signal.bindingHash,
       fingerprint: signal.fingerprint,
       status: "BLOCKED",
       targets: [],
@@ -408,8 +522,10 @@ export function compileCapitalizationPlan(
   }
 
   return {
-    planId: stableId("capplan", [signal.signalId, ...targets.map(item => item.targetId)]),
+    tenantId: signal.tenantId,
+    planId: digest("capplan", [signal.tenantId, signal.signalId, signal.bindingHash, ...targets.map(item => item.targetId)]),
     signalId: signal.signalId,
+    signalBindingHash: signal.bindingHash,
     fingerprint: signal.fingerprint,
     status: targets.length > 0 ? "READY" : "BLOCKED",
     targets,
@@ -418,9 +534,75 @@ export function compileCapitalizationPlan(
   };
 }
 
+export function receiptAttestationPayload(
+  tenantId: string,
+  planId: string,
+  target: CapitalizationTarget,
+  receipt: UnsignedCapitalizationReceipt
+): string {
+  return JSON.stringify({
+    version: 1,
+    tenantId,
+    planId,
+    targetId: target.targetId,
+    targetType: target.type,
+    destinationRef: target.destinationRef,
+    action: target.action,
+    idempotencyKey: target.idempotencyKey,
+    executionNonce: target.executionNonce,
+    connectorId: receipt.connectorId,
+    receiptRef: receipt.receiptRef,
+    executedAt: receipt.executedAt,
+    status: receipt.status,
+    artifactHash: receipt.artifactHash ?? null,
+    nonce: receipt.nonce
+  });
+}
+
+function verifyReceiptAttestation(
+  plan: CapitalizationPlan,
+  target: CapitalizationTarget,
+  receipt: CapitalizationReceipt,
+  verifier: CapitalizationReceiptVerifier
+): void {
+  const secret = required(verifier?.hmacSecret, "CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
+  if (secret.length < 32) {
+    throw new Error("CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
+  }
+  const connectorId = required(receipt.connectorId, "CAPITALIZATION_RECEIPT_CONNECTOR_REQUIRED");
+  if (!target.allowedConnectorIds.includes(connectorId)
+    || (verifier.allowedConnectorIds && !verifier.allowedConnectorIds.includes(connectorId))) {
+    throw new Error("CAPITALIZATION_RECEIPT_CONNECTOR_NOT_ALLOWED");
+  }
+  if (receipt.nonce !== target.executionNonce) {
+    throw new Error("CAPITALIZATION_RECEIPT_NONCE_MISMATCH");
+  }
+  if (!/^[0-9a-f]{64}$/i.test(receipt.attestation)) {
+    throw new Error("CAPITALIZATION_RECEIPT_ATTESTATION_INVALID");
+  }
+
+  const unsigned: UnsignedCapitalizationReceipt = {
+    targetId: receipt.targetId,
+    receiptRef: receipt.receiptRef,
+    executedAt: receipt.executedAt,
+    status: receipt.status,
+    artifactHash: receipt.artifactHash,
+    connectorId: receipt.connectorId,
+    nonce: receipt.nonce
+  };
+  const expected = createHmac("sha256", secret)
+    .update(receiptAttestationPayload(plan.tenantId, plan.planId, target, unsigned))
+    .digest();
+  const actual = Buffer.from(receipt.attestation, "hex");
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    throw new Error("CAPITALIZATION_RECEIPT_ATTESTATION_INVALID");
+  }
+}
+
 export function recordCapitalizationEvidence(
   plan: CapitalizationPlan,
-  receipts: CapitalizationReceipt[]
+  receipts: CapitalizationReceipt[],
+  verifier: CapitalizationReceiptVerifier
 ): CapitalizationProof {
   if (!plan || typeof plan !== "object") {
     throw new Error("CAPITALIZATION_PROOF_INVALID_PLAN");
@@ -428,18 +610,29 @@ export function recordCapitalizationEvidence(
   if (!Array.isArray(receipts)) {
     throw new Error("CAPITALIZATION_PROOF_INVALID_RECEIPTS");
   }
+  required(verifier?.hmacSecret, "CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
 
   const planned = new Map(plan.targets.map(item => [item.targetId, item]));
   const normalizedReceipts: CapitalizationReceipt[] = [];
   const seenTargetIds = new Set<string>();
 
   for (const receipt of receipts) {
-    if (!receipt || !planned.has(receipt.targetId) || seenTargetIds.has(receipt.targetId)) continue;
+    if (!receipt || !planned.has(receipt.targetId)) {
+      throw new Error("CAPITALIZATION_RECEIPT_UNKNOWN_TARGET");
+    }
+    if (seenTargetIds.has(receipt.targetId)) {
+      throw new Error("CAPITALIZATION_RECEIPT_DUPLICATE_TARGET");
+    }
+    const plannedTarget = planned.get(receipt.targetId)!;
+    if (plannedTarget.tenantId !== plan.tenantId) {
+      throw new Error("CAPITALIZATION_RECEIPT_TENANT_MISMATCH");
+    }
     required(receipt.receiptRef, "CAPITALIZATION_RECEIPT_REF_REQUIRED");
     assertTimestamp(receipt.executedAt);
     if (receipt.status !== "success" && receipt.status !== "failed") {
       throw new Error("CAPITALIZATION_RECEIPT_INVALID_STATUS");
     }
+    verifyReceiptAttestation(plan, plannedTarget, receipt, verifier);
     normalizedReceipts.push({ ...receipt });
     seenTargetIds.add(receipt.targetId);
   }
@@ -450,10 +643,11 @@ export function recordCapitalizationEvidence(
   const failedTargetIds = normalizedReceipts
     .filter(receipt => receipt.status === "failed")
     .map(receipt => receipt.targetId);
-  const completed = new Set(successfulTargetIds);
+  const successful = new Set(successfulTargetIds);
+  const failed = new Set(failedTargetIds);
   const missingTargetIds = plan.targets
     .map(item => item.targetId)
-    .filter(targetId => !completed.has(targetId) && !failedTargetIds.includes(targetId));
+    .filter(targetId => !successful.has(targetId) && !failed.has(targetId));
 
   let status: CapitalizationProof["status"];
   if (plan.targets.length > 0 && successfulTargetIds.length === plan.targets.length) {
@@ -465,9 +659,11 @@ export function recordCapitalizationEvidence(
   }
 
   return {
-    proofId: stableId("capproof", [
+    tenantId: plan.tenantId,
+    proofId: digest("capproof", [
+      plan.tenantId,
       plan.planId,
-      ...normalizedReceipts.map(receipt => `${receipt.targetId}:${receipt.status}:${receipt.receiptRef}`)
+      ...normalizedReceipts.map(receipt => `${receipt.targetId}:${receipt.status}:${receipt.receiptRef}:${receipt.connectorId}`)
     ]),
     planId: plan.planId,
     status,
