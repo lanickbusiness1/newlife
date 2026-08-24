@@ -23,6 +23,12 @@ import {
   evaluateKnowledgePromotion,
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
+import {
+  assessProcurementIntegrity,
+  GENESIS_V4_GUINEA_DIGITAL_STATE_CONTROL_ANCHOR,
+  scoreDigitalService,
+  summarizeXRoadHealth
+} from "./guineaDigitalStateControl.js";
 
 const PACKAGE_VERSION = "0.3.0";
 const CONTROL_PLANE_REVISION = "0.6.0";
@@ -217,6 +223,30 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
+  register("guinea.service.score", "Score la performance d'un service public guinéen à partir de KPI explicitement fournis.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "guinea:service:score", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    assessment: scoreDigitalService((payload as any)?.observation ?? payload)
+  }));
+
+  register("guinea.xroad.observe", "Agrège l'observabilité X-Road avec disponibilité, échecs, latence p95 et lineage de preuve.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "guinea:xroad:observe", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    health: summarizeXRoadHealth((payload as any)?.calls ?? payload)
+  }));
+
+  register("guinea.procurement.assess_integrity", "Émet des signaux de risque explicables sur une procédure de commande publique sans produire d'accusation automatisée.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "guinea:procurement:assess", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    assessment: assessProcurementIntegrity((payload as any)?.observation ?? payload)
+  }));
+
   return server;
 }
 
@@ -243,7 +273,8 @@ if (mode === "stdio") {
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
-      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
+      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
+      guineaDigitalStateControl: GENESIS_V4_GUINEA_DIGITAL_STATE_CONTROL_ANCHOR.assetId
     });
   });
 
