@@ -9,6 +9,14 @@ export type DomainVerificationState =
   | "HTTPS_VERIFIED"
   | "DOMAIN_FAILED";
 
+const DEPLOYMENT_ENVIRONMENTS = new Set<DeploymentEnvironment>([
+  "development",
+  "staging",
+  "production"
+]);
+
+const DNS_RECORD_TYPES = new Set<DnsRecordType>(["A", "AAAA", "CNAME"]);
+
 export interface DomainIntent {
   hostname: string;
   environment: DeploymentEnvironment;
@@ -42,6 +50,20 @@ function required(value: string | undefined, name: string): string {
   return value.trim();
 }
 
+function validateEnvironment(value: unknown): DeploymentEnvironment {
+  if (typeof value !== "string" || !DEPLOYMENT_ENVIRONMENTS.has(value as DeploymentEnvironment)) {
+    throw new Error("DEPLOYBOT_DOMAIN_INVALID: environment must be development, staging or production");
+  }
+  return value as DeploymentEnvironment;
+}
+
+function validateRecordType(value: unknown): DnsRecordType {
+  if (typeof value !== "string" || !DNS_RECORD_TYPES.has(value as DnsRecordType)) {
+    throw new Error("DEPLOYBOT_DOMAIN_INVALID: recordType must be A, AAAA or CNAME");
+  }
+  return value as DnsRecordType;
+}
+
 function normalizeService(service: string): string {
   const normalized = required(service, "service").toLowerCase();
   if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(normalized)) {
@@ -58,16 +80,18 @@ export function compileDomainIntent(input: {
   providerDeploymentId: string;
 }): DomainIntent {
   const service = normalizeService(input.service);
-  const hostname = input.environment === "production"
+  const environment = validateEnvironment(input.environment);
+  const recordType = validateRecordType(input.recordType);
+  const hostname = environment === "production"
     ? `${service}.afriagenesis.com`
-    : input.environment === "staging"
+    : environment === "staging"
       ? `${service}-staging.afriagenesis.com`
       : `${service}-dev.afriagenesis.com`;
 
   return {
     hostname,
-    environment: input.environment,
-    recordType: input.recordType,
+    environment,
+    recordType,
     target: required(input.target, "target"),
     providerDeploymentId: required(input.providerDeploymentId, "providerDeploymentId")
   };
