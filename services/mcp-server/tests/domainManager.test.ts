@@ -19,6 +19,16 @@ describe("DeployBot domain manager", () => {
       .toBe("mcp-staging.afriagenesis.com");
   });
 
+  test("rejects an unknown environment received from runtime JSON", () => {
+    expect(() => compileDomainIntent({ ...base, environment: "qa" as any } as any))
+      .toThrow(/environment/i);
+  });
+
+  test("rejects an unsupported DNS record type received from runtime JSON", () => {
+    expect(() => compileDomainIntent({ ...base, recordType: "TXT" as any } as any))
+      .toThrow(/record/i);
+  });
+
   test("does not verify HTTPS before DNS", () => {
     const intent = compileDomainIntent(base);
     const result = verifyDomainEvidence({
