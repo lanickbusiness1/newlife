@@ -90,6 +90,18 @@ describe("DeployBot Release Center", () => {
       .toThrow(/Big4/i);
   });
 
+  test("rejects an unknown risk class received from runtime JSON", () => {
+    const bundle = compileReleaseEvidenceBundle(baseInput);
+    expect(() => verifyReleaseEvidenceBundle(bundle, { riskClass: "unknown" as any, targetDeliverable: "service" } as any))
+      .toThrow(/risk/i);
+  });
+
+  test("rejects an unknown target deliverable received from runtime JSON", () => {
+    const bundle = compileReleaseEvidenceBundle(baseInput);
+    expect(() => verifyReleaseEvidenceBundle(bundle, { riskClass: "moderate", targetDeliverable: "preview" as any } as any))
+      .toThrow(/deliverable|target/i);
+  });
+
   test("requires canonical DNS and TLS evidence", () => {
     const bundle = compileReleaseEvidenceBundle({
       ...baseInput,
