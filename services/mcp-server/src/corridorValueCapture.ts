@@ -2,7 +2,7 @@ export const GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR = {
   genome: "GENESIS_V4",
   decisionId: "V4-DEC-017",
   assetId: "GEN-V4-CORRIDOR-VALUE-CAPTURE-001",
-  version: "0.1.0",
+  version: "0.1.1",
   canonicalOwner: "AfrIAgenesis®",
   parentCapabilities: [
     "Sovereign Industrialization & Resource Value Capture OS™",
@@ -38,6 +38,18 @@ export type CorridorOpportunityLane =
   | "governance_and_transparency"
   | "market_and_hinterland"
   | "procurement_and_ppp_advisory";
+
+export type CorridorScoreKey =
+  | "corridorControl"
+  | "feedstockSecurity"
+  | "infrastructureReadiness"
+  | "marketReach"
+  | "localIndustrialization"
+  | "governanceRisk"
+  | "buyerAccess"
+  | "procurementReadiness";
+
+export type CorridorScoreEvidenceRefs = Record<CorridorScoreKey, string[]>;
 
 export interface ValueComponentInput {
   name: string;
@@ -83,6 +95,7 @@ export interface CorridorValueCaptureInput {
   evidenceRefs: string[];
   economicValue: EconomicValueInput;
   scores: CorridorScoresInput;
+  scoreEvidenceRefs: CorridorScoreEvidenceRefs;
 }
 
 export interface CorridorValueCaptureAssessment {
@@ -108,6 +121,7 @@ export interface CorridorValueCaptureAssessment {
   governanceRisk: number;
   buyerAccess: number;
   procurementReadiness: number;
+  scoreEvidenceRefs: CorridorScoreEvidenceRefs;
   strategicReadinessScore: number;
   afriagenesisOpportunityScore: number;
   decision: CorridorDecision;
@@ -130,6 +144,28 @@ const ASSET_CLASSES = new Set<CorridorAssetClass>([
   "industrial_corridor",
   "other"
 ]);
+
+const SCORE_KEYS: CorridorScoreKey[] = [
+  "corridorControl",
+  "feedstockSecurity",
+  "infrastructureReadiness",
+  "marketReach",
+  "localIndustrialization",
+  "governanceRisk",
+  "buyerAccess",
+  "procurementReadiness"
+];
+
+const SCORE_ERROR_SUFFIX: Record<CorridorScoreKey, string> = {
+  corridorControl: "CORRIDOR_CONTROL",
+  feedstockSecurity: "FEEDSTOCK_SECURITY",
+  infrastructureReadiness: "INFRASTRUCTURE_READINESS",
+  marketReach: "MARKET_REACH",
+  localIndustrialization: "LOCAL_INDUSTRIALIZATION",
+  governanceRisk: "GOVERNANCE_RISK",
+  buyerAccess: "BUYER_ACCESS",
+  procurementReadiness: "PROCUREMENT_READINESS"
+};
 
 function requiredText(value: unknown, code: string): asserts value is string {
   if (typeof value !== "string" || !value.trim()) {
@@ -167,6 +203,19 @@ function formatted(value: number): string {
   return Number.isInteger(value) ? value.toFixed(1) : String(round(value, 4));
 }
 
+function normalizeScoreEvidenceRefs(input: CorridorScoreEvidenceRefs): CorridorScoreEvidenceRefs {
+  return {
+    corridorControl: unique(input.corridorControl.map(ref => ref.trim())),
+    feedstockSecurity: unique(input.feedstockSecurity.map(ref => ref.trim())),
+    infrastructureReadiness: unique(input.infrastructureReadiness.map(ref => ref.trim())),
+    marketReach: unique(input.marketReach.map(ref => ref.trim())),
+    localIndustrialization: unique(input.localIndustrialization.map(ref => ref.trim())),
+    governanceRisk: unique(input.governanceRisk.map(ref => ref.trim())),
+    buyerAccess: unique(input.buyerAccess.map(ref => ref.trim())),
+    procurementReadiness: unique(input.procurementReadiness.map(ref => ref.trim()))
+  };
+}
+
 export function computeSovereignValueCapture(input: EconomicValueInput): SovereignValueCaptureResult {
   if (!input || typeof input !== "object") {
     throw new Error("CORRIDOR_INVALID_ECONOMIC_VALUE");
@@ -195,7 +244,7 @@ export function computeSovereignValueCapture(input: EconomicValueInput): Soverei
 
     classifiedValue += component.grossValue;
     localRetainedValue += component.grossValue * component.localShare;
-    evidenceRefs.push(component.evidenceRef);
+    evidenceRefs.push(component.evidenceRef.trim());
   }
 
   if (classifiedValue > input.totalEconomicValue + 1e-9) {
@@ -253,6 +302,24 @@ function validateAssessmentInput(input: CorridorValueCaptureInput): void {
   assertFiniteRange(input.scores.governanceRisk, 0, 100, "CORRIDOR_INVALID_GOVERNANCE_RISK");
   assertFiniteRange(input.scores.buyerAccess, 0, 100, "CORRIDOR_INVALID_BUYER_ACCESS");
   assertFiniteRange(input.scores.procurementReadiness, 0, 100, "CORRIDOR_INVALID_PROCUREMENT_READINESS");
+
+  if (!input.scoreEvidenceRefs || typeof input.scoreEvidenceRefs !== "object") {
+    throw new Error("CORRIDOR_SCORE_EVIDENCE_REQUIRED");
+  }
+
+  const registeredEvidence = new Set(input.evidenceRefs.map(ref => ref.trim()));
+
+  for (const key of SCORE_KEYS) {
+    const suffix = SCORE_ERROR_SUFFIX[key];
+    const refs = input.scoreEvidenceRefs[key];
+    assertEvidenceRefs(refs, `CORRIDOR_SCORE_EVIDENCE_REQUIRED_${suffix}`);
+
+    for (const ref of refs) {
+      if (!registeredEvidence.has(ref.trim())) {
+        throw new Error(`CORRIDOR_SCORE_EVIDENCE_NOT_REGISTERED_${suffix}`);
+      }
+    }
+  }
 }
 
 function deriveOpportunityLanes(
@@ -344,6 +411,13 @@ export function assessCorridorValueCapture(input: CorridorValueCaptureInput): Co
   validateAssessmentInput(input);
   const value = computeSovereignValueCapture(input.economicValue);
   const scores = input.scores;
+  const registeredEvidence = new Set(input.evidenceRefs.map(ref => ref.trim()));
+
+  for (const ref of value.evidenceRefs) {
+    if (!registeredEvidence.has(ref)) {
+      throw new Error("CORRIDOR_COMPONENT_EVIDENCE_NOT_REGISTERED");
+    }
+  }
 
   const strategicReadinessScore = round(
     0.18 * scores.corridorControl +
@@ -372,7 +446,8 @@ export function assessCorridorValueCapture(input: CorridorValueCaptureInput): Co
   );
 
   const opportunityLanes = deriveOpportunityLanes(value.sovereignValueCaptureRatio, scores);
-  const evidenceRefs = unique([...input.evidenceRefs, ...value.evidenceRefs]);
+  const evidenceRefs = unique(input.evidenceRefs.map(ref => ref.trim()));
+  const scoreEvidenceRefs = normalizeScoreEvidenceRefs(input.scoreEvidenceRefs);
 
   return {
     anchor: GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR,
@@ -397,6 +472,7 @@ export function assessCorridorValueCapture(input: CorridorValueCaptureInput): Co
     governanceRisk: scores.governanceRisk,
     buyerAccess: scores.buyerAccess,
     procurementReadiness: scores.procurementReadiness,
+    scoreEvidenceRefs,
     strategicReadinessScore,
     afriagenesisOpportunityScore,
     decision: decision.decision,
