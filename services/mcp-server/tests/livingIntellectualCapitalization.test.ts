@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -7,12 +8,17 @@ import {
   compileChatSignal,
   evaluateEditorialSignal,
   GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR,
-  recordCapitalizationEvidence
+  recordCapitalizationEvidence,
+  receiptAttestationPayload,
+  type CapitalizationReceipt,
+  type CapitalizationTarget
 } from "../src/livingIntellectualCapitalization";
 import { compileRemePromotion } from "../src/remePromotion";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "../../..");
+const TEST_TENANT = "afriagenesis-core";
+const TEST_SECRET = "test-only-capitalization-receipt-secret";
 
 function readSqlDirectory(relativePath: string): string {
   const directory = join(repoRoot, relativePath);
@@ -22,8 +28,31 @@ function readSqlDirectory(relativePath: string): string {
     .join("\n");
 }
 
+function connectorFor(target: CapitalizationTarget): string {
+  if (target.allowedConnectorIds.includes("notion")) return "notion";
+  if (target.allowedConnectorIds.includes("github")) return "github";
+  return target.allowedConnectorIds[0];
+}
+
+function signedReceipt(planId: string, tenantId: string, target: CapitalizationTarget, index: number): CapitalizationReceipt {
+  const unsigned = {
+    targetId: target.targetId,
+    receiptRef: `receipt:${target.targetId}:${index}`,
+    executedAt: "2026-08-24T02:30:00Z",
+    status: "success" as const,
+    artifactHash: `sha256:${String(index + 1).padStart(2, "0")}`,
+    connectorId: connectorFor(target),
+    nonce: target.executionNonce
+  };
+  const attestation = createHmac("sha256", TEST_SECRET)
+    .update(receiptAttestationPayload(tenantId, planId, target, unsigned))
+    .digest("hex");
+  return { ...unsigned, attestation };
+}
+
 function durableDecision() {
   return compileChatSignal({
+    tenantId: TEST_TENANT,
     conversationId: "chat-v4-dec-016",
     sourceRef: "chat:2026-08-24:v4-dec-016",
     sourceTimestamp: "2026-08-24T02:15:00Z",
@@ -44,15 +73,17 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
     const gate = evaluateEditorialSignal(signal, []);
     const plan = compileCapitalizationPlan(signal, gate);
 
+    expect(signal.tenantId).toBe(TEST_TENANT);
     expect(signal.evidenceRefs).toEqual(["notion:V4-DEC-016"]);
     expect(signal.productRefs).toEqual(["GENESIS-V4", "AFRIA-RECRUIT"]);
-    expect(signal.fingerprint).toMatch(/^sigfp-[0-9a-f]{8}$/);
+    expect(signal.fingerprint).toMatch(/^sigfp-[0-9a-f]{64}$/);
     expect(gate.status).toBe("APPROVED");
     expect(gate.bookCandidate).toBe(true);
     expect(gate.executionCandidate).toBe(true);
     expect(gate.totalScore).toBeGreaterThanOrEqual(0.72);
 
     expect(plan.status).toBe("READY");
+    expect(plan.tenantId).toBe(TEST_TENANT);
     expect(plan.targets.map(target => target.type)).toEqual(expect.arrayContaining([
       "notion_canonical",
       "genesis_v4",
@@ -66,6 +97,7 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
 
   test("fails closed for unverified or low-confidence signals", () => {
     const unverified = compileChatSignal({
+      tenantId: TEST_TENANT,
       conversationId: "chat-noise",
       sourceRef: "chat:noise",
       sourceTimestamp: "2026-08-24T02:15:00Z",
@@ -74,6 +106,7 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
       content: "A potentially interesting strategic idea that is long enough to look substantial but has not been verified and therefore cannot become canonical or manuscript material without evidence."
     });
     const lowConfidence = compileChatSignal({
+      tenantId: TEST_TENANT,
       conversationId: "chat-low-confidence",
       sourceRef: "chat:low-confidence",
       sourceTimestamp: "2026-08-24T02:15:00Z",
@@ -100,6 +133,7 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
 
   test("allows a short validated decision with canonical decision evidence", () => {
     const signal = compileChatSignal({
+      tenantId: TEST_TENANT,
       conversationId: "chat-short-decision",
       sourceRef: "chat:short-decision",
       sourceTimestamp: "2026-08-24T02:15:00Z",
@@ -117,6 +151,7 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
 
   test("omits book and product targets when editorial or execution requirements are absent", () => {
     const signal = compileChatSignal({
+      tenantId: TEST_TENANT,
       conversationId: "chat-operational-note",
       sourceRef: "chat:operational-note",
       sourceTimestamp: "2026-08-24T02:15:00Z",
@@ -141,17 +176,11 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
     const signal = durableDecision();
     const gate = evaluateEditorialSignal(signal);
     const plan = compileCapitalizationPlan(signal, gate);
-    const allReceipts = plan.targets.map((target, index) => ({
-      targetId: target.targetId,
-      receiptRef: `receipt:${index + 1}`,
-      executedAt: "2026-08-24T02:30:00Z",
-      status: "success" as const,
-      artifactHash: `sha256:${index + 1}`
-    }));
+    const allReceipts = plan.targets.map((target, index) => signedReceipt(plan.planId, plan.tenantId, target, index));
 
-    const complete = recordCapitalizationEvidence(plan, allReceipts);
-    const partial = recordCapitalizationEvidence(plan, allReceipts.slice(0, 1));
-    const failed = recordCapitalizationEvidence(plan, []);
+    const complete = recordCapitalizationEvidence(plan, allReceipts, { hmacSecret: TEST_SECRET });
+    const partial = recordCapitalizationEvidence(plan, allReceipts.slice(0, 1), { hmacSecret: TEST_SECRET });
+    const failed = recordCapitalizationEvidence(plan, [], { hmacSecret: TEST_SECRET });
 
     expect(complete.status).toBe("COMPLETE");
     expect(complete.nextGate).toBe("REME_CANDIDATE");
@@ -166,21 +195,17 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
     const signal = durableDecision();
     const gate = evaluateEditorialSignal(signal);
     const plan = compileCapitalizationPlan(signal, gate);
-    const allReceipts = plan.targets.map((target, index) => ({
-      targetId: target.targetId,
-      receiptRef: `receipt:${index + 1}`,
-      executedAt: "2026-08-24T02:30:00Z",
-      status: "success" as const
-    }));
-    const complete = recordCapitalizationEvidence(plan, allReceipts);
-    const partial = recordCapitalizationEvidence(plan, allReceipts.slice(0, 1));
+    const allReceipts = plan.targets.map((target, index) => signedReceipt(plan.planId, plan.tenantId, target, index));
+    const complete = recordCapitalizationEvidence(plan, allReceipts, { hmacSecret: TEST_SECRET });
+    const partial = recordCapitalizationEvidence(plan, allReceipts.slice(0, 1), { hmacSecret: TEST_SECRET });
 
     const reme = compileRemePromotion(plan, complete, "R.E.M.E-VAL-001");
     expect(reme.type).toBe("reme");
     expect(reme.action).toBe("promote_candidate");
     expect(reme.requiredEvidenceType).toBe("connector_receipt");
     expect(reme.destinationRef).toBe("R.E.M.E-VAL-001");
-    expect(reme.idempotencyKey).toMatch(/^idem-[0-9a-f]{8}$/);
+    expect(reme.idempotencyKey).toMatch(/^idem-[0-9a-f]{32}$/);
+    expect(reme.allowedConnectorIds).toEqual(["notion"]);
     expect(() => compileRemePromotion(plan, partial, "R.E.M.E-VAL-001")).toThrow("REME_PROMOTION_REQUIRES_COMPLETE_PROOF");
   });
 
@@ -194,6 +219,7 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
     expect(indexSource).toContain('register("genesis.capitalization.record_evidence"');
     expect(indexSource).toContain('"capitalization:evidence"');
     expect(indexSource).toContain("compileRemePromotion");
+    expect(indexSource).toContain("CAPITALIZATION_RECEIPT_HMAC_SECRET");
     expect(GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.decisionId).toBe("V4-DEC-016");
   });
 
