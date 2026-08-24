@@ -15,6 +15,11 @@ import { compileDomainIntent } from "./domainManager.js";
 import { compileReleaseEvidenceBundle, verifyReleaseEvidenceBundle } from "./releaseCenter.js";
 import { compileComputeEconomicsPlan, verifyAiEconomicsCertificate } from "./computeEconomics.js";
 import {
+  compileAssuranceReport,
+  compileIndependentAssurance,
+  verifyIndependentAssurance
+} from "./independentAssurance.js";
+import {
   decideNextAction,
   evaluateOutcome,
   GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR,
@@ -28,11 +33,12 @@ import {
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
 
-const PACKAGE_VERSION = "0.5.0";
-const CONTROL_PLANE_REVISION = "0.8.0";
-const SOVEREIGN_DELIVERY_RUNTIME = "DEPLOYBOT_SOVEREIGN_DELIVERY_RUNTIME_0.5.0";
+const PACKAGE_VERSION = "0.6.0";
+const CONTROL_PLANE_REVISION = "0.9.0";
+const SOVEREIGN_DELIVERY_RUNTIME = "DEPLOYBOT_SOVEREIGN_DELIVERY_RUNTIME_0.6.0";
 const COMPUTE_INFERENCE_ECONOMICS_LAYER = "COMPUTE_INFERENCE_ECONOMICS_LAYER_0.5.0";
-const RELEASE_EVIDENCE_SCHEMA = "1.1.0";
+const RELEASE_EVIDENCE_SCHEMA = "1.2.0";
+const INDEPENDENT_ASSURANCE_COUNCIL = "INDEPENDENT_ASSURANCE_COUNCIL_1.0.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -78,11 +84,11 @@ function governed(ctx: Context, tool: string, data: unknown) {
     eces: {
       status: "allowed",
       gate: "G8.3",
-      reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine, Sovereign Delivery Runtime and Compute & Inference Economics Control Layer."
+      reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine, Sovereign Delivery Runtime, Compute & Inference Economics Control Layer and Independent Assurance Council."
     },
     auditId,
     limitations: [
-      "MCP package 0.5.0 / control-plane revision 0.8.0: deterministic runtime contracts and economics estimates do not constitute provider, DNS, HTTPS, energy-metering or production proof without externally captured release evidence."
+      "MCP package 0.6.0 / control-plane revision 0.9.0: internal agentic assurance is an internal rigor proof, not a statutory audit, certification or external attestation. Production proof still requires observed provider, DNS/HTTPS, rollback and economics evidence."
     ]
   };
 }
@@ -206,7 +212,31 @@ function buildServer() {
     verification: verifyAiEconomicsCertificate((payload as any)?.certificate)
   }));
 
-  register("deploybot.release.compile", "Compile un Release Evidence Bundle immuable et hashé incluant l'AI Economics Certificate avant livraison terminale.", {
+  register("deploybot.assurance.compile_report", "Scelle un rapport d'audit interne du Independent Assurance Council avec snapshot, findings et SHA-256.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    report: compileAssuranceReport(payload as any)
+  }));
+
+  register("deploybot.assurance.compile_council", "Compile les cinq rapports spécialistes et l'arbitre en verdict d'assurance indépendant fail-closed.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    assurance: compileIndependentAssurance(payload as any)
+  }));
+
+  register("deploybot.assurance.verify", "Vérifie l'intégrité et les invariants d'une preuve Independent Assurance Council avant release.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    verification: verifyIndependentAssurance((payload as any)?.evidence)
+  }));
+
+  register("deploybot.release.compile", "Compile un Release Evidence Bundle immuable et hashé incluant économie IA et assurance indépendante avant livraison terminale.", {
     context: RequestContext,
     payload: z.unknown()
   }, "deploy:plan", async ({ context, payload }) => ({
@@ -214,7 +244,7 @@ function buildServer() {
     release: compileReleaseEvidenceBundle(payload as any)
   }));
 
-  register("deploybot.release.verify", "Vérifie l'intégrité, l'AI Economics Certificate et les gates d'un Release Evidence Bundle avant DELIVERED_*.", {
+  register("deploybot.release.verify", "Vérifie l'intégrité, l'AI Economics Certificate et les gates d'assurance d'un Release Evidence Bundle avant DELIVERED_*.", {
     context: RequestContext,
     payload: z.unknown()
   }, "deploy:plan", async ({ context, payload }) => ({
@@ -305,6 +335,7 @@ if (mode === "stdio") {
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       sovereignDeliveryRuntime: SOVEREIGN_DELIVERY_RUNTIME,
       computeInferenceEconomicsLayer: COMPUTE_INFERENCE_ECONOMICS_LAYER,
+      independentAssuranceCouncil: INDEPENDENT_ASSURANCE_COUNCIL,
       releaseEvidenceSchema: RELEASE_EVIDENCE_SCHEMA,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
