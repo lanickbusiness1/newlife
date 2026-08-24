@@ -14,6 +14,7 @@ import {
   type CapitalizationReceipt,
   type CapitalizationTarget
 } from "../src/livingIntellectualCapitalization";
+import { loadAuthoritativeCapitalizationFingerprints } from "../src/capitalizationState";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "../../..");
@@ -191,5 +192,59 @@ describe("V4-DEC-016 review security regressions", () => {
     }
     expect(migrations).toContain("grant update on genesis_capitalization.capitalization_plans to service_role");
     expect(migrations).toContain("grant update on genesis_capitalization.capitalization_targets to service_role");
+  });
+
+  test("derives an identical canonical plan when product references arrive in a different order", () => {
+    const forwardSignal = compileChatSignal({
+      ...baseInput("tenant-a"),
+      productRefs: ["GENESIS-V4", "AFRIA-RECRUIT", "AFRIA-MARKETING-TEAM"]
+    });
+    const reverseSignal = compileChatSignal({
+      ...baseInput("tenant-a"),
+      productRefs: ["AFRIA-MARKETING-TEAM", "AFRIA-RECRUIT", "GENESIS-V4"]
+    });
+    const forwardPlan = compileCapitalizationPlan(forwardSignal, evaluateEditorialSignal(forwardSignal));
+    const reversePlan = compileCapitalizationPlan(reverseSignal, evaluateEditorialSignal(reverseSignal));
+
+    expect(reverseSignal.bindingHash).toBe(forwardSignal.bindingHash);
+    expect(reversePlan.planId).toBe(forwardPlan.planId);
+    expect(reversePlan.targets.map(target => target.targetId)).toEqual(forwardPlan.targets.map(target => target.targetId));
+    expect(reversePlan.targets.map(target => target.idempotencyKey)).toEqual(forwardPlan.targets.map(target => target.idempotencyKey));
+  });
+
+  test("loads duplicate fingerprints from authoritative tenant state and ignores caller-supplied dedup snapshots", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fakeFetch: typeof fetch = async (input, init) => {
+      calls.push({ url: String(input), init });
+      return new Response(JSON.stringify(["sigfp-b", "sigfp-a", "sigfp-a"]), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    };
+
+    const fingerprints = await loadAuthoritativeCapitalizationFingerprints(
+      "tenant-a",
+      {
+        supabaseUrl: "https://example.supabase.co",
+        serviceRoleKey: "service-role-test-key"
+      },
+      fakeFetch
+    );
+
+    expect(fingerprints).toEqual(["sigfp-a", "sigfp-b"]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("https://example.supabase.co/rest/v1/rpc/genesis_capitalization_known_fingerprints");
+    expect(calls[0].init?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ p_tenant_id: "tenant-a" });
+
+    const indexSource = readFileSync(join(repoRoot, "services/mcp-server/src/index.ts"), "utf8");
+    expect(indexSource).toContain("loadAuthoritativeCapitalizationFingerprints");
+    expect(indexSource).not.toContain("(payload as any)?.existingFingerprints");
+
+    const migrations = readSqlDirectory("supabase/migrations");
+    expect(migrations).toContain("create or replace function public.genesis_capitalization_known_fingerprints");
+    expect(migrations).toContain("security invoker");
+    expect(migrations).toContain("grant execute on function public.genesis_capitalization_known_fingerprints(text) to service_role");
+    expect(migrations).toContain("revoke execute on function public.genesis_capitalization_known_fingerprints(text) from public, anon, authenticated");
   });
 });
