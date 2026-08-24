@@ -8,7 +8,7 @@ This proof covers the deterministic runtime tranche of **V4-DEC-017 — Sovereig
 
 Canonical asset: `GEN-V4-CORRIDOR-VALUE-CAPTURE-001`
 
-Engine version: `0.1.0`
+Engine version: `0.1.1`
 
 Demonstrator: `Tanga–Lamu–EACOP`
 
@@ -18,7 +18,7 @@ Branch: `feat/v4-dec-017-corridor-value-capture`
 
 Pull request: `#59 — feat: implement V4-DEC-017 corridor value capture engine`
 
-Verified code commit: `393635663978921846d7e5bec7b219470798e1f2`
+Latest runtime/test commit verified before this documentation update: `9f32193f7fb621175b61293c90946661408c1900`
 
 ## TDD evidence
 
@@ -48,14 +48,6 @@ Job ID: `97295327721`
 
 Result: success after implementing `src/corridorValueCapture.ts`.
 
-Checks passed:
-
-- dependency install;
-- `npm audit --audit-level=high`;
-- TypeScript strict typecheck;
-- Vitest suite;
-- TypeScript build.
-
 ### MCP integration RED
 
 Workflow: `MCP CI #184`
@@ -64,9 +56,7 @@ Run ID: `32680218710`
 
 Job ID: `97295467207`
 
-Result: expected single test failure before control-plane wiring.
-
-Proof: 41 tests passed and the only failure required `register("corridor.value_capture.assess"` plus health metadata in `src/index.ts`.
+Result: expected single failure before MCP control-plane registration and health metadata were added.
 
 ### MCP integration GREEN
 
@@ -76,16 +66,77 @@ Run ID: `32680277707`
 
 Job ID: `97295621615`
 
-Verified code commit: `393635663978921846d7e5bec7b219470798e1f2`
+Result: success with 42 tests after governed MCP integration.
+
+### Evidence-provenance review finding
+
+Manual PR diff review identified an important governance weakness: strategic scores required only assessment-level evidence, but were not individually bound to evidence references. For an evidence-first sovereign decision engine, this was insufficient.
+
+The runtime was hardened rather than accepted at the weaker state.
+
+### Evidence hardening RED
+
+Test commit: `137162a016a7fbabc3efe665087f3b478a1042a5`
+
+Workflow: `MCP CI #187`
+
+Run ID: `32680469250`
+
+Job ID: `97296151899`
+
+Result: expected failure of four new provenance tests while all 42 prior tests remained green.
+
+The missing behaviors were:
+
+- preserving per-score evidence lineage;
+- rejecting a strategic score with no evidence;
+- rejecting strategic-score evidence absent from the assessment registry;
+- rejecting economic-component evidence absent from the assessment registry.
+
+### Evidence hardening implementation
+
+Runtime commit: `434ee5a867411db40f5bb5f2a85238b66efb1d8f`
+
+Changes:
+
+- engine version advanced to `0.1.1`;
+- added `scoreEvidenceRefs` for all eight strategic score dimensions;
+- every strategic score requires at least one evidence reference;
+- every strategic evidence reference must be registered in top-level `evidenceRefs`;
+- every economic component evidence reference must also be registered in top-level `evidenceRefs`;
+- evidence is normalized and preserved in the result;
+- missing/orphan evidence fails closed with explicit `CORRIDOR_*` errors.
+
+### Near-GREEN diagnostic run
+
+Workflow: `MCP CI #188`
+
+Run ID: `32680542636`
+
+Job ID: `97296351690`
+
+Result: 45/46 tests passed. The single failure was traced to the test fixture, not production logic: the fixture removed an evidence reference shared by both a strategic score and an economic component, so the score provenance gate correctly rejected it first.
+
+The test was isolated to exercise only orphan economic evidence; the security rule was not weakened.
+
+### Final GREEN — runtime provenance hardened
+
+Test-isolation commit: `9f32193f7fb621175b61293c90946661408c1900`
+
+Workflow: `MCP CI #189`
+
+Run ID: `32680592597`
+
+Job ID: `97296488974`
 
 Result: **success**.
 
 Fresh CI evidence:
 
 - `npm ci --ignore-scripts` — success;
-- `npm audit --audit-level=high` — success, 0 vulnerabilities;
+- `npm audit --audit-level=high` — success, **0 vulnerabilities**;
 - `npm run typecheck` — success;
-- `npm test` — **6 test files passed, 42 tests passed, 0 failed**;
+- `npm test` — **6 test files passed, 46 tests passed, 0 failed**;
 - `npm run build` — success.
 
 ## Implemented behavior
@@ -124,7 +175,7 @@ Deterministic weights:
 - Buyer access — 10%
 - Procurement readiness — 10%
 
-This score measures addressable AfrIAgenesis intervention opportunity and is intentionally distinct from intrinsic corridor readiness.
+This score measures addressable AfrIAgenesis intervention opportunity and remains intentionally distinct from intrinsic corridor readiness.
 
 ### Decision gate
 
@@ -147,6 +198,16 @@ GO requires all:
 
 Otherwise the engine returns HOLD with explicit blockers.
 
+### Evidence provenance
+
+Assessment-level `evidenceRefs[]` is the evidence registry for tranche 1.
+
+Every strategic score has its own `scoreEvidenceRefs` entry. All eight entries are mandatory and non-empty. Every score reference must exist in the assessment registry.
+
+Every economic value component also requires an evidence reference registered at assessment level.
+
+The engine fails closed on missing or orphan evidence and returns the normalized score-to-evidence mapping in the assessment output.
+
 ### Opportunity lanes
 
 Implemented deterministic lanes:
@@ -161,7 +222,7 @@ Implemented deterministic lanes:
 
 ### Evidence and learning
 
-Every assessment requires evidence references. The engine preserves unique evidence lineage and emits R.E.M.E-ready events for corridor assessment, decision, SVCR and opportunity score.
+The engine preserves unique evidence lineage and emits R.E.M.E-ready events for corridor assessment, decision, SVCR and opportunity score.
 
 ## Governed MCP exposure
 
@@ -196,10 +257,10 @@ This tranche is deterministic and caller-input-driven. It does **not** yet prove
 
 The correct state is:
 
-`DOCTRINE_VALIDATED + RUNTIME_CODE_VERIFIED + MCP_INTEGRATED + CI_GREEN`
+`DOCTRINE_VALIDATED + RUNTIME_CODE_VERIFIED + MCP_INTEGRATED + EVIDENCE_PROVENANCE_HARDENED + CI_GREEN`
 
 The prohibited state is:
 
 `PRODUCTION_PROVEN`
 
-Promotion to `PRODUCTION_PROVEN` requires the remaining persistence, ingestion, agent, cockpit, deployment, M6, S7+, M8, rollback and R.E.M.E evidence gates.
+Promotion to `PRODUCTION_PROVEN` requires the remaining persistence, authoritative source ingestion, agent, cockpit, deployment, M6, S7+, M8, rollback and R.E.M.E evidence gates.
