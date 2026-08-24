@@ -139,4 +139,18 @@ describe("V4-DEC-018 Guinea Sovereign Digital Public Service Control Plane", () 
     expect(indexSource).toContain('"guinea:procurement:assess"');
     expect(indexSource).toContain("guineaDigitalStateControl");
   });
+
+  test("wires governed event ingestion to a real PostgreSQL driver with fail-closed secret configuration", () => {
+    const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+    const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    const renderSource = readFileSync(new URL("../render.yaml", import.meta.url), "utf8");
+
+    expect(indexSource).toContain('register("guinea.event.ingest"');
+    expect(indexSource).toContain('"guinea:event:write"');
+    expect(indexSource).toContain("persistGovernmentEvent");
+    expect(indexSource).toContain("GENESIS_GUINEA_DATABASE_URL");
+    expect(packageJson.dependencies.pg).toBe("8.23.0");
+    expect(renderSource).toContain("GENESIS_GUINEA_DATABASE_URL");
+    expect(renderSource).toContain("sync: false");
+  });
 });
