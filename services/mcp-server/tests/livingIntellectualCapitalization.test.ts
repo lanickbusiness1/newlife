@@ -85,7 +85,7 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
     const plan = compileCapitalizationPlan(signal, gate);
     expect(signal.tenantId).toBe(TEST_TENANT);
     expect(signal.evidenceRefs).toEqual(["notion:V4-DEC-016"]);
-    expect(signal.productRefs).toEqual(["GENESIS-V4", "AFRIA-RECRUIT"]);
+    expect(signal.productRefs).toEqual(["AFRIA-RECRUIT", "GENESIS-V4"]);
     expect(signal.fingerprint).toMatch(/^sigfp-[0-9a-f]{64}$/);
     expect(gate.status).toBe("APPROVED");
     expect(gate.bookCandidate).toBe(true);
