@@ -2,7 +2,9 @@
 
 **Decision:** V4-DEC-017 — Sovereign Corridor & Resource Value Capture Doctrine™
 
-**Status:** VALIDATED — implementation tranche 1
+**Status:** VALIDATED — tranche 1 CODE_VERIFIED
+
+**Runtime version:** `0.1.1`
 
 ## Purpose
 
@@ -14,11 +16,11 @@ This is not a new catalogue product. It is a specialized engine attached to Sove
 
 Tanga–Lamu–EACOP / East Africa.
 
-The implementation must remain country- and corridor-agnostic so later Country Genesis or Sector OS instances can reuse it for ports, pipelines, railways, refineries, terminals, logistics corridors and industrial hubs.
+The implementation remains country- and corridor-agnostic so later Country Genesis or Sector OS instances can reuse it for ports, pipelines, railways, refineries, terminals, logistics corridors and industrial hubs.
 
 ## Runtime boundary
 
-Tranche 1 is deterministic and evidence-first. It does not fetch external data, make irreversible decisions, write to third-party systems or claim live deployment proof. All inputs are caller-provided and must carry evidence references.
+Tranche 1 is deterministic and evidence-first. It does not fetch external data, make irreversible decisions, write to third-party systems or claim live deployment proof. All inputs are caller-provided and must carry registered evidence references.
 
 The engine is exposed through the existing governed MCP server. Authorization, audit envelope and ECES scope checks remain handled by `src/index.ts`.
 
@@ -48,6 +50,8 @@ Required:
 - `asOf`
 - `evidenceRefs[]`
 
+`evidenceRefs[]` is the assessment-level evidence registry. Every evidence reference used by economic components or strategic scores must exist in this registry.
+
 ### Economic value
 
 Required:
@@ -75,7 +79,9 @@ Rules:
 - component values must be non-negative;
 - sum of component gross values may not exceed total economic value;
 - local share must be between 0 and 1;
-- every component requires evidence;
+- every component requires an `evidenceRef`;
+- every component `evidenceRef` must exist in assessment-level `evidenceRefs[]`;
+- orphan economic evidence fails closed with `CORRIDOR_COMPONENT_EVIDENCE_NOT_REGISTERED`;
 - no missing value is imputed.
 
 ### Strategic scores
@@ -91,7 +97,16 @@ Caller supplies explicit normalized values in `[0, 100]` for:
 - `buyerAccess`
 - `procurementReadiness`
 
-Each metric must carry at least one evidence reference through the assessment-level `evidenceRefs` set. No silent normalization or external benchmark is performed in tranche 1.
+The caller must also provide `scoreEvidenceRefs`, a mapping with the same eight keys. Each score requires at least one evidence reference and every referenced evidence ID must be registered in assessment-level `evidenceRefs[]`.
+
+Evidence rules are fail-closed:
+
+- missing evidence for a score → `CORRIDOR_SCORE_EVIDENCE_REQUIRED_<SCORE>`;
+- evidence not registered at assessment level → `CORRIDOR_SCORE_EVIDENCE_NOT_REGISTERED_<SCORE>`.
+
+The assessment output preserves the normalized `scoreEvidenceRefs` mapping so every strategic score remains traceable to its supporting evidence.
+
+No silent normalization, benchmark substitution, external inference or evidence imputation is performed in tranche 1.
 
 ## Derived metrics
 
@@ -154,7 +169,7 @@ All of the following:
 
 All other valid cases.
 
-The output must state the exact triggered gate rules.
+The output states the exact triggered gate rules.
 
 ## Output model
 
@@ -163,10 +178,12 @@ The engine returns:
 - canonical anchor metadata;
 - corridor identity;
 - `localRetainedValue`;
+- `classifiedValue`;
 - `unclassifiedValue`;
 - `valueCoverageRatio`;
 - `sovereignValueCaptureRatio`;
-- five strategic component scores;
+- all eight strategic scores;
+- `scoreEvidenceRefs` for the eight strategic scores;
 - `strategicReadinessScore`;
 - `sovereigntyGap`;
 - `afriagenesisOpportunityScore`;
@@ -174,7 +191,7 @@ The engine returns:
 - `decisionReasons[]`;
 - `blockers[]`;
 - `opportunityLanes[]`;
-- unique `evidenceRefs[]`;
+- unique registered `evidenceRefs[]`;
 - `remeEvents[]`.
 
 ## Opportunity lanes
@@ -191,7 +208,7 @@ The engine deterministically emits intervention lanes when thresholds are met:
 
 ## MCP interface
 
-Add one governed tool in tranche 1:
+Governed tool:
 
 `corridor.value_capture.assess`
 
@@ -203,21 +220,24 @@ Input: `{ context, payload }` where payload matches the engine assessment model.
 
 Output: existing governed envelope plus the deterministic assessment.
 
-Health endpoint must expose the engine asset ID and version.
+Health endpoint exposes the engine asset ID and version.
 
 ## Testing requirements
 
-Tests must prove:
+Tests prove:
 
-1. SVCR arithmetic is correct and evidence lineage is preserved.
+1. SVCR arithmetic is correct and economic evidence lineage is preserved.
 2. Invalid value totals and local shares fail closed.
 3. GO, HOLD and NO_GO thresholds are deterministic.
 4. Opportunity score is distinct from project readiness.
 5. Opportunity lanes are emitted from explicit gaps.
-6. MCP registration exposes `corridor.value_capture.assess` under `corridor:assess`.
-7. Health metadata exposes the engine anchor.
-8. No function silently imputes missing metrics.
+6. Every strategic score requires at least one registered evidence reference.
+7. Orphan strategic-score evidence fails closed.
+8. Orphan economic-component evidence fails closed.
+9. MCP registration exposes `corridor.value_capture.assess` under `corridor:assess`.
+10. Health metadata exposes the engine anchor and version.
+11. No function silently imputes missing metrics or evidence.
 
 ## Production truth rule
 
-Passing unit tests and MCP CI establishes `CODE_VERIFIED` for tranche 1 only. V4-DEC-017 must not be labeled `PRODUCTION_PROVEN` until persistence, source ingestion, agents, cockpit, M6, S7+, M8, rollback evidence and R.E.M.E end-to-end proof are completed.
+Passing unit tests and MCP CI establishes `CODE_VERIFIED` for tranche 1 only. V4-DEC-017 must not be labeled `PRODUCTION_PROVEN` until persistence, authoritative source ingestion, specialized agents, cockpit, deployment, M6, S7+, M8, rollback evidence and R.E.M.E end-to-end proof are completed.
