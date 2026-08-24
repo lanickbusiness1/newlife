@@ -1,3 +1,11 @@
+export const GENESIS_V4_GUINEA_DIGITAL_STATE_CONTROL_ANCHOR = {
+  assetId: "GEN-V4-GN-DIGITAL-STATE-CONTROL-001",
+  version: "0.1.0",
+  decisionId: "V4-DEC-018",
+  countryCode: "GN",
+  proofMode: "CODE_VERIFIED_NOT_PRODUCTION_PROVEN"
+} as const;
+
 export type GovernmentActorType = "citizen" | "business" | "agent" | "system";
 
 export interface GovernmentEvent {
@@ -38,6 +46,39 @@ export interface ServiceScore {
   breaches: string[];
 }
 
+export interface XRoadCallObservation {
+  serviceId: string;
+  status: "success" | "failure";
+  latencyMs: number;
+  evidenceRef: string;
+}
+
+export interface XRoadHealthSummary {
+  availabilityPct: number;
+  failureRatePct: number;
+  p95LatencyMs: number;
+  state: ServiceControlState;
+  breaches: string[];
+  evidenceRefs: string[];
+}
+
+export interface ProcurementObservation {
+  procurementId: string;
+  bidderCount: number;
+  estimatedValue: number;
+  awardedValue: number;
+  procurementMethod: "open" | "restricted" | "direct" | string;
+  evidenceRefs: string[];
+}
+
+export interface ProcurementIntegrityAssessment {
+  riskScore: number;
+  riskBand: "LOW" | "MEDIUM" | "HIGH";
+  flags: string[];
+  interpretation: "risk_signal_only_human_review_required";
+  evidenceRefs: string[];
+}
+
 export interface ReleaseEvidence {
   m6Passed: boolean;
   s7PlusPassed: boolean;
@@ -72,6 +113,10 @@ const requiredEventFields: Array<keyof GovernmentEvent> = [
 
 function clamp(value: number, min = 0, max = 100): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 export function validateGovernmentEvent(event: GovernmentEvent): ValidationResult {
@@ -137,6 +182,73 @@ export function scoreDigitalService(observation: ServiceObservation): ServiceSco
         : "CRITICAL";
 
   return { score, state, breaches };
+}
+
+export function summarizeXRoadHealth(
+  calls: XRoadCallObservation[]
+): XRoadHealthSummary {
+  if (!Array.isArray(calls) || calls.length === 0) {
+    throw new Error("GUINEA_XROAD_NO_OBSERVATIONS");
+  }
+
+  const failures = calls.filter((call) => call.status === "failure").length;
+  const availabilityPct = round1(((calls.length - failures) / calls.length) * 100);
+  const failureRatePct = round1((failures / calls.length) * 100);
+  const latencies = calls.map((call) => Math.max(0, call.latencyMs)).sort((a, b) => a - b);
+  const p95Index = Math.max(0, Math.ceil(latencies.length * 0.95) - 1);
+  const p95LatencyMs = latencies[p95Index] ?? 0;
+  const breaches: string[] = [];
+
+  if (availabilityPct < 99) breaches.push("availability");
+  if (failureRatePct > 2) breaches.push("failure_rate");
+  if (p95LatencyMs > 1000) breaches.push("p95_latency");
+
+  const state: ServiceControlState =
+    breaches.length === 0
+      ? "HEALTHY"
+      : availabilityPct >= 95 && failureRatePct <= 5
+        ? "WATCH"
+        : "CRITICAL";
+
+  return {
+    availabilityPct,
+    failureRatePct,
+    p95LatencyMs,
+    state,
+    breaches,
+    evidenceRefs: calls.map((call) => call.evidenceRef)
+  };
+}
+
+export function assessProcurementIntegrity(
+  observation: ProcurementObservation
+): ProcurementIntegrityAssessment {
+  const flags: string[] = [];
+
+  if (observation.bidderCount <= 1) flags.push("single_bid");
+  if (
+    observation.estimatedValue > 0 &&
+    observation.awardedValue > observation.estimatedValue * 1.1
+  ) {
+    flags.push("award_above_estimate");
+  }
+  if (observation.procurementMethod === "restricted") {
+    flags.push("restricted_method");
+  }
+  if (observation.procurementMethod === "direct") {
+    flags.push("direct_award_method");
+  }
+
+  const riskScore = Math.min(100, flags.length * 25);
+  const riskBand = riskScore >= 50 ? "HIGH" : riskScore >= 25 ? "MEDIUM" : "LOW";
+
+  return {
+    riskScore,
+    riskBand,
+    flags,
+    interpretation: "risk_signal_only_human_review_required",
+    evidenceRefs: [...observation.evidenceRefs]
+  };
 }
 
 export function evaluateReleaseTruth(evidence: ReleaseEvidence): ReleaseTruth {
