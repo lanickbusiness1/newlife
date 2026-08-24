@@ -8,46 +8,48 @@ Canonical chain:
 
 `Chat / signal → verification → decision → Notion canonical → GENESIS V4 → book material → product / execution → evidence → R.E.M.E™`
 
-This design extends the existing GENESIS V4 ChatGPT Native Control Plane and Loop Engineering doctrine. It does not create a new product or a parallel framework.
+This is an extension of the GENESIS V4 ChatGPT Native Control Plane and Loop Engineering doctrine, not a new product or parallel framework.
 
 ## Goal
 
-Turn durable conversations and external signals into governed, deduplicated, traceable intellectual capital that can be promoted into canonical Notion, GENESIS V4, the AfrIAgenesis® book manuscript and executable product work without letting chat memory become canonical by itself.
+Turn durable conversations and external signals into governed, deduplicated, tenant-isolated and traceable intellectual capital that can be promoted into canonical Notion, GENESIS V4, the AfrIAgenesis® book manuscript and executable product work without letting chat memory become canonical by itself.
 
 ## Non-goals
 
-- Do not embed Notion, Google Drive or other third-party credentials in the MCP runtime.
-- Do not let a model write directly to GENOME™, R.E.M.E™ or the book without an explicit gate result and write contract.
-- Do not create a second Loop Engineering engine.
-- Do not make the book a raw transcript archive.
-- Do not expose the capitalization ledger through the public Supabase Data API.
+- No Notion, GitHub, Supabase or service-role credential embedded in the runtime or repository.
+- No direct model write to GENOME™, R.E.M.E™ or the manuscript without gate + execution contract + evidence.
+- No second Loop Engineering engine.
+- No raw-transcript book archive.
+- No public Supabase Data API exposure for the capitalization ledger.
 
 ## Architecture
 
-### 1. Deterministic runtime module
+### 1. Deterministic tenant-bound runtime
 
-Create `services/mcp-server/src/livingIntellectualCapitalization.ts` as a pure TypeScript module. It owns four responsibilities:
+`services/mcp-server/src/livingIntellectualCapitalization.ts` owns:
 
-1. `compileChatSignal` — normalize a chat/conversation signal and generate a deterministic fingerprint.
-2. `evaluateEditorialSignal` — apply the Editorial Signal Gate™ and decide whether the signal is durable enough for canonical/book capitalisation.
-3. `compileCapitalizationPlan` — produce idempotent write contracts for each approved destination.
-4. `recordCapitalizationEvidence` — verify receipts returned by external connectors and close the proof chain.
+1. `compileChatSignal` — normalize a signal and derive tenant-bound cryptographic identifiers.
+2. `evaluateEditorialSignal` — execute Editorial Signal Gate™.
+3. `compileCapitalizationPlan` — produce tenant-bound idempotent write contracts only from the exact evaluated signal.
+4. `recordCapitalizationEvidence` — authenticate connector receipts and close the proof chain.
 
-The module does not perform network I/O. External writes remain connector actions executed by the governing agent. This preserves provider independence, secret isolation and least privilege.
+The module performs no external network write. Connector execution remains outside the pure domain module. The MCP request context injects `tenantId`; callers do not choose another tenant inside the payload.
 
 ### 2. MCP tools
 
-Register three governed tools in `services/mcp-server/src/index.ts`:
+Exactly three governed tools are registered:
 
 - `genesis.capitalization.evaluate_signal` — scope `capitalization:evaluate`
 - `genesis.capitalization.compile_plan` — scope `capitalization:plan`
 - `genesis.capitalization.record_evidence` — scope `capitalization:evidence`
 
-The tools inherit the existing `RequestContext`, ECES authorization and audit logging.
+They inherit `RequestContext`, ECES authorization, audit logging and restricted-data approval requirements.
+
+R.E.M.E promotion is emitted as a governed target after complete proof closure; it is not a fourth MCP tool.
 
 ### 3. Private Supabase ledger
 
-Create a migration that introduces private schema `genesis_capitalization` with six tables:
+Private schema `genesis_capitalization` contains:
 
 - `chat_signals`
 - `editorial_gate_evaluations`
@@ -56,11 +58,13 @@ Create a migration that introduces private schema `genesis_capitalization` with 
 - `execution_receipts`
 - `proof_chains`
 
-The schema is not added to `api.schemas`. All privileges are revoked from `PUBLIC`, `anon` and `authenticated`. RLS is enabled as defense in depth. The tables are intended for server-side persistence through a separately authorized database integration, not direct browser access.
+The schema is not exposed through Supabase Data API. `PUBLIC`, `anon` and `authenticated` receive no schema/table privileges. RLS is enabled on every table as defense in depth. Server-side persistence is limited to the authorized service integration.
+
+Every parent-child relation is tenant-bound through composite foreign keys, so a privileged persistence path cannot attach a child row from tenant B to a parent row from tenant A.
 
 ### 4. Write contracts
 
-A capitalization plan contains zero or more target contracts. Supported target types are:
+Supported target types:
 
 - `notion_canonical`
 - `genesis_v4`
@@ -68,17 +72,19 @@ A capitalization plan contains zero or more target contracts. Supported target t
 - `product_execution`
 - `reme`
 
-Every target contract includes:
+Every target includes:
 
+- `tenantId`
 - deterministic `targetId`
 - deterministic `idempotencyKey`
-- destination type
-- destination reference
+- `destinationRef`
 - action (`append`, `link`, `create_execution_item`, `promote_candidate`)
 - required evidence type
+- issued `executionNonce`
+- `allowedConnectorIds[]`
 - status `PLANNED`
 
-No target can be executed twice under the same idempotency key.
+Product execution permits only the declared repository/deployment connectors. Canonical, book and R.E.M.E targets permit the Notion connector under the current implementation.
 
 ## Data contracts
 
@@ -86,16 +92,17 @@ No target can be executed twice under the same idempotency key.
 
 Required:
 
+- `tenantId: string` — injected from governed MCP `RequestContext`
 - `conversationId: string`
 - `sourceRef: string`
 - `content: string`
 - `sourceTimestamp: string`
 - `verificationStatus: "unverified" | "verified" | "decision_validated"`
-- `confidence: number` between 0 and 1
+- `confidence: number` in `[0,1]`
 
 Optional:
 
-- `signalId`
+- caller signal reference
 - `evidenceRefs[]`
 - `canonicalDecisionRef`
 - `bookSectionHint`
@@ -103,13 +110,17 @@ Optional:
 - `tags[]`
 - `existingFingerprints[]`
 
-### Normalized chat signal
+### Signal identity and binding
 
-The compiler trims content, normalizes whitespace, de-duplicates references, derives a lowercase canonical text representation and computes an FNV-1a based fingerprint. It returns a deterministic `signalId` when none is supplied.
+Normalized content is hashed with SHA-256. The fingerprint is full-width 256-bit hexadecimal and includes `tenantId`; identical content in different tenants therefore has different fingerprints.
+
+The compiler also derives a `bindingHash` over immutable evaluation inputs including tenant, signal identity, fingerprint, verification status, confidence, evidence references, canonical/book/product references and tags.
+
+`compileCapitalizationPlan` recomputes the gate and refuses a supplied gate unless tenant, fingerprint, binding hash and evaluated result exactly match the current signal. A reused caller signal reference cannot transfer approval to modified content.
 
 ### Editorial Signal Gate™
 
-The gate scores five dimensions from 0 to 1:
+The gate scores:
 
 - verification
 - durability
@@ -117,102 +128,140 @@ The gate scores five dimensions from 0 to 1:
 - editorial value
 - execution relevance
 
-Mandatory fail-closed rules:
+Fail-closed rules:
 
-- `unverified` input cannot become canonical or book material.
-- confidence below `0.65` cannot become canonical or book material.
-- missing evidence is allowed only for `decision_validated` signals that include a `canonicalDecisionRef`.
-- exact fingerprint duplicate is rejected as `DUPLICATE`.
-- content shorter than 80 characters is rejected as `INSUFFICIENT_SIGNAL` unless it is a validated decision with an explicit canonical reference.
+- unverified input cannot become canonical/book material;
+- confidence `< 0.65` fails;
+- missing evidence is allowed only for `decision_validated` with `canonicalDecisionRef`;
+- exact tenant-bound fingerprint replay becomes `DUPLICATE`;
+- content shorter than 80 characters fails unless it is a validated decision with explicit canonical reference.
 
-A signal becomes `BOOK_CANDIDATE` when:
+Book candidate threshold: approved, total score `>= 0.72`, editorial value `>= 0.65`.
 
-- it is not duplicate,
-- verification passes,
-- total score is at least `0.72`, and
-- editorial value is at least `0.65`.
-
-A signal becomes `EXECUTION_CANDIDATE` when execution relevance is at least `0.60` and at least one product reference exists.
+Execution candidate threshold: approved, execution relevance `>= 0.60`, at least one product reference.
 
 ### Capitalization plan
 
-The planner accepts the normalized signal and gate result. It generates:
+The planner emits:
 
-- `notion_canonical` whenever the gate is approved,
-- `genesis_v4` when a canonical decision reference exists or the signal is tagged `genesis_v4`,
-- `book_manuscript` when the gate is `BOOK_CANDIDATE`,
-- `product_execution` for each product reference when it is an `EXECUTION_CANDIDATE`,
-- `reme` only after execution evidence is later recorded; it is not pre-authorized by the initial plan.
+- `notion_canonical` on approved gate;
+- `genesis_v4` when canonical decision reference exists or `genesis_v4` tag is present;
+- `book_manuscript` for a book candidate;
+- one `product_execution` contract per distinct product reference for an execution candidate.
 
-### Evidence closure
+R.E.M.E is emitted only after a complete proof returns `REME_CANDIDATE`.
 
-`recordCapitalizationEvidence` receives a plan and connector receipts. Each receipt contains:
+## Authenticated evidence closure
+
+A receipt contains:
 
 - `targetId`
 - `receiptRef`
 - `executedAt`
-- `status: "success" | "failed"`
+- `status`
 - optional `artifactHash`
+- `connectorId`
+- issued target `nonce`
+- `attestation`
 
-The proof result is:
+The verifier requires `CAPITALIZATION_RECEIPT_HMAC_SECRET` at runtime and validates an HMAC-SHA256 over a canonical payload binding:
 
-- `COMPLETE` when every planned target has a successful receipt,
-- `PARTIAL` when at least one target succeeded and at least one is missing/failed,
-- `FAILED` when no planned target succeeded.
+`tenant + plan + target + destination/action + connector + nonce + receipt fields`.
 
-A complete proof returns `nextGate: "REME_CANDIDATE"`. Partial or failed proof returns `nextGate: "EXECUTION_REPAIR"`.
+Closure fails closed when the verifier secret is unavailable, the nonce differs, the connector is not allow-listed or the attestation is invalid. Caller-controlled receipt strings alone can never yield `COMPLETE`.
+
+Proof states:
+
+- `COMPLETE` — every planned target has an authenticated successful receipt;
+- `PARTIAL` — at least one authenticated target succeeds and at least one is missing/failed;
+- `FAILED` — no planned target succeeds.
+
+Only `COMPLETE` yields `REME_CANDIDATE`.
+
+## Database trust model
+
+The persistence schema stores runtime binding fields, execution nonces, connector allowlists and receipt trust state.
+
+Tenant-aware lineage constraints include:
+
+- gate → signal: `(tenant_id, chat_signal_id)`
+- plan → signal: `(tenant_id, chat_signal_id)`
+- plan → gate: `(tenant_id, editorial_gate_evaluation_id, chat_signal_id)`
+- target → plan: `(tenant_id, capitalization_plan_id)`
+- receipt → target: `(tenant_id, capitalization_target_id)`
+- proof → plan: `(tenant_id, capitalization_plan_id)`
+
+Verified database receipts require HMAC-SHA256 metadata. The pre-hardening bootstrap evidence is retained for historical lineage as `legacy_unverified`; it is not upgraded retroactively and cannot satisfy the hardened runtime verifier.
 
 ## Idempotence and deduplication
 
-Two defenses are required:
+Defenses:
 
-1. normalized content fingerprint prevents exact semantic-text replay after whitespace/case normalization;
-2. per-target idempotency keys prevent duplicate writes for the same signal and destination.
+1. full-width tenant-bound SHA-256 normalized-content fingerprint;
+2. binding hash tying the gate to immutable signal inputs;
+3. tenant-bound target/idempotency keys;
+4. per-target execution nonce;
+5. HMAC-authenticated connector receipts;
+6. tenant-aware database foreign keys.
 
-The runtime does not claim semantic embedding similarity. Near-duplicate semantic detection can be added later through the World Model without changing these contracts.
+Near-duplicate semantic detection remains a future World Model capability and is not claimed here.
 
-## Security
+## Security invariants
 
 - ChatGPT memory remains `non_canonical_cache`.
-- Restricted data still requires `approvalContext` through the existing MCP request gate.
-- The Supabase ledger stays in a private schema and is not added to Data API exposure.
-- `PUBLIC`, `anon` and `authenticated` receive no privileges on the schema or tables.
-- No `SECURITY DEFINER` function is introduced.
-- No service role key, Notion token or database secret is committed.
-- External connectors must return receipts before the system claims end-to-end completion.
+- Restricted data still requires `approvalContext` through ECES.
+- Private schema remains outside browser/Data API exposure.
+- `PUBLIC`, `anon`, `authenticated` have no privileges on the schema/tables.
+- No `SECURITY DEFINER` function is introduced by V4-DEC-016.
+- No secret is committed.
+- No proof completion without authenticated execution receipts.
+- No cross-tenant lineage even through privileged persistence.
+
+RLS-without-policy notices on this private schema are intentional: client roles have no schema/table access. This is fail-closed, not an omitted client policy.
 
 ## Rollback
 
-The repository will include an explicit rollback SQL artifact. In a controlled dev/staging validation, rollback removes only the `genesis_capitalization` schema introduced by this feature. Production execution must export/retain ledger evidence before destructive rollback.
+Two rollback layers exist:
 
-## Tests
+1. feature rollback can remove the isolated `genesis_capitalization` schema when destructive rollback is explicitly authorized and evidence has been exported;
+2. the security-hardening rollback can restore the pre-hardening schema shape for controlled recovery, with an explicit warning that it discards post-hardening binding/attestation columns.
 
-Vitest coverage must prove:
+Rollback is an emergency recovery mechanism, not an automatic downgrade path.
 
-1. verified durable signal is accepted and routed to canonical + book + product targets;
-2. unverified or low-confidence signal fails closed;
-3. exact fingerprint duplicate is rejected;
-4. short validated CEO decision with canonical reference can pass despite short content;
-5. book destination is absent for low editorial value;
-6. product destination is absent without product references;
-7. evidence closure distinguishes COMPLETE/PARTIAL/FAILED;
-8. MCP index registers three least-privilege tools;
-9. migration contains the six required tables, RLS and explicit revokes;
-10. rollback artifact removes only the feature schema.
+## Test requirements
+
+Vitest must prove at minimum:
+
+1. approved durable routing to canonical/GENESIS/book/product targets;
+2. fail-closed verification/confidence behavior;
+3. exact duplicate rejection;
+4. validated short-decision exception;
+5. target omission when editorial/execution requirements are absent;
+6. COMPLETE/PARTIAL/FAILED evidence states;
+7. R.E.M.E contract only after complete proof;
+8. three least-privilege MCP tools;
+9. every ledger table has RLS and explicit revokes;
+10. tenant-scoped SHA-256 identity/idempotency;
+11. gate↔signal immutable binding;
+12. HMAC receipt tamper/wrong-connector/missing-verifier rejection;
+13. tenant-aware composite database lineage;
+14. rollback artifacts are present.
 
 ## Done definition
 
-`V4-DEC-016` moves from `SPÉCIFIÉ — NON ENCORE CODÉ` to `CODÉ — VERIFIED` only when all of the following exist:
+`V4-DEC-016` reaches `CODÉ — VERIFIED` only when all are evidenced:
 
-- implementation code;
-- migration committed and applied to the linked Supabase project or a verified staging equivalent;
-- tests passing;
-- typecheck passing;
-- build passing;
-- npm security audit passing at the repository threshold;
-- Supabase security advisor reviewed after DDL;
-- rollback artifact present and validated;
-- MCP tools registered;
-- one real canonical Notion + book write executed through authorized connectors with receipts recorded in the proof chain;
+- implementation committed;
+- private migrations applied to linked Supabase runtime;
+- audit, typecheck, tests and build green;
+- security/performance advisors reviewed and feature-caused findings resolved or explicitly justified;
+- rollback artifacts present;
+- three MCP tools registered;
+- canonical Notion/book writes executed through authorized connectors;
+- evidence lineage recorded;
 - M6, S7+ and M8 evidence recorded;
-- R.E.M.E™ update completed.
+- R.E.M.E update completed;
+- independent PR review has no unresolved valid blocking finding;
+- merged `main` passes its post-merge CI.
+
+A historical pre-hardening receipt is never presented as post-hardening cryptographic proof.
