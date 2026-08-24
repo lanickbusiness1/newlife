@@ -3,9 +3,10 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 export const GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR = Object.freeze({
   decisionId: "V4-DEC-016",
   assetId: "GENESIS-V4-LIVING-INTELLECTUAL-CAPITALIZATION-LOOP",
-  version: "1.1.0",
+  version: "1.2.0",
   mode: "extension_not_framework",
   editorialGate: "Editorial Signal Gate™",
+  planTrust: "HMAC-SHA256 planning authority attestation",
   receiptTrust: "HMAC-SHA256 connector attestation",
   destinations: [
     "notion_canonical",
@@ -124,6 +125,8 @@ export type CapitalizationReceipt = {
 
 export type CapitalizationReceiptVerifier = {
   hmacSecret: string;
+  planHmacSecret: string;
+  planAttestation: string;
   allowedConnectorIds?: string[];
 };
 
@@ -142,9 +145,7 @@ export type CapitalizationProof = {
 type UnsignedCapitalizationReceipt = Omit<CapitalizationReceipt, "attestation">;
 
 function required(value: unknown, code: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(code);
-  }
+  if (typeof value !== "string" || value.trim().length === 0) throw new Error(code);
   return value.trim();
 }
 
@@ -154,11 +155,9 @@ function optional(value: unknown): string | null {
 
 function uniqueStrings(values: unknown): string[] {
   if (!Array.isArray(values)) return [];
-  return [...new Set(
-    values
-      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-      .map(value => value.trim())
-  )];
+  return [...new Set(values
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map(value => value.trim()))];
 }
 
 function canonicalStrings(values: string[]): string[] {
@@ -170,9 +169,7 @@ function normalizeText(value: string): string {
 }
 
 function digest(prefix: string, parts: unknown[], fullWidth = false): string {
-  const hex = createHash("sha256")
-    .update(JSON.stringify(parts))
-    .digest("hex");
+  const hex = createHash("sha256").update(JSON.stringify(parts)).digest("hex");
   return `${prefix}-${fullWidth ? hex : hex.slice(0, 32)}`;
 }
 
@@ -188,10 +185,14 @@ function assertConfidence(value: number): void {
 
 function assertTimestamp(value: string): string {
   const timestamp = required(value, "CAPITALIZATION_SIGNAL_TIMESTAMP_REQUIRED");
-  if (Number.isNaN(Date.parse(timestamp))) {
-    throw new Error("CAPITALIZATION_SIGNAL_INVALID_TIMESTAMP");
-  }
+  if (Number.isNaN(Date.parse(timestamp))) throw new Error("CAPITALIZATION_SIGNAL_INVALID_TIMESTAMP");
   return timestamp;
+}
+
+function assertHmacSecret(secret: unknown, code: string): string {
+  const value = required(secret, code);
+  if (value.length < 32) throw new Error(code);
+  return value;
 }
 
 function buildSignalBinding(fields: {
@@ -221,9 +222,7 @@ function buildSignalBinding(fields: {
 }
 
 export function compileChatSignal(input: ChatSignalInput): NormalizedChatSignal {
-  if (!input || typeof input !== "object") {
-    throw new Error("CAPITALIZATION_SIGNAL_INVALID_INPUT");
-  }
+  if (!input || typeof input !== "object") throw new Error("CAPITALIZATION_SIGNAL_INVALID_INPUT");
 
   const tenantId = required(input.tenantId, "CAPITALIZATION_SIGNAL_TENANT_REQUIRED");
   const conversationId = required(input.conversationId, "CAPITALIZATION_SIGNAL_CONVERSATION_REQUIRED");
@@ -239,14 +238,7 @@ export function compileChatSignal(input: ChatSignalInput): NormalizedChatSignal 
   const normalizedContent = normalizeText(content);
   const fingerprint = digest("sigfp", [tenantId, normalizedContent], true);
   const callerSignalRef = optional(input.signalId);
-  const signalId = digest("signal", [
-    tenantId,
-    callerSignalRef,
-    conversationId,
-    sourceRef,
-    sourceTimestamp,
-    fingerprint
-  ]);
+  const signalId = digest("signal", [tenantId, callerSignalRef, conversationId, sourceRef, sourceTimestamp, fingerprint]);
   const evidenceRefs = uniqueStrings(input.evidenceRefs);
   const canonicalDecisionRef = optional(input.canonicalDecisionRef);
   const bookSectionHint = optional(input.bookSectionHint);
@@ -288,73 +280,32 @@ export function compileChatSignal(input: ChatSignalInput): NormalizedChatSignal 
 
 function scoreSignal(signal: NormalizedChatSignal): EditorialScores {
   const tagSet = new Set(signal.tags);
-  const verification = signal.verificationStatus === "decision_validated"
-    ? 1
-    : signal.verificationStatus === "verified"
-      ? 0.85
-      : 0;
-
-  const durability = signal.canonicalDecisionRef
-    ? 1
-    : ["doctrine", "architecture", "policy", "genesis_v4"].some(tag => tagSet.has(tag))
-      ? 0.9
-      : signal.normalizedContent.length >= 180
-        ? 0.75
-        : signal.normalizedContent.length >= 80
-          ? 0.65
-          : 0.3;
-
-  const strategicRelevance = signal.canonicalDecisionRef || tagSet.has("genesis_v4")
-    ? 1
-    : signal.productRefs.length > 0
-      ? 0.8
-      : tagSet.has("operational")
-        ? 0.65
-        : 0.5;
-
-  const editorialValue = signal.bookSectionHint || tagSet.has("book")
-    ? 1
-    : tagSet.has("operational")
-      ? 0.35
-      : signal.normalizedContent.length >= 220
-        ? 0.75
-        : signal.normalizedContent.length >= 120
-          ? 0.65
-          : 0.45;
-
-  const executionRelevance = signal.productRefs.length > 0
-    ? 1
-    : tagSet.has("execution")
-      ? 0.75
-      : 0.35;
-
-  return {
-    verification,
-    durability,
-    strategicRelevance,
-    editorialValue,
-    executionRelevance
-  };
+  const verification = signal.verificationStatus === "decision_validated" ? 1
+    : signal.verificationStatus === "verified" ? 0.85 : 0;
+  const durability = signal.canonicalDecisionRef ? 1
+    : ["doctrine", "architecture", "policy", "genesis_v4"].some(tag => tagSet.has(tag)) ? 0.9
+    : signal.normalizedContent.length >= 180 ? 0.75
+    : signal.normalizedContent.length >= 80 ? 0.65 : 0.3;
+  const strategicRelevance = signal.canonicalDecisionRef || tagSet.has("genesis_v4") ? 1
+    : signal.productRefs.length > 0 ? 0.8
+    : tagSet.has("operational") ? 0.65 : 0.5;
+  const editorialValue = signal.bookSectionHint || tagSet.has("book") ? 1
+    : tagSet.has("operational") ? 0.35
+    : signal.normalizedContent.length >= 220 ? 0.75
+    : signal.normalizedContent.length >= 120 ? 0.65 : 0.45;
+  const executionRelevance = signal.productRefs.length > 0 ? 1 : tagSet.has("execution") ? 0.75 : 0.35;
+  return { verification, durability, strategicRelevance, editorialValue, executionRelevance };
 }
 
 export function evaluateEditorialSignal(
   signal: NormalizedChatSignal,
   existingFingerprints: string[] = signal.existingFingerprints
 ): EditorialGateResult {
-  if (!signal || typeof signal !== "object") {
-    throw new Error("EDITORIAL_GATE_INVALID_SIGNAL");
-  }
+  if (!signal || typeof signal !== "object") throw new Error("EDITORIAL_GATE_INVALID_SIGNAL");
 
   const fingerprints = new Set(uniqueStrings(existingFingerprints));
   const scores = scoreSignal(signal);
-  const totalScore = round3(
-    (scores.verification
-      + scores.durability
-      + scores.strategicRelevance
-      + scores.editorialValue
-      + scores.executionRelevance) / 5
-  );
-
+  const totalScore = round3((scores.verification + scores.durability + scores.strategicRelevance + scores.editorialValue + scores.executionRelevance) / 5);
   const base = {
     tenantId: signal.tenantId,
     signalId: signal.signalId,
@@ -378,24 +329,13 @@ export function evaluateEditorialSignal(
   const reasons: string[] = [];
   if (signal.verificationStatus === "unverified") reasons.push("verification_required");
   if (signal.confidence < 0.65) reasons.push("confidence_below_0_65");
-
-  const validatedDecisionException = signal.verificationStatus === "decision_validated"
-    && Boolean(signal.canonicalDecisionRef);
-
-  if (signal.evidenceRefs.length === 0 && !validatedDecisionException) {
-    reasons.push("evidence_required");
-  }
-  if (signal.normalizedContent.length < 80 && !validatedDecisionException) {
-    reasons.push("insufficient_signal");
-  }
+  const validatedDecisionException = signal.verificationStatus === "decision_validated" && Boolean(signal.canonicalDecisionRef);
+  if (signal.evidenceRefs.length === 0 && !validatedDecisionException) reasons.push("evidence_required");
+  if (signal.normalizedContent.length < 80 && !validatedDecisionException) reasons.push("insufficient_signal");
 
   const status: EditorialGateStatus = reasons.length === 0 ? "APPROVED" : "REJECTED";
-  const bookCandidate = status === "APPROVED"
-    && totalScore >= 0.72
-    && scores.editorialValue >= 0.65;
-  const executionCandidate = status === "APPROVED"
-    && scores.executionRelevance >= 0.6
-    && signal.productRefs.length > 0;
+  const bookCandidate = status === "APPROVED" && totalScore >= 0.72 && scores.editorialValue >= 0.65;
+  const executionCandidate = status === "APPROVED" && scores.executionRelevance >= 0.6 && signal.productRefs.length > 0;
 
   return {
     ...base,
@@ -404,7 +344,7 @@ export function evaluateEditorialSignal(
     executionCandidate,
     reasons,
     requiredGates: status === "APPROVED"
-      ? ["CANONICAL_WRITE_RECEIPT", "CONNECTOR_ATTESTATION", "EVIDENCE_CLOSURE"]
+      ? ["CANONICAL_WRITE_RECEIPT", "PLAN_AUTHORITY_ATTESTATION", "CONNECTOR_ATTESTATION", "EVIDENCE_CLOSURE"]
       : ["EDITORIAL_SIGNAL_REPAIR"]
   };
 }
@@ -449,13 +389,8 @@ function target(
   };
 }
 
-export function compileCapitalizationPlan(
-  signal: NormalizedChatSignal,
-  gate: EditorialGateResult
-): CapitalizationPlan {
-  if (!signal || !gate) {
-    throw new Error("CAPITALIZATION_PLAN_INVALID_INPUT");
-  }
+export function compileCapitalizationPlan(signal: NormalizedChatSignal, gate: EditorialGateResult): CapitalizationPlan {
+  if (!signal || !gate) throw new Error("CAPITALIZATION_PLAN_INVALID_INPUT");
 
   const recomputedGate = evaluateEditorialSignal(signal, signal.existingFingerprints);
   if (gate.tenantId !== signal.tenantId
@@ -480,44 +415,23 @@ export function compileCapitalizationPlan(
     };
   }
 
-  const targets: CapitalizationTarget[] = [];
-  targets.push(target(
+  const targets: CapitalizationTarget[] = [target(
     signal,
     "notion_canonical",
     signal.canonicalDecisionRef ?? "notion:capitalization-inbox",
     "append",
     "connector_receipt"
-  ));
+  )];
 
   if (signal.canonicalDecisionRef || signal.tags.includes("genesis_v4")) {
-    targets.push(target(
-      signal,
-      "genesis_v4",
-      signal.canonicalDecisionRef ?? "GENESIS-V4",
-      "link",
-      "connector_receipt"
-    ));
+    targets.push(target(signal, "genesis_v4", signal.canonicalDecisionRef ?? "GENESIS-V4", "link", "connector_receipt"));
   }
-
   if (gate.bookCandidate) {
-    targets.push(target(
-      signal,
-      "book_manuscript",
-      `book:${signal.bookSectionHint ?? "editorial-memory"}`,
-      "append",
-      "connector_receipt"
-    ));
+    targets.push(target(signal, "book_manuscript", `book:${signal.bookSectionHint ?? "editorial-memory"}`, "append", "connector_receipt"));
   }
-
   if (gate.executionCandidate) {
     for (const productRef of signal.productRefs) {
-      targets.push(target(
-        signal,
-        "product_execution",
-        `product:${productRef}`,
-        "create_execution_item",
-        "repository_receipt"
-      ));
+      targets.push(target(signal, "product_execution", `product:${productRef}`, "create_execution_item", "repository_receipt"));
     }
   }
 
@@ -532,6 +446,52 @@ export function compileCapitalizationPlan(
     remeStatus: targets.length > 0 ? "PENDING_EXECUTION_EVIDENCE" : "NOT_ELIGIBLE",
     blockers: targets.length > 0 ? [] : ["no_capitalization_targets"]
   };
+}
+
+export function planAttestationPayload(plan: CapitalizationPlan): string {
+  if (!plan || typeof plan !== "object") throw new Error("CAPITALIZATION_PLAN_INVALID_INPUT");
+  const targets = [...plan.targets]
+    .sort((a, b) => a.targetId.localeCompare(b.targetId))
+    .map(item => ({
+      tenantId: item.tenantId,
+      targetId: item.targetId,
+      type: item.type,
+      destinationRef: item.destinationRef,
+      action: item.action,
+      requiredEvidenceType: item.requiredEvidenceType,
+      idempotencyKey: item.idempotencyKey,
+      executionNonce: item.executionNonce,
+      allowedConnectorIds: canonicalStrings(item.allowedConnectorIds),
+      status: item.status
+    }));
+  return JSON.stringify({
+    version: 1,
+    tenantId: plan.tenantId,
+    planId: plan.planId,
+    signalId: plan.signalId,
+    signalBindingHash: plan.signalBindingHash,
+    fingerprint: plan.fingerprint,
+    status: plan.status,
+    remeStatus: plan.remeStatus,
+    blockers: canonicalStrings(plan.blockers),
+    targets
+  });
+}
+
+export function attestCapitalizationPlan(plan: CapitalizationPlan, secret: string): string {
+  const signingSecret = assertHmacSecret(secret, "CAPITALIZATION_PLAN_SIGNER_UNAVAILABLE");
+  return createHmac("sha256", signingSecret).update(planAttestationPayload(plan)).digest("hex");
+}
+
+function verifyPlanAttestation(plan: CapitalizationPlan, verifier: CapitalizationReceiptVerifier): void {
+  const secret = assertHmacSecret(verifier?.planHmacSecret, "CAPITALIZATION_PLAN_ATTESTATION_REQUIRED");
+  const attestation = required(verifier?.planAttestation, "CAPITALIZATION_PLAN_ATTESTATION_REQUIRED");
+  if (!/^[0-9a-f]{64}$/i.test(attestation)) throw new Error("CAPITALIZATION_PLAN_ATTESTATION_INVALID");
+  const expected = createHmac("sha256", secret).update(planAttestationPayload(plan)).digest();
+  const actual = Buffer.from(attestation, "hex");
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    throw new Error("CAPITALIZATION_PLAN_ATTESTATION_INVALID");
+  }
 }
 
 export function receiptAttestationPayload(
@@ -565,21 +525,14 @@ function verifyReceiptAttestation(
   receipt: CapitalizationReceipt,
   verifier: CapitalizationReceiptVerifier
 ): void {
-  const secret = required(verifier?.hmacSecret, "CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
-  if (secret.length < 32) {
-    throw new Error("CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
-  }
+  const secret = assertHmacSecret(verifier?.hmacSecret, "CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
   const connectorId = required(receipt.connectorId, "CAPITALIZATION_RECEIPT_CONNECTOR_REQUIRED");
   if (!target.allowedConnectorIds.includes(connectorId)
     || (verifier.allowedConnectorIds && !verifier.allowedConnectorIds.includes(connectorId))) {
     throw new Error("CAPITALIZATION_RECEIPT_CONNECTOR_NOT_ALLOWED");
   }
-  if (receipt.nonce !== target.executionNonce) {
-    throw new Error("CAPITALIZATION_RECEIPT_NONCE_MISMATCH");
-  }
-  if (!/^[0-9a-f]{64}$/i.test(receipt.attestation)) {
-    throw new Error("CAPITALIZATION_RECEIPT_ATTESTATION_INVALID");
-  }
+  if (receipt.nonce !== target.executionNonce) throw new Error("CAPITALIZATION_RECEIPT_NONCE_MISMATCH");
+  if (!/^[0-9a-f]{64}$/i.test(receipt.attestation)) throw new Error("CAPITALIZATION_RECEIPT_ATTESTATION_INVALID");
 
   const unsigned: UnsignedCapitalizationReceipt = {
     targetId: receipt.targetId,
@@ -604,59 +557,43 @@ export function recordCapitalizationEvidence(
   receipts: CapitalizationReceipt[],
   verifier: CapitalizationReceiptVerifier
 ): CapitalizationProof {
-  if (!plan || typeof plan !== "object") {
-    throw new Error("CAPITALIZATION_PROOF_INVALID_PLAN");
-  }
-  if (!Array.isArray(receipts)) {
-    throw new Error("CAPITALIZATION_PROOF_INVALID_RECEIPTS");
-  }
-  required(verifier?.hmacSecret, "CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
+  if (!plan || typeof plan !== "object") throw new Error("CAPITALIZATION_PROOF_INVALID_PLAN");
+  if (!Array.isArray(receipts)) throw new Error("CAPITALIZATION_PROOF_INVALID_RECEIPTS");
+  verifyPlanAttestation(plan, verifier);
+  assertHmacSecret(verifier?.hmacSecret, "CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
 
   const planned = new Map(plan.targets.map(item => [item.targetId, item]));
   const normalizedReceipts: CapitalizationReceipt[] = [];
   const seenTargetIds = new Set<string>();
 
   for (const receipt of receipts) {
-    if (!receipt || !planned.has(receipt.targetId)) {
-      throw new Error("CAPITALIZATION_RECEIPT_UNKNOWN_TARGET");
-    }
-    if (seenTargetIds.has(receipt.targetId)) {
-      throw new Error("CAPITALIZATION_RECEIPT_DUPLICATE_TARGET");
-    }
+    if (!receipt || !planned.has(receipt.targetId)) throw new Error("CAPITALIZATION_RECEIPT_UNKNOWN_TARGET");
+    if (seenTargetIds.has(receipt.targetId)) throw new Error("CAPITALIZATION_RECEIPT_DUPLICATE_TARGET");
     const plannedTarget = planned.get(receipt.targetId)!;
-    if (plannedTarget.tenantId !== plan.tenantId) {
-      throw new Error("CAPITALIZATION_RECEIPT_TENANT_MISMATCH");
-    }
+    if (plannedTarget.tenantId !== plan.tenantId) throw new Error("CAPITALIZATION_RECEIPT_TENANT_MISMATCH");
     required(receipt.receiptRef, "CAPITALIZATION_RECEIPT_REF_REQUIRED");
     assertTimestamp(receipt.executedAt);
-    if (receipt.status !== "success" && receipt.status !== "failed") {
-      throw new Error("CAPITALIZATION_RECEIPT_INVALID_STATUS");
-    }
+    if (receipt.status !== "success" && receipt.status !== "failed") throw new Error("CAPITALIZATION_RECEIPT_INVALID_STATUS");
     verifyReceiptAttestation(plan, plannedTarget, receipt, verifier);
     normalizedReceipts.push({ ...receipt });
     seenTargetIds.add(receipt.targetId);
   }
 
-  const successfulTargetIds = normalizedReceipts
-    .filter(receipt => receipt.status === "success")
-    .map(receipt => receipt.targetId);
-  const failedTargetIds = normalizedReceipts
-    .filter(receipt => receipt.status === "failed")
-    .map(receipt => receipt.targetId);
+  normalizedReceipts.sort((a, b) => a.targetId.localeCompare(b.targetId) || a.receiptRef.localeCompare(b.receiptRef));
+
+  const successfulTargetIds = normalizedReceipts.filter(receipt => receipt.status === "success").map(receipt => receipt.targetId);
+  const failedTargetIds = normalizedReceipts.filter(receipt => receipt.status === "failed").map(receipt => receipt.targetId);
   const successful = new Set(successfulTargetIds);
   const failed = new Set(failedTargetIds);
   const missingTargetIds = plan.targets
     .map(item => item.targetId)
-    .filter(targetId => !successful.has(targetId) && !failed.has(targetId));
+    .filter(targetId => !successful.has(targetId) && !failed.has(targetId))
+    .sort((a, b) => a.localeCompare(b));
 
   let status: CapitalizationProof["status"];
-  if (plan.targets.length > 0 && successfulTargetIds.length === plan.targets.length) {
-    status = "COMPLETE";
-  } else if (successfulTargetIds.length > 0) {
-    status = "PARTIAL";
-  } else {
-    status = "FAILED";
-  }
+  if (plan.targets.length > 0 && successfulTargetIds.length === plan.targets.length) status = "COMPLETE";
+  else if (successfulTargetIds.length > 0) status = "PARTIAL";
+  else status = "FAILED";
 
   return {
     tenantId: plan.tenantId,
