@@ -54,6 +54,8 @@ export interface AssuranceFinding {
 export interface AssuranceReport {
   schemaVersion: "1.0.0";
   auditorRole: AssuranceAuditorRole;
+  auditorId: string;
+  executionContextId: string;
   snapshotSha: string;
   findings: AssuranceFinding[];
   verdict: AssuranceReportVerdict;
@@ -74,7 +76,12 @@ export interface IndependentAssuranceEvidence {
   openP0: number;
   openP1: number;
   auditorReportHashes: string[];
+  specialistAuditorIds: string[];
+  specialistExecutionContextIds: string[];
   arbiterReportHash: string;
+  arbiterAuditorId: string;
+  arbiterExecutionContextId: string;
+  builderAgentIds: string[];
   externalMandate: boolean;
   evidenceRef: string;
   generatedAt: string;
@@ -85,6 +92,7 @@ export interface IndependentAssuranceInput {
   snapshotSha: string;
   specialistReports: AssuranceReport[];
   arbiterReport: AssuranceReport;
+  builderAgentIds: string[];
   externalMandate: boolean;
   evidenceRef: string;
   generatedAt: string;
@@ -137,6 +145,17 @@ function validateFinding(finding: AssuranceFinding, index: number): AssuranceFin
   return finding;
 }
 
+function normalizedUnique(values: unknown, name: string, expectedLength?: number): string[] {
+  if (!Array.isArray(values) || (expectedLength !== undefined && values.length !== expectedLength)) {
+    throw new Error(`INDEPENDENT_ASSURANCE_INVALID: ${name} must contain ${expectedLength ?? "the required"} entries`);
+  }
+  const normalized = values.map((value, index) => requiredString(value, `${name}[${index}]`));
+  if (new Set(normalized).size !== normalized.length) {
+    throw new Error(`INDEPENDENT_ASSURANCE_INVALID: ${name} contains duplicate identities/contexts`);
+  }
+  return normalized;
+}
+
 export function compileAssuranceReport(input: AssuranceReportInput): AssuranceReport {
   if (!AUDITOR_ROLES.has(input?.auditorRole)) {
     throw new Error("INDEPENDENT_ASSURANCE_INVALID: auditorRole is unknown");
@@ -144,6 +163,8 @@ export function compileAssuranceReport(input: AssuranceReportInput): AssuranceRe
   if (!REPORT_VERDICTS.has(input?.verdict)) {
     throw new Error("INDEPENDENT_ASSURANCE_INVALID: verdict must be PASS, HOLD or BLOCK");
   }
+  const auditorId = requiredString(input.auditorId, "auditorId");
+  const executionContextId = requiredString(input.executionContextId, "executionContextId");
   requiredString(input.snapshotSha, "snapshotSha");
   requiredString(input.generatedAt, "generatedAt");
   if (!Array.isArray(input.findings)) {
@@ -158,6 +179,8 @@ export function compileAssuranceReport(input: AssuranceReportInput): AssuranceRe
   const withoutHash: Omit<AssuranceReport, "sha256"> = {
     schemaVersion: "1.0.0",
     ...input,
+    auditorId,
+    executionContextId,
     snapshotSha: input.snapshotSha.trim(),
     evidenceRefs: input.evidenceRefs.map(ref => ref.trim())
   };
@@ -174,8 +197,13 @@ export function verifyAssuranceReport(report: AssuranceReport): { valid: true; s
   if (!REPORT_VERDICTS.has(report.verdict)) {
     throw new Error("INDEPENDENT_ASSURANCE_INVALID: report verdict is unknown");
   }
+  requiredString(report.auditorId, "report.auditorId");
+  requiredString(report.executionContextId, "report.executionContextId");
   requiredString(report.snapshotSha, "report.snapshotSha");
   requiredString(report.generatedAt, "report.generatedAt");
+  if (!Array.isArray(report.findings)) {
+    throw new Error("INDEPENDENT_ASSURANCE_INVALID: report findings must be an array");
+  }
   report.findings.forEach(validateFinding);
   if (!Array.isArray(report.evidenceRefs) || report.evidenceRefs.length === 0) {
     throw new Error("INDEPENDENT_ASSURANCE_INVALID: report evidenceRefs must not be empty");
@@ -202,11 +230,17 @@ export function compileIndependentAssurance(input: IndependentAssuranceInput): I
   if (typeof input?.externalMandate !== "boolean") {
     throw new Error("INDEPENDENT_ASSURANCE_INVALID: externalMandate must be boolean");
   }
+  const builderAgentIds = normalizedUnique(input?.builderAgentIds, "builderAgentIds");
+  if (builderAgentIds.length === 0) {
+    throw new Error("INDEPENDENT_ASSURANCE_INVALID: builderAgentIds must identify at least one change-authoring agent");
+  }
   if (!Array.isArray(input?.specialistReports) || input.specialistReports.length !== 5) {
     throw new Error("INDEPENDENT_ASSURANCE_INVALID: exactly five specialist reports are required");
   }
 
   const seenRoles = new Set<string>();
+  const specialistAuditorIds: string[] = [];
+  const specialistExecutionContextIds: string[] = [];
   for (const report of input.specialistReports) {
     verifyAssuranceReport(report);
     if (!SPECIALIST_ROLES.includes(report.auditorRole as AssuranceSpecialistRole)) {
@@ -219,6 +253,14 @@ export function compileIndependentAssurance(input: IndependentAssuranceInput): I
     if (report.snapshotSha !== snapshotSha) {
       throw new Error("INDEPENDENT_ASSURANCE_SNAPSHOT_MISMATCH: specialist report differs from council snapshot");
     }
+    if (specialistAuditorIds.includes(report.auditorId)) {
+      throw new Error(`INDEPENDENT_ASSURANCE_IDENTITY_COLLISION: duplicate specialist auditor identity ${report.auditorId}`);
+    }
+    if (specialistExecutionContextIds.includes(report.executionContextId)) {
+      throw new Error(`INDEPENDENT_ASSURANCE_CONTEXT_COLLISION: duplicate specialist execution context ${report.executionContextId}`);
+    }
+    specialistAuditorIds.push(report.auditorId);
+    specialistExecutionContextIds.push(report.executionContextId);
   }
 
   for (const requiredRole of SPECIALIST_ROLES) {
@@ -233,6 +275,21 @@ export function compileIndependentAssurance(input: IndependentAssuranceInput): I
   }
   if (input.arbiterReport.snapshotSha !== snapshotSha) {
     throw new Error("INDEPENDENT_ASSURANCE_SNAPSHOT_MISMATCH: arbiter report differs from council snapshot");
+  }
+  if (specialistAuditorIds.includes(input.arbiterReport.auditorId)) {
+    throw new Error("INDEPENDENT_ASSURANCE_SEPARATION_REQUIRED: arbiter auditor identity must be distinct from all specialists");
+  }
+  if (specialistExecutionContextIds.includes(input.arbiterReport.executionContextId)) {
+    throw new Error("INDEPENDENT_ASSURANCE_SEPARATION_REQUIRED: arbiter execution context must be distinct from all specialists");
+  }
+
+  const builderSet = new Set(builderAgentIds);
+  if (builderSet.has(input.arbiterReport.auditorId)) {
+    throw new Error("INDEPENDENT_ASSURANCE_SEPARATION_REQUIRED: builder identity cannot act as Assurance Arbiter");
+  }
+  const independentSpecialistCount = specialistAuditorIds.filter(id => !builderSet.has(id)).length;
+  if (independentSpecialistCount < 4) {
+    throw new Error("INDEPENDENT_ASSURANCE_SEPARATION_REQUIRED: at least four specialist auditor identities must be independent of builder identities");
   }
 
   const reports = [...input.specialistReports, input.arbiterReport];
@@ -259,7 +316,12 @@ export function compileIndependentAssurance(input: IndependentAssuranceInput): I
     openP0,
     openP1,
     auditorReportHashes: input.specialistReports.map(report => report.sha256),
+    specialistAuditorIds,
+    specialistExecutionContextIds,
     arbiterReportHash: input.arbiterReport.sha256,
+    arbiterAuditorId: input.arbiterReport.auditorId,
+    arbiterExecutionContextId: input.arbiterReport.executionContextId,
+    builderAgentIds,
     externalMandate: input.externalMandate,
     evidenceRef: input.evidenceRef.trim(),
     generatedAt: input.generatedAt.trim()
@@ -296,6 +358,28 @@ export function verifyIndependentAssurance(
     || evidence.auditorReportHashes.some(hash => !/^[a-f0-9]{64}$/.test(hash))) {
     throw new Error("INDEPENDENT_ASSURANCE_INVALID: five valid specialist report hashes are required");
   }
+
+  const specialistAuditorIds = normalizedUnique(evidence.specialistAuditorIds, "specialistAuditorIds", 5);
+  const specialistExecutionContextIds = normalizedUnique(evidence.specialistExecutionContextIds, "specialistExecutionContextIds", 5);
+  const arbiterAuditorId = requiredString(evidence.arbiterAuditorId, "arbiterAuditorId");
+  const arbiterExecutionContextId = requiredString(evidence.arbiterExecutionContextId, "arbiterExecutionContextId");
+  const builderAgentIds = normalizedUnique(evidence.builderAgentIds, "builderAgentIds");
+  if (builderAgentIds.length === 0) {
+    throw new Error("INDEPENDENT_ASSURANCE_INVALID: builderAgentIds must not be empty");
+  }
+  if (specialistAuditorIds.includes(arbiterAuditorId)) {
+    throw new Error("INDEPENDENT_ASSURANCE_SEPARATION_REQUIRED: arbiter auditor identity collides with specialist");
+  }
+  if (specialistExecutionContextIds.includes(arbiterExecutionContextId)) {
+    throw new Error("INDEPENDENT_ASSURANCE_SEPARATION_REQUIRED: arbiter context collides with specialist");
+  }
+  if (builderAgentIds.includes(arbiterAuditorId)) {
+    throw new Error("INDEPENDENT_ASSURANCE_SEPARATION_REQUIRED: builder identity cannot be arbiter");
+  }
+  if (specialistAuditorIds.filter(id => !builderAgentIds.includes(id)).length < 4) {
+    throw new Error("INDEPENDENT_ASSURANCE_SEPARATION_REQUIRED: insufficient independent specialist identities");
+  }
+
   if (!/^[a-f0-9]{64}$/.test(evidence.arbiterReportHash)) {
     throw new Error("INDEPENDENT_ASSURANCE_INVALID: arbiterReportHash is invalid");
   }
