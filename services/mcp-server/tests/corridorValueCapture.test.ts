@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
   assessCorridorValueCapture,
@@ -212,5 +213,15 @@ describe("GENESIS V4 Energy Corridor & Resource Value Capture Engine", () => {
     } as unknown as CorridorValueCaptureInput;
 
     expect(() => assessCorridorValueCapture(invalid)).toThrow(/CORRIDOR_INVALID_MARKET_REACH/);
+  });
+
+  test("requires governed MCP registration and health metadata for the corridor engine", () => {
+    const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+
+    expect(indexSource).toContain('register("corridor.value_capture.assess"');
+    expect(indexSource).toContain('"corridor:assess"');
+    expect(indexSource).toContain('from "./corridorValueCapture.js"');
+    expect(indexSource).toContain("corridorValueCapture: GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR.assetId");
+    expect(indexSource).toContain("corridorValueCaptureVersion: GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR.version");
   });
 });
