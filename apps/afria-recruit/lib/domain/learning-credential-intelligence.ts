@@ -55,6 +55,8 @@ export interface CandidateLearningContext {
   languages: string[];
   targetSectors: string[];
   skillGaps: string[];
+  asOf?: string;
+  maxEvidenceAgeDays?: number;
 }
 
 export interface LearningEvaluation {
@@ -105,6 +107,8 @@ const skillEvidenceRank: Record<CandidateSkillEvidenceState, number> = {
   'employer-validated': 5,
 };
 
+const DAY_MS = 86_400_000;
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -145,6 +149,26 @@ function costsAreMateriallyVerified(opportunity: LearningOpportunity): boolean {
 function assessmentConditionVerified(opportunity: LearningOpportunity): boolean {
   if (opportunity.assessmentRequired !== true) return true;
   return opportunity.assessmentVerified === true;
+}
+
+function evidenceFreshnessReason(
+  opportunity: LearningOpportunity,
+  context: CandidateLearningContext,
+): string | null {
+  if (context.maxEvidenceAgeDays === undefined) return null;
+  if (!Number.isFinite(context.maxEvidenceAgeDays) || context.maxEvidenceAgeDays < 0) {
+    return 'EVIDENCE_FRESHNESS_POLICY_INVALID';
+  }
+  if (!context.asOf?.trim()) return 'EVIDENCE_FRESHNESS_REFERENCE_MISSING';
+
+  const asOf = Date.parse(context.asOf);
+  const retrievedAt = Date.parse(opportunity.sourceRetrievedAt);
+  if (!Number.isFinite(asOf) || !Number.isFinite(retrievedAt) || retrievedAt > asOf) {
+    return 'EVIDENCE_DATE_INVALID';
+  }
+
+  const ageDays = (asOf - retrievedAt) / DAY_MS;
+  return ageDays > context.maxEvidenceAgeDays ? 'EVIDENCE_STALE' : null;
 }
 
 function isCountryRestricted(opportunity: LearningOpportunity): boolean {
@@ -321,6 +345,8 @@ export function evaluateLearningOpportunity(
   if (!hasPrimaryEvidence(opportunity)) blockingReasons.push('EVIDENCE_MISSING');
   if (opportunity.verificationStatus !== 'VERIFIED') blockingReasons.push('EVIDENCE_UNVERIFIED');
   if (classification === 'UNVERIFIED_CREDENTIAL') blockingReasons.push('CREDENTIAL_CLAIM_UNVERIFIED');
+  const freshnessReason = evidenceFreshnessReason(opportunity, context);
+  if (freshnessReason) blockingReasons.push(freshnessReason);
   if (!countryFits(opportunity, context)) blockingReasons.push('COUNTRY_INELIGIBLE');
   if (!languageFits(opportunity, context)) blockingReasons.push('LANGUAGE_INELIGIBLE');
   if (!sectorFits(opportunity, context)) blockingReasons.push('SPECIALIZATION_MISMATCH');
