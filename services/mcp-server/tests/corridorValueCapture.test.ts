@@ -7,7 +7,7 @@ import {
   type CorridorValueCaptureInput
 } from "../src/corridorValueCapture";
 
-const goFixture: CorridorValueCaptureInput = {
+const goFixture = {
   corridorId: "east-africa:tanga-lamu-eacop",
   corridorName: "Tanga–Lamu–EACOP",
   countries: ["UG", "TZ", "KE"],
@@ -38,10 +38,20 @@ const goFixture: CorridorValueCaptureInput = {
     governanceRisk: 35,
     buyerAccess: 70,
     procurementReadiness: 65
+  },
+  scoreEvidenceRefs: {
+    corridorControl: ["evidence:ownership"],
+    feedstockSecurity: ["evidence:project"],
+    infrastructureReadiness: ["evidence:storage"],
+    marketReach: ["evidence:project"],
+    localIndustrialization: ["evidence:ownership"],
+    governanceRisk: ["evidence:project"],
+    buyerAccess: ["evidence:project"],
+    procurementReadiness: ["evidence:project"]
   }
-};
+} as unknown as CorridorValueCaptureInput;
 
-const holdFixture: CorridorValueCaptureInput = {
+const holdFixture = {
   ...goFixture,
   corridorId: "east-africa:hold-case",
   corridorName: "Hold case",
@@ -55,9 +65,9 @@ const holdFixture: CorridorValueCaptureInput = {
     buyerAccess: 50,
     procurementReadiness: 50
   }
-};
+} as CorridorValueCaptureInput;
 
-const noGoFixture: CorridorValueCaptureInput = {
+const noGoFixture = {
   ...goFixture,
   corridorId: "east-africa:no-go-case",
   corridorName: "No-go case",
@@ -81,7 +91,7 @@ const noGoFixture: CorridorValueCaptureInput = {
     buyerAccess: 80,
     procurementReadiness: 80
   }
-};
+} as CorridorValueCaptureInput;
 
 describe("GENESIS V4 Energy Corridor & Resource Value Capture Engine", () => {
   test("anchors the runtime to V4-DEC-017 without creating a product silo", () => {
@@ -89,7 +99,6 @@ describe("GENESIS V4 Energy Corridor & Resource Value Capture Engine", () => {
       genome: "GENESIS_V4",
       decisionId: "V4-DEC-017",
       assetId: "GEN-V4-CORRIDOR-VALUE-CAPTURE-001",
-      version: "0.1.0",
       proofMode: "deterministic_evidence_first",
       demonstrator: "Tanga–Lamu–EACOP"
     });
@@ -201,6 +210,50 @@ describe("GENESIS V4 Energy Corridor & Resource Value Capture Engine", () => {
       "decision:GO",
       "svcr:41.5"
     ]));
+  });
+
+  test("requires explicit registered evidence for every strategic score", () => {
+    const result = assessCorridorValueCapture(goFixture) as any;
+
+    expect(result.scoreEvidenceRefs).toMatchObject({
+      corridorControl: ["evidence:ownership"],
+      feedstockSecurity: ["evidence:project"],
+      infrastructureReadiness: ["evidence:storage"],
+      localIndustrialization: ["evidence:ownership"]
+    });
+  });
+
+  test("fails closed when a strategic score has no evidence", () => {
+    const invalid = {
+      ...goFixture,
+      scoreEvidenceRefs: {
+        ...(goFixture as any).scoreEvidenceRefs,
+        marketReach: []
+      }
+    } as unknown as CorridorValueCaptureInput;
+
+    expect(() => assessCorridorValueCapture(invalid)).toThrow(/CORRIDOR_SCORE_EVIDENCE_REQUIRED_MARKET_REACH/);
+  });
+
+  test("fails closed when score evidence is not registered at assessment level", () => {
+    const invalid = {
+      ...goFixture,
+      scoreEvidenceRefs: {
+        ...(goFixture as any).scoreEvidenceRefs,
+        governanceRisk: ["evidence:orphan"]
+      }
+    } as unknown as CorridorValueCaptureInput;
+
+    expect(() => assessCorridorValueCapture(invalid)).toThrow(/CORRIDOR_SCORE_EVIDENCE_NOT_REGISTERED_GOVERNANCE_RISK/);
+  });
+
+  test("fails closed when an economic component evidence ref is not registered at assessment level", () => {
+    const invalid = {
+      ...goFixture,
+      evidenceRefs: ["evidence:project", "evidence:storage"]
+    } as unknown as CorridorValueCaptureInput;
+
+    expect(() => assessCorridorValueCapture(invalid)).toThrow(/CORRIDOR_COMPONENT_EVIDENCE_NOT_REGISTERED/);
   });
 
   test("fails closed instead of imputing a missing strategic metric", () => {
