@@ -29,9 +29,12 @@ import {
   scoreDigitalService,
   summarizeXRoadHealth
 } from "./guineaDigitalStateControl.js";
+import { getGuineaPersistenceStatus } from "./guineaStatePersistence.js";
+import { persistGovernmentEventViaPostgres } from "./guineaPgPersistence.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.6.0";
+const CONTROL_PLANE_REVISION = "0.7.0";
+const GUINEA_DATABASE_ENV_KEY = "GENESIS_GUINEA_DATABASE_URL";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -74,9 +77,9 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
+    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Guinea sovereign persistence fail-closed." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.7.0: Guinea persistence is real only when GENESIS_GUINEA_DATABASE_URL is securely configured; no in-memory success fallback is permitted."]
   };
 }
 
@@ -223,6 +226,21 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
+  register("guinea.event.ingest", "Persiste un événement gouvernemental guinéen canonique et retourne son receipt d'audit SHA-256. Échec fermé si la connexion souveraine n'est pas configurée.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "guinea:event:write", async ({ context, payload }) => {
+    if (!process.env[GUINEA_DATABASE_ENV_KEY]) {
+      throw new Error("GUINEA_PERSISTENCE_NOT_CONFIGURED");
+    }
+    const event = (payload as any)?.event ?? payload;
+    const receipt = await persistGovernmentEventViaPostgres(event);
+    return {
+      tenantId: context.tenantId,
+      receipt
+    };
+  });
+
   register("guinea.service.score", "Score la performance d'un service public guinéen à partir de KPI explicitement fournis.", {
     context: RequestContext,
     payload: z.unknown()
@@ -274,7 +292,8 @@ if (mode === "stdio") {
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
-      guineaDigitalStateControl: GENESIS_V4_GUINEA_DIGITAL_STATE_CONTROL_ANCHOR.assetId
+      guineaDigitalStateControl: GENESIS_V4_GUINEA_DIGITAL_STATE_CONTROL_ANCHOR.assetId,
+      guineaPersistence: getGuineaPersistenceStatus(process.env).state
     });
   });
 
