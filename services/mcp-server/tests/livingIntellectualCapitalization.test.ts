@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 import {
   compileCapitalizationPlan,
   compileChatSignal,
+  compileRemePromotion,
   evaluateEditorialSignal,
   GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR,
   recordCapitalizationEvidence
@@ -159,6 +160,28 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
     expect(partial.nextGate).toBe("EXECUTION_REPAIR");
     expect(partial.missingTargetIds.length).toBeGreaterThan(0);
     expect(failed.status).toBe("FAILED");
+  });
+
+  test("emits a governed R.E.M.E promotion contract only after complete evidence", () => {
+    const signal = durableDecision();
+    const gate = evaluateEditorialSignal(signal);
+    const plan = compileCapitalizationPlan(signal, gate);
+    const allReceipts = plan.targets.map((target, index) => ({
+      targetId: target.targetId,
+      receiptRef: `receipt:${index + 1}`,
+      executedAt: "2026-08-24T02:30:00Z",
+      status: "success" as const
+    }));
+    const complete = recordCapitalizationEvidence(plan, allReceipts);
+    const partial = recordCapitalizationEvidence(plan, allReceipts.slice(0, 1));
+
+    const reme = compileRemePromotion(plan, complete, "R.E.M.E-VAL-001");
+    expect(reme.type).toBe("reme");
+    expect(reme.action).toBe("promote_candidate");
+    expect(reme.requiredEvidenceType).toBe("connector_receipt");
+    expect(reme.destinationRef).toBe("R.E.M.E-VAL-001");
+    expect(reme.idempotencyKey).toMatch(/^idem-[0-9a-f]{8}$/);
+    expect(() => compileRemePromotion(plan, partial, "R.E.M.E-VAL-001")).toThrow("REME_PROMOTION_REQUIRES_COMPLETE_PROOF");
   });
 
   test("registers three least-privilege capitalization MCP tools", () => {
