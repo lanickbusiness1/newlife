@@ -22,6 +22,16 @@ describe("DeployBot deployment orchestrator", () => {
       .toThrow(/sovereignty/i);
   });
 
+  test("rejects an unknown environment received from runtime JSON", () => {
+    expect(() => compileDeploymentRequest({ ...base, environment: "qa" as any } as any))
+      .toThrow(/environment/i);
+  });
+
+  test("rejects an unknown provider received from runtime JSON", () => {
+    expect(() => compileDeploymentRequest({ ...base, provider: "unknown-cloud" as any } as any))
+      .toThrow(/provider/i);
+  });
+
   test("compiles a valid provider-neutral deployment plan", () => {
     const request = compileDeploymentRequest(base);
     expect(request.environment).toBe("production");
