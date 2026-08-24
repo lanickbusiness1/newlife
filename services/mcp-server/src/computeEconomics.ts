@@ -12,6 +12,7 @@ export interface ComputeWorkloadProfile {
   minQualityScore: number;
   maxTtftMs: number;
   maxInterTokenLatencyMs: number;
+  allowedRegions?: string[];
 }
 
 export interface ComputeCandidate {
@@ -117,6 +118,16 @@ function sovereigntyThreshold(classification: ComputeDataClassification): number
   }
 }
 
+function normalizedRegion(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isRegionAllowed(workload: ComputeWorkloadProfile, candidateRegion: string): boolean {
+  if (!workload.allowedRegions) return true;
+  const candidate = normalizedRegion(candidateRegion);
+  return workload.allowedRegions.some(region => normalizedRegion(region) === candidate);
+}
+
 function canonicalize(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
@@ -139,11 +150,27 @@ function validateInput(input: ComputeEconomicsPlanInput): void {
   requiredString(input.generatedAt, "generatedAt");
   finite(input.workload.inputTokensPerRequest, "workload.inputTokensPerRequest");
   finite(input.workload.outputTokensPerRequest, "workload.outputTokensPerRequest");
+  if (input.workload.inputTokensPerRequest + input.workload.outputTokensPerRequest <= 0) {
+    throw new Error("COMPUTE_ECONOMICS_INVALID: workload token volume must be > 0");
+  }
   finite(input.workload.requestsPerMonth, "workload.requestsPerMonth", 1);
   finite(input.workload.revenuePerMonthUsd, "workload.revenuePerMonthUsd");
   bounded(input.workload.minQualityScore, "workload.minQualityScore", 0, 1);
   finite(input.workload.maxTtftMs, "workload.maxTtftMs", 1);
   finite(input.workload.maxInterTokenLatencyMs, "workload.maxInterTokenLatencyMs", 1);
+
+  if (input.workload.allowedRegions !== undefined) {
+    if (!Array.isArray(input.workload.allowedRegions) || input.workload.allowedRegions.length === 0) {
+      throw new Error("COMPUTE_ECONOMICS_INVALID: allowedRegions must contain at least one region");
+    }
+    input.workload.allowedRegions.forEach((region, index) => {
+      requiredString(region, `workload.allowedRegions[${index}]`);
+    });
+  }
+
+  if (input.workload.dataClassification === "restricted" && !input.workload.allowedRegions?.length) {
+    throw new Error("COMPUTE_ECONOMICS_INVALID: restricted workload requires an explicit sovereignty localization policy via allowedRegions");
+  }
 
   if (!Array.isArray(input.candidates) || input.candidates.length === 0) {
     throw new Error("COMPUTE_ECONOMICS_INVALID: at least one compute candidate is required");
@@ -190,6 +217,7 @@ function buildCandidateEconomics(
   if (candidate.ttftMs > workload.maxTtftMs) ineligibilityReasons.push("ttft_limit");
   if (candidate.interTokenLatencyMs > workload.maxInterTokenLatencyMs) ineligibilityReasons.push("inter_token_latency_limit");
   if (candidate.sovereigntyScore < sovereigntyThreshold(workload.dataClassification)) ineligibilityReasons.push("sovereignty_floor");
+  if (!isRegionAllowed(workload, candidate.region)) ineligibilityReasons.push("region_not_allowed");
 
   const costScore = cheapestEligibleCost === undefined || monthlyInferenceCostUsd === 0
     ? 100
@@ -257,7 +285,7 @@ export function compileComputeEconomicsPlan(input: ComputeEconomicsPlanInput): C
   const preliminary = input.candidates.map(candidate => buildCandidateEconomics(input.workload, candidate));
   const eligible = preliminary.filter(candidate => candidate.eligible);
   if (eligible.length === 0) {
-    throw new Error("COMPUTE_NO_ELIGIBLE_CANDIDATE: sovereignty, quality or latency policy rejected all candidates");
+    throw new Error("COMPUTE_NO_ELIGIBLE_CANDIDATE: sovereignty, localization, quality or latency policy rejected all candidates");
   }
 
   const cheapestEligibleCost = Math.min(...eligible.map(candidate => candidate.monthlyInferenceCostUsd));
