@@ -33,7 +33,7 @@ import {
 import { compileRemePromotion } from "./remePromotion.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.7.1";
+const CONTROL_PLANE_REVISION = "0.8.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -79,11 +79,11 @@ function governed(ctx: Context, tool: string, data: unknown) {
     eces: {
       status: "allowed",
       gate: "G8.3",
-      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 0.7.1."
+      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 0.8.0."
     },
     auditId,
     limitations: [
-      "MCP package 0.3.0 / control-plane revision 0.7.1: deterministic planning does not itself perform external Notion, repository or database writes; connector receipts are required before end-to-end completion is claimed."
+      "MCP package 0.3.0 / control-plane revision 0.8.0: external writes remain connector-owned; evidence closure requires tenant-bound, HMAC-SHA256 connector attestations and fails closed when the verifier secret is unavailable."
     ]
   };
 }
@@ -231,31 +231,43 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
-  register("genesis.capitalization.evaluate_signal", "Normalise un signal conversationnel et applique l’Editorial Signal Gate™ de V4-DEC-016 sans promouvoir ChatGPT Memory comme source canonique.", {
+  register("genesis.capitalization.evaluate_signal", "Normalise un signal conversationnel tenant-bound et applique l’Editorial Signal Gate™ de V4-DEC-016 sans promouvoir ChatGPT Memory comme source canonique.", {
     context: RequestContext,
     payload: z.unknown()
   }, "capitalization:evaluate", async ({ context, payload }) => {
-    const signal = compileChatSignal(payload as any);
+    const signal = compileChatSignal({ ...(payload as any), tenantId: context.tenantId });
     const gate = evaluateEditorialSignal(signal, (payload as any)?.existingFingerprints);
     return { tenantId: context.tenantId, signal, gate };
   });
 
-  register("genesis.capitalization.compile_plan", "Compile un signal approuvé en contrats d’écriture idempotents vers Notion canonique, GENESIS V4, livre et produits/exécution.", {
+  register("genesis.capitalization.compile_plan", "Compile un signal approuvé en contrats d’écriture tenant-bound et idempotents vers Notion canonique, GENESIS V4, livre et produits/exécution.", {
     context: RequestContext,
     payload: z.unknown()
   }, "capitalization:plan", async ({ context, payload }) => {
-    const signal = compileChatSignal(payload as any);
+    const signal = compileChatSignal({ ...(payload as any), tenantId: context.tenantId });
     const gate = evaluateEditorialSignal(signal, (payload as any)?.existingFingerprints);
     const plan = compileCapitalizationPlan(signal, gate);
     return { tenantId: context.tenantId, signal, gate, plan };
   });
 
-  register("genesis.capitalization.record_evidence", "Ferme la chaîne de preuve V4-DEC-016 et émet le contrat R.E.M.E uniquement lorsque toutes les cibles planifiées ont un reçu réussi.", {
+  register("genesis.capitalization.record_evidence", "Ferme la chaîne de preuve V4-DEC-016 uniquement à partir de reçus attestés par un connecteur autorisé ; émet le contrat R.E.M.E après preuve complète.", {
     context: RequestContext,
     payload: z.unknown()
   }, "capitalization:evidence", async ({ context, payload }) => {
     const plan = (payload as any)?.plan;
-    const proof = recordCapitalizationEvidence(plan, (payload as any)?.receipts ?? []);
+    if (plan?.tenantId !== context.tenantId) {
+      throw new Error("CAPITALIZATION_PLAN_TENANT_MISMATCH");
+    }
+    const hmacSecret = process.env.GENESIS_CAPITALIZATION_RECEIPT_HMAC_SECRET ?? "";
+    const allowedConnectorIds = process.env.GENESIS_CAPITALIZATION_TRUSTED_CONNECTORS
+      ?.split(",")
+      .map(value => value.trim())
+      .filter(Boolean);
+    const proof = recordCapitalizationEvidence(
+      plan,
+      (payload as any)?.receipts ?? [],
+      { hmacSecret, allowedConnectorIds }
+    );
     const remePromotion = proof.status === "COMPLETE"
       ? compileRemePromotion(plan, proof, (payload as any)?.remeDestinationRef ?? "R.E.M.E-VAL-001")
       : null;
@@ -289,7 +301,8 @@ if (mode === "stdio") {
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
-      livingIntellectualCapitalization: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.assetId
+      livingIntellectualCapitalization: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.assetId,
+      capitalizationReceiptTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.receiptTrust
     });
   });
 
