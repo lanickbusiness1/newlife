@@ -71,6 +71,33 @@ describe("Compute & Inference Economics Control Layer", () => {
     })).toThrow(/eligible|sovereign/i);
   });
 
+  test("fails closed when restricted data is routed outside an explicit allowed region", () => {
+    expect(() => compileComputeEconomicsPlan({
+      ...baseInput,
+      workload: {
+        ...baseInput.workload,
+        dataClassification: "restricted" as const,
+        allowedRegions: ["africa-west"]
+      },
+      candidates: [{
+        ...baseInput.candidates[1],
+        region: "eu-west",
+        sovereigntyScore: 95
+      }]
+    })).toThrow(/eligible|region|localization|sovereign/i);
+  });
+
+  test("rejects an empty-token workload instead of emitting NaN energy economics", () => {
+    expect(() => compileComputeEconomicsPlan({
+      ...baseInput,
+      workload: {
+        ...baseInput.workload,
+        inputTokensPerRequest: 0,
+        outputTokensPerRequest: 0
+      }
+    })).toThrow(/token/i);
+  });
+
   test("emits a tamper-evident AI Economics Certificate", () => {
     const plan = compileComputeEconomicsPlan(baseInput);
     expect(plan.certificate.schemaVersion).toBe("1.0.0");
