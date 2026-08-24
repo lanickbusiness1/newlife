@@ -10,6 +10,21 @@ export type DeploymentState =
   | "DEPLOYMENT_FAILED"
   | "ROLLED_BACK";
 
+const DEPLOYMENT_ENVIRONMENTS = new Set<DeploymentEnvironment>([
+  "development",
+  "staging",
+  "production"
+]);
+
+const DEPLOYMENT_PROVIDERS = new Set<DeploymentProvider>([
+  "egreed",
+  "render",
+  "railway",
+  "fly",
+  "cloudflare",
+  "vps"
+]);
+
 export interface DeploymentRequest {
   assetId: string;
   version: string;
@@ -46,12 +61,28 @@ function required(value: string | undefined, name: string): string {
   return value.trim();
 }
 
+function validateEnvironment(value: unknown): DeploymentEnvironment {
+  if (typeof value !== "string" || !DEPLOYMENT_ENVIRONMENTS.has(value as DeploymentEnvironment)) {
+    throw new Error("DEPLOYBOT_DEPLOYMENT_INVALID: environment must be development, staging or production");
+  }
+  return value as DeploymentEnvironment;
+}
+
+function validateProvider(value: unknown): DeploymentProvider {
+  if (typeof value !== "string" || !DEPLOYMENT_PROVIDERS.has(value as DeploymentProvider)) {
+    throw new Error("DEPLOYBOT_DEPLOYMENT_INVALID: provider is not an authorized DeployBot provider");
+  }
+  return value as DeploymentProvider;
+}
+
 export function compileDeploymentRequest(input: DeploymentRequest): DeploymentRequest {
   const request: DeploymentRequest = {
     ...input,
     assetId: required(input.assetId, "assetId"),
     version: required(input.version, "version"),
     commitSha: required(input.commitSha, "commitSha"),
+    environment: validateEnvironment(input.environment),
+    provider: validateProvider(input.provider),
     artifactRef: required(input.artifactRef, "artifactRef"),
     healthPath: required(input.healthPath, "healthPath"),
     sovereigntyDecisionRef: input.sovereigntyDecisionRef?.trim() ?? "",
@@ -80,7 +111,7 @@ export function evaluateDeployment(input: {
     };
   }
 
-  if (evidence.provider !== request.provider) {
+  if (validateProvider(evidence.provider) !== request.provider) {
     throw new Error("DEPLOYBOT_PROVIDER_MISMATCH: provider evidence does not match deployment request");
   }
 
@@ -108,6 +139,10 @@ export function evaluateDeployment(input: {
       providerEvidence: evidence,
       nextAction: "Archive rollback evidence and open a new deployment attempt only after correction."
     };
+  }
+
+  if (evidence.providerStatus !== "live") {
+    throw new Error("DEPLOYBOT_DEPLOYMENT_INVALID: providerStatus must be live, failed or rolled_back");
   }
 
   return {
