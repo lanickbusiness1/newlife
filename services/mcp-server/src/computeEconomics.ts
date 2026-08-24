@@ -2,6 +2,13 @@ import { createHash } from "node:crypto";
 
 export type ComputeDataClassification = "public" | "internal" | "confidential" | "restricted";
 
+const COMPUTE_DATA_CLASSIFICATIONS = new Set<ComputeDataClassification>([
+  "public",
+  "internal",
+  "confidential",
+  "restricted"
+]);
+
 export interface ComputeWorkloadProfile {
   workloadId: string;
   dataClassification: ComputeDataClassification;
@@ -104,6 +111,12 @@ function bounded(value: number, name: string, min: number, max: number): number 
   return value;
 }
 
+function validateDataClassification(value: unknown): asserts value is ComputeDataClassification {
+  if (typeof value !== "string" || !COMPUTE_DATA_CLASSIFICATIONS.has(value as ComputeDataClassification)) {
+    throw new Error("COMPUTE_ECONOMICS_INVALID: workload.dataClassification must be public, internal, confidential or restricted");
+  }
+}
+
 function round(value: number, decimals = 6): number {
   const factor = 10 ** decimals;
   return Math.round((value + Number.EPSILON) * factor) / factor;
@@ -115,6 +128,8 @@ function sovereigntyThreshold(classification: ComputeDataClassification): number
     case "confidential": return 70;
     case "internal": return 50;
     case "public": return 0;
+    default:
+      throw new Error("COMPUTE_ECONOMICS_INVALID: unsupported workload.dataClassification");
   }
 }
 
@@ -147,6 +162,7 @@ function withoutCertificateHash(certificate: AiEconomicsCertificate): Omit<AiEco
 
 function validateInput(input: ComputeEconomicsPlanInput): void {
   requiredString(input.workload.workloadId, "workload.workloadId");
+  validateDataClassification(input.workload.dataClassification);
   requiredString(input.generatedAt, "generatedAt");
   finite(input.workload.inputTokensPerRequest, "workload.inputTokensPerRequest");
   finite(input.workload.outputTokensPerRequest, "workload.outputTokensPerRequest");
