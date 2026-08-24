@@ -47,6 +47,8 @@ function assurance(snapshotSha = "abc123", externalMandate = false, p1 = false) 
   ] as const;
   const specialistReports = roles.map((auditorRole, index) => compileAssuranceReport({
     auditorRole,
+    auditorId: `agent:assurance:release:${index + 1}`,
+    executionContextId: `ctx:assurance:release:${index + 1}`,
     snapshotSha,
     findings: p1 && index === 0 ? [{
       id: "P1-RELEASE",
@@ -56,11 +58,13 @@ function assurance(snapshotSha = "abc123", externalMandate = false, p1 = false) 
       evidenceRefs: ["release:test"]
     }] : [],
     verdict: p1 && index === 0 ? "HOLD" : "PASS",
-    evidenceRefs: ["CI#295"],
+    evidenceRefs: ["CI#316"],
     generatedAt: "2026-08-24T15:45:00Z"
   }));
   const arbiterReport = compileAssuranceReport({
     auditorRole: "ASSURANCE_ARBITER",
+    auditorId: "agent:assurance:release:arbiter",
+    executionContextId: "ctx:assurance:release:arbiter",
     snapshotSha,
     findings: [],
     verdict: "PASS",
@@ -71,6 +75,7 @@ function assurance(snapshotSha = "abc123", externalMandate = false, p1 = false) 
     snapshotSha,
     specialistReports,
     arbiterReport,
+    builderAgentIds: ["agent:builder:release-fixture"],
     externalMandate,
     evidenceRef: "REME-IAC-RELEASE",
     generatedAt: "2026-08-24T15:47:00Z"
@@ -82,7 +87,7 @@ const baseInput = {
   assetId: "INF-DEPLOYBOT-001",
   version: "0.6.0",
   commitSha: "abc123",
-  ciRun: "MCP-CI-295",
+  ciRun: "MCP-CI-316",
   testSummary: "all tests passed",
   gates: { m6: "pass" as const, s7plus: "pass" as const, m8: "pass" as const },
   sovereigntyDecisionRef: "SOV-DEPLOY-001",
