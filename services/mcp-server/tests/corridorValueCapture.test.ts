@@ -213,7 +213,7 @@ describe("GENESIS V4 Energy Corridor & Resource Value Capture Engine", () => {
   });
 
   test("requires explicit registered evidence for every strategic score", () => {
-    const result = assessCorridorValueCapture(goFixture) as any;
+    const result = assessCorridorValueCapture(goFixture);
 
     expect(result.scoreEvidenceRefs).toMatchObject({
       corridorControl: ["evidence:ownership"],
@@ -227,7 +227,7 @@ describe("GENESIS V4 Energy Corridor & Resource Value Capture Engine", () => {
     const invalid = {
       ...goFixture,
       scoreEvidenceRefs: {
-        ...(goFixture as any).scoreEvidenceRefs,
+        ...goFixture.scoreEvidenceRefs,
         marketReach: []
       }
     } as unknown as CorridorValueCaptureInput;
@@ -239,7 +239,7 @@ describe("GENESIS V4 Energy Corridor & Resource Value Capture Engine", () => {
     const invalid = {
       ...goFixture,
       scoreEvidenceRefs: {
-        ...(goFixture as any).scoreEvidenceRefs,
+        ...goFixture.scoreEvidenceRefs,
         governanceRisk: ["evidence:orphan"]
       }
     } as unknown as CorridorValueCaptureInput;
@@ -250,7 +250,17 @@ describe("GENESIS V4 Energy Corridor & Resource Value Capture Engine", () => {
   test("fails closed when an economic component evidence ref is not registered at assessment level", () => {
     const invalid = {
       ...goFixture,
-      evidenceRefs: ["evidence:project", "evidence:storage"]
+      evidenceRefs: ["evidence:project", "evidence:storage"],
+      scoreEvidenceRefs: {
+        corridorControl: ["evidence:project"],
+        feedstockSecurity: ["evidence:project"],
+        infrastructureReadiness: ["evidence:storage"],
+        marketReach: ["evidence:project"],
+        localIndustrialization: ["evidence:project"],
+        governanceRisk: ["evidence:project"],
+        buyerAccess: ["evidence:project"],
+        procurementReadiness: ["evidence:project"]
+      }
     } as unknown as CorridorValueCaptureInput;
 
     expect(() => assessCorridorValueCapture(invalid)).toThrow(/CORRIDOR_COMPONENT_EVIDENCE_NOT_REGISTERED/);
