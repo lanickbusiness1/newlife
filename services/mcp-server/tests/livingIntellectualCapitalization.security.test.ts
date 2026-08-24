@@ -150,4 +150,41 @@ describe("V4-DEC-016 review security regressions", () => {
     expect(migrations).toContain("foreign key (tenant_id, capitalization_plan_id)");
     expect(migrations).toContain("foreign key (tenant_id, capitalization_target_id)");
   });
+
+  test("fails closed when an evidence-only caller supplies a plan without authoritative plan attestation", () => {
+    const signal = compileChatSignal(baseInput("tenant-a"));
+    const plan = compileCapitalizationPlan(signal, evaluateEditorialSignal(signal));
+    const receipts = plan.targets.map((target, index) => signedReceipt(plan.planId, plan.tenantId, target, index));
+
+    expect(() => recordCapitalizationEvidence(plan, receipts, {
+      hmacSecret: TEST_SECRET,
+      planHmacSecret: "",
+      planAttestation: ""
+    } as any)).toThrow("CAPITALIZATION_PLAN_ATTESTATION_REQUIRED");
+
+    const indexSource = readFileSync(join(repoRoot, "services/mcp-server/src/index.ts"), "utf8");
+    expect(indexSource).toContain("GENESIS_CAPITALIZATION_PLAN_HMAC_SECRET");
+    expect(indexSource).toContain("planAttestation");
+  });
+
+  test("derives the same proof identity regardless of authenticated receipt arrival order", () => {
+    const signal = compileChatSignal(baseInput("tenant-a"));
+    const plan = compileCapitalizationPlan(signal, evaluateEditorialSignal(signal));
+    const receipts = plan.targets.map((target, index) => signedReceipt(plan.planId, plan.tenantId, target, index));
+
+    const forward = recordCapitalizationEvidence(plan, receipts, { hmacSecret: TEST_SECRET });
+    const reverse = recordCapitalizationEvidence(plan, [...receipts].reverse(), { hmacSecret: TEST_SECRET });
+
+    expect(reverse.proofId).toBe(forward.proofId);
+    expect(reverse.receipts.map(receipt => receipt.targetId)).toEqual(forward.receipts.map(receipt => receipt.targetId));
+  });
+
+  test("keeps signal gate receipt and closed proof tables append-only for service_role", () => {
+    const migrations = readSqlDirectory("supabase/migrations");
+    for (const table of ["chat_signals", "editorial_gate_evaluations", "execution_receipts", "proof_chains"]) {
+      expect(migrations).toContain(`revoke update on genesis_capitalization.${table} from service_role`);
+    }
+    expect(migrations).toContain("grant update on genesis_capitalization.capitalization_plans to service_role");
+    expect(migrations).toContain("grant update on genesis_capitalization.capitalization_targets to service_role");
+  });
 });
