@@ -11,6 +11,21 @@ export type ReleaseTargetDeliverable = "url" | "apk" | "aab" | "service" | "infr
 
 type Pass = "pass";
 
+const RELEASE_RISK_CLASSES = new Set<ReleaseRiskClass>([
+  "low",
+  "moderate",
+  "high",
+  "regulated"
+]);
+
+const RELEASE_TARGET_DELIVERABLES = new Set<ReleaseTargetDeliverable>([
+  "url",
+  "apk",
+  "aab",
+  "service",
+  "infrastructure"
+]);
+
 export interface ReleaseEvidenceBundle {
   schemaVersion: "1.1.0";
   releaseId: string;
@@ -53,6 +68,20 @@ function required(value: string | undefined, name: string): string {
     throw new Error(`DEPLOYBOT_RELEASE_INVALID: ${name} is required`);
   }
   return value.trim();
+}
+
+function validateRiskClass(value: unknown): ReleaseRiskClass {
+  if (typeof value !== "string" || !RELEASE_RISK_CLASSES.has(value as ReleaseRiskClass)) {
+    throw new Error("DEPLOYBOT_RELEASE_INVALID: policy.riskClass must be low, moderate, high or regulated");
+  }
+  return value as ReleaseRiskClass;
+}
+
+function validateTargetDeliverable(value: unknown): ReleaseTargetDeliverable {
+  if (typeof value !== "string" || !RELEASE_TARGET_DELIVERABLES.has(value as ReleaseTargetDeliverable)) {
+    throw new Error("DEPLOYBOT_RELEASE_INVALID: policy.targetDeliverable must be url, apk, aab, service or infrastructure");
+  }
+  return value as ReleaseTargetDeliverable;
 }
 
 function canonicalize(value: unknown): string {
@@ -119,6 +148,9 @@ export function verifyReleaseEvidenceBundle(
     throw new Error("DEPLOYBOT_RELEASE_SCHEMA_UNSUPPORTED");
   }
 
+  const riskClass = validateRiskClass(policy?.riskClass);
+  const targetDeliverable = validateTargetDeliverable(policy?.targetDeliverable);
+
   const expectedHash = digest(bundleWithoutHash(bundle));
   if (!/^[a-f0-9]{64}$/.test(bundle.sha256) || bundle.sha256 !== expectedHash) {
     throw new Error("DEPLOYBOT_RELEASE_SHA_MISMATCH: release bundle is tampered or malformed");
@@ -142,7 +174,7 @@ export function verifyReleaseEvidenceBundle(
     throw new Error("DEPLOYBOT_RELEASE_GATES_INCOMPLETE: M6, S7+ and M8 must pass");
   }
 
-  if ((policy.riskClass === "high" || policy.riskClass === "regulated") && bundle.gates.big4 !== "pass") {
+  if ((riskClass === "high" || riskClass === "regulated") && bundle.gates.big4 !== "pass") {
     throw new Error("DEPLOYBOT_RELEASE_BIG4_REQUIRED: Big4 must pass for high/regulated release policy");
   }
 
@@ -154,9 +186,9 @@ export function verifyReleaseEvidenceBundle(
     throw new Error("DEPLOYBOT_RELEASE_COMMIT_MISMATCH: provider deployed commit differs from release commit");
   }
 
-  const publicDelivery = policy.targetDeliverable === "url"
-    || policy.targetDeliverable === "service"
-    || policy.targetDeliverable === "infrastructure";
+  const publicDelivery = targetDeliverable === "url"
+    || targetDeliverable === "service"
+    || targetDeliverable === "infrastructure";
 
   if (publicDelivery && finalUrlUsesCanonicalDomain(bundle.finalUrlOrArtifact)) {
     if (!bundle.domain) {
