@@ -30,9 +30,10 @@ import {
   GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR,
   recordCapitalizationEvidence
 } from "./livingIntellectualCapitalization.js";
+import { compileRemePromotion } from "./remePromotion.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.7.0";
+const CONTROL_PLANE_REVISION = "0.7.1";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -78,11 +79,11 @@ function governed(ctx: Context, tool: string, data: unknown) {
     eces: {
       status: "allowed",
       gate: "G8.3",
-      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 0.7.0."
+      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 0.7.1."
     },
     auditId,
     limitations: [
-      "MCP package 0.3.0 / control-plane revision 0.7.0: deterministic planning does not itself perform external Notion, repository or database writes; connector receipts are required before end-to-end completion is claimed."
+      "MCP package 0.3.0 / control-plane revision 0.7.1: deterministic planning does not itself perform external Notion, repository or database writes; connector receipts are required before end-to-end completion is claimed."
     ]
   };
 }
@@ -249,13 +250,17 @@ function buildServer() {
     return { tenantId: context.tenantId, signal, gate, plan };
   });
 
-  register("genesis.capitalization.record_evidence", "Ferme la chaîne de preuve V4-DEC-016 à partir des reçus d’exécution des connecteurs autorisés.", {
+  register("genesis.capitalization.record_evidence", "Ferme la chaîne de preuve V4-DEC-016 et émet le contrat R.E.M.E uniquement lorsque toutes les cibles planifiées ont un reçu réussi.", {
     context: RequestContext,
     payload: z.unknown()
-  }, "capitalization:evidence", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    proof: recordCapitalizationEvidence((payload as any)?.plan, (payload as any)?.receipts ?? [])
-  }));
+  }, "capitalization:evidence", async ({ context, payload }) => {
+    const plan = (payload as any)?.plan;
+    const proof = recordCapitalizationEvidence(plan, (payload as any)?.receipts ?? []);
+    const remePromotion = proof.status === "COMPLETE"
+      ? compileRemePromotion(plan, proof, (payload as any)?.remeDestinationRef ?? "R.E.M.E-VAL-001")
+      : null;
+    return { tenantId: context.tenantId, proof, remePromotion };
+  });
 
   return server;
 }
