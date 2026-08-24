@@ -24,6 +24,7 @@ import {
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
 import {
+  attestCapitalizationPlan,
   compileCapitalizationPlan,
   compileChatSignal,
   evaluateEditorialSignal,
@@ -33,7 +34,7 @@ import {
 import { compileRemePromotion } from "./remePromotion.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.8.0";
+const CONTROL_PLANE_REVISION = "0.9.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -79,11 +80,11 @@ function governed(ctx: Context, tool: string, data: unknown) {
     eces: {
       status: "allowed",
       gate: "G8.3",
-      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 0.8.0."
+      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 0.9.0."
     },
     auditId,
     limitations: [
-      "MCP package 0.3.0 / control-plane revision 0.8.0: external writes remain connector-owned; evidence closure requires tenant-bound, HMAC-SHA256 connector attestations and fails closed when the verifier secret is unavailable."
+      "MCP package 0.3.0 / control-plane revision 0.9.0: external writes remain connector-owned; evidence closure requires both a planning-authority HMAC attestation and tenant-bound HMAC-SHA256 connector receipts."
     ]
   };
 }
@@ -240,24 +241,26 @@ function buildServer() {
     return { tenantId: context.tenantId, signal, gate };
   });
 
-  register("genesis.capitalization.compile_plan", "Compile un signal approuvé en contrats d’écriture tenant-bound et idempotents vers Notion canonique, GENESIS V4, livre et produits/exécution.", {
+  register("genesis.capitalization.compile_plan", "Compile un signal approuvé en contrats d’écriture tenant-bound et signe le plan avec l’autorité capitalization:plan.", {
     context: RequestContext,
     payload: z.unknown()
   }, "capitalization:plan", async ({ context, payload }) => {
     const signal = compileChatSignal({ ...(payload as any), tenantId: context.tenantId });
     const gate = evaluateEditorialSignal(signal, (payload as any)?.existingFingerprints);
     const plan = compileCapitalizationPlan(signal, gate);
-    return { tenantId: context.tenantId, signal, gate, plan };
+    const planHmacSecret = process.env.GENESIS_CAPITALIZATION_PLAN_HMAC_SECRET ?? "";
+    const planAttestation = attestCapitalizationPlan(plan, planHmacSecret);
+    return { tenantId: context.tenantId, signal, gate, plan, planAttestation };
   });
 
-  register("genesis.capitalization.record_evidence", "Ferme la chaîne de preuve V4-DEC-016 uniquement à partir de reçus attestés par un connecteur autorisé ; émet le contrat R.E.M.E après preuve complète.", {
+  register("genesis.capitalization.record_evidence", "Ferme V4-DEC-016 uniquement pour un plan authentifié émis par l’autorité de planification et des reçus attestés par les connecteurs autorisés.", {
     context: RequestContext,
     payload: z.unknown()
   }, "capitalization:evidence", async ({ context, payload }) => {
     const plan = (payload as any)?.plan;
-    if (plan?.tenantId !== context.tenantId) {
-      throw new Error("CAPITALIZATION_PLAN_TENANT_MISMATCH");
-    }
+    if (plan?.tenantId !== context.tenantId) throw new Error("CAPITALIZATION_PLAN_TENANT_MISMATCH");
+
+    const planHmacSecret = process.env.GENESIS_CAPITALIZATION_PLAN_HMAC_SECRET ?? "";
     const hmacSecret = process.env.GENESIS_CAPITALIZATION_RECEIPT_HMAC_SECRET ?? "";
     const allowedConnectorIds = process.env.GENESIS_CAPITALIZATION_TRUSTED_CONNECTORS
       ?.split(",")
@@ -266,7 +269,12 @@ function buildServer() {
     const proof = recordCapitalizationEvidence(
       plan,
       (payload as any)?.receipts ?? [],
-      { hmacSecret, allowedConnectorIds }
+      {
+        hmacSecret,
+        planHmacSecret,
+        planAttestation: (payload as any)?.planAttestation ?? "",
+        allowedConnectorIds
+      }
     );
     const remePromotion = proof.status === "COMPLETE"
       ? compileRemePromotion(plan, proof, (payload as any)?.remeDestinationRef ?? "R.E.M.E-VAL-001")
@@ -302,6 +310,7 @@ if (mode === "stdio") {
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
       livingIntellectualCapitalization: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.assetId,
+      capitalizationPlanTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.planTrust,
       capitalizationReceiptTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.receiptTrust
     });
   });
@@ -323,9 +332,7 @@ if (mode === "stdio") {
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
       console.error(error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: "MCP_INTERNAL_ERROR" });
-      }
+      if (!res.headersSent) res.status(500).json({ error: "MCP_INTERNAL_ERROR" });
     }
   });
 
