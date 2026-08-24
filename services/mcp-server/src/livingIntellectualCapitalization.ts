@@ -3,7 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 export const GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR = Object.freeze({
   decisionId: "V4-DEC-016",
   assetId: "GENESIS-V4-LIVING-INTELLECTUAL-CAPITALIZATION-LOOP",
-  version: "1.2.0",
+  version: "1.3.0",
   mode: "extension_not_framework",
   editorialGate: "Editorial Signal Gate™",
   planTrust: "HMAC-SHA256 planning authority attestation",
@@ -242,8 +242,8 @@ export function compileChatSignal(input: ChatSignalInput): NormalizedChatSignal 
   const evidenceRefs = uniqueStrings(input.evidenceRefs);
   const canonicalDecisionRef = optional(input.canonicalDecisionRef);
   const bookSectionHint = optional(input.bookSectionHint);
-  const productRefs = uniqueStrings(input.productRefs);
-  const tags = uniqueStrings(input.tags).map(tag => tag.toLocaleLowerCase("en"));
+  const productRefs = canonicalStrings(uniqueStrings(input.productRefs));
+  const tags = canonicalStrings(uniqueStrings(input.tags).map(tag => tag.toLocaleLowerCase("en")));
   const bindingHash = buildSignalBinding({
     tenantId,
     signalId,
@@ -434,6 +434,8 @@ export function compileCapitalizationPlan(signal: NormalizedChatSignal, gate: Ed
       targets.push(target(signal, "product_execution", `product:${productRef}`, "create_execution_item", "repository_receipt"));
     }
   }
+
+  targets.sort((a, b) => a.targetId.localeCompare(b.targetId));
 
   return {
     tenantId: signal.tenantId,
