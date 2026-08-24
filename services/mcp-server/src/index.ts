@@ -29,11 +29,18 @@ import {
   scoreDigitalService,
   summarizeXRoadHealth
 } from "./guineaDigitalStateControl.js";
+import {
+  buildExecutiveCockpit,
+  mineAdministrativeProcess,
+  normalizeEServiceRecord,
+  normalizeProcurementRecord,
+  normalizeXRoadRecord
+} from "./guineaInstitutionAdapters.js";
 import { getGuineaPersistenceStatus } from "./guineaStatePersistence.js";
 import { persistGovernmentEventViaPostgres } from "./guineaPgPersistence.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.7.0";
+const CONTROL_PLANE_REVISION = "0.8.0";
 const GUINEA_DATABASE_ENV_KEY = "GENESIS_GUINEA_DATABASE_URL";
 
 const RequestContext = z.object({
@@ -77,17 +84,14 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Guinea sovereign persistence fail-closed." },
+    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Guinea sovereign persistence and sandbox adapters." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.7.0: Guinea persistence is real only when GENESIS_GUINEA_DATABASE_URL is securely configured; no in-memory success fallback is permitted."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.8.0: sandbox adapters only transform explicitly supplied institutional fixtures; live persistence still requires GENESIS_GUINEA_DATABASE_URL and no in-memory success fallback is permitted."]
   };
 }
 
 function buildServer() {
-  const server = new McpServer({
-    name: "afriagenesis-intelligence-mcp",
-    version: PACKAGE_VERSION
-  });
+  const server = new McpServer({ name: "afriagenesis-intelligence-mcp", version: PACKAGE_VERSION });
 
   function register(
     name: string,
@@ -100,177 +104,131 @@ function buildServer() {
       const ctx = RequestContext.parse(args.context);
       authorize(ctx, requiredScope);
       const data = await handler(args);
-      return {
-        content: [{ type: "text", text: JSON.stringify(governed(ctx, name, data)) }]
-      };
+      return { content: [{ type: "text", text: JSON.stringify(governed(ctx, name, data)) }] };
     });
   }
 
   register("entity.search", "Recherche des entités dans le tenant.", {
     context: RequestContext, query: z.string().min(2)
-  }, "entity:read", async ({ context, query }) => ({
-    tenantId: context.tenantId, query, items: []
-  }));
+  }, "entity:read", async ({ context, query }) => ({ tenantId: context.tenantId, query, items: [] }));
 
   register("entity.get", "Retourne une entité par identifiant.", {
     context: RequestContext, entityId: z.string().min(1)
-  }, "entity:read", async ({ context, entityId }) => ({
-    tenantId: context.tenantId, entityId, status: "mock"
-  }));
+  }, "entity:read", async ({ context, entityId }) => ({ tenantId: context.tenantId, entityId, status: "mock" }));
 
   register("evidence.search", "Recherche des preuves.", {
     context: RequestContext, query: z.string().min(2)
-  }, "evidence:read", async ({ context, query }) => ({
-    tenantId: context.tenantId, query, items: []
-  }));
+  }, "evidence:read", async ({ context, query }) => ({ tenantId: context.tenantId, query, items: [] }));
 
   register("evidence.get_lineage", "Retourne le lineage d’une preuve.", {
     context: RequestContext, evidenceId: z.string().min(1)
-  }, "evidence:read", async ({ context, evidenceId }) => ({
-    tenantId: context.tenantId, evidenceId, lineage: []
-  }));
+  }, "evidence:read", async ({ context, evidenceId }) => ({ tenantId: context.tenantId, evidenceId, lineage: [] }));
 
   register("signal.ingest", "Ingestion contrôlée d’un signal non sensible.", {
     context: RequestContext, payload: z.unknown()
-  }, "signal:write", async ({ context, payload }) => ({
-    tenantId: context.tenantId, accepted: true, payload
-  }));
+  }, "signal:write", async ({ context, payload }) => ({ tenantId: context.tenantId, accepted: true, payload }));
 
   register("opportunity.score", "Calcule un score explicable.", {
     context: RequestContext, payload: z.unknown()
-  }, "opportunity:score", async ({ context, payload }) => ({
-    tenantId: context.tenantId, score: 0, factors: [], payload
-  }));
+  }, "opportunity:score", async ({ context, payload }) => ({ tenantId: context.tenantId, score: 0, factors: [], payload }));
 
   register("opportunity.explain_score", "Explique un score d’opportunité.", {
     context: RequestContext, opportunityId: z.string().min(1)
-  }, "opportunity:read", async ({ context, opportunityId }) => ({
-    tenantId: context.tenantId, opportunityId, explanation: []
-  }));
+  }, "opportunity:read", async ({ context, opportunityId }) => ({ tenantId: context.tenantId, opportunityId, explanation: [] }));
 
   register("executive.generate_brief", "Produit un brief exécutif gouverné.", {
     context: RequestContext, topic: z.string().min(3)
-  }, "executive:brief", async ({ context, topic }) => ({
-    tenantId: context.tenantId, topic, priorities: [], risks: [], evidence: []
-  }));
+  }, "executive:brief", async ({ context, topic }) => ({ tenantId: context.tenantId, topic, priorities: [], risks: [], evidence: [] }));
 
   register("genome.revenue_engine.compile", "Compile un produit AfrIAgenesis® en moteur Release-to-Revenue GENESIS V4.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "revenue:plan", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    ...compileRevenueEngine(payload)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "revenue:plan", async ({ context, payload }) => ({ tenantId: context.tenantId, ...compileRevenueEngine(payload) }));
 
   register("deploybot.validation_relay.compile", "Compile une validation CEO en state machine DeployBot A1-A3 jusqu’au livrable final ou veto A4.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "deploy:plan", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    ...compileValidationRelay(payload)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({ tenantId: context.tenantId, ...compileValidationRelay(payload) }));
 
   register("world.reconstruct_state", "Reconstruit un World State depuis des observations explicitement sourcées et conserve leur lineage de preuve.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "world:read", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    state: reconstructWorldState((payload as any)?.observations)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "world:read", async ({ context, payload }) => ({ tenantId: context.tenantId, state: reconstructWorldState((payload as any)?.observations) }));
 
   register("world.simulate", "Simule et classe des scénarios contrefactuels à partir d’inputs explicites, sans imputation silencieuse.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "world:simulate", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    simulations: simulateScenarios((payload as any)?.state, (payload as any)?.scenarios)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "world:simulate", async ({ context, payload }) => ({ tenantId: context.tenantId, simulations: simulateScenarios((payload as any)?.state, (payload as any)?.scenarios) }));
 
   register("world.decide", "Sélectionne la meilleure action réversible autorisée après consultation du World Model.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "world:decide", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    decision: decideNextAction((payload as any)?.state, (payload as any)?.simulations)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "world:decide", async ({ context, payload }) => ({ tenantId: context.tenantId, decision: decideNextAction((payload as any)?.state, (payload as any)?.simulations) }));
 
   register("world.evaluate_outcome", "Compare une prévision à un résultat observé avec preuve et émet un apprentissage borné.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "world:evaluate", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    evaluation: evaluateOutcome((payload as any)?.decision, (payload as any)?.actual)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "world:evaluate", async ({ context, payload }) => ({ tenantId: context.tenantId, evaluation: evaluateOutcome((payload as any)?.decision, (payload as any)?.actual) }));
 
   register("genesis.context.compile", "Compile GENOME, R.E.M.E et World Model en Context Packet borné pour une tâche ChatGPT/agentique.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "context:compile", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    packet: compileGenesisContext(payload as any)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "context:compile", async ({ context, payload }) => ({ tenantId: context.tenantId, packet: compileGenesisContext(payload as any) }));
 
   register("genesis.control.compile_transition", "Compile une interaction exécutive en contrat de transition d’état GENESIS gouverné et fail-closed.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "control:compile", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    transition: compileControlTransition(payload as any)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "control:compile", async ({ context, payload }) => ({ tenantId: context.tenantId, transition: compileControlTransition(payload as any) }));
 
   register("genesis.knowledge.evaluate_promotion", "Évalue la promotion d’un candidat ChatGPT/Research vers Project Context, World Model, R.E.M.E ou GENOME sans contourner les gates.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "knowledge:promote", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    promotion: evaluateKnowledgePromotion(payload as any)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "knowledge:promote", async ({ context, payload }) => ({ tenantId: context.tenantId, promotion: evaluateKnowledgePromotion(payload as any) }));
 
   register("guinea.event.ingest", "Persiste un événement gouvernemental guinéen canonique et retourne son receipt d'audit SHA-256. Échec fermé si la connexion souveraine n'est pas configurée.", {
-    context: RequestContext,
-    payload: z.unknown()
+    context: RequestContext, payload: z.unknown()
   }, "guinea:event:write", async ({ context, payload }) => {
-    if (!process.env[GUINEA_DATABASE_ENV_KEY]) {
-      throw new Error("GUINEA_PERSISTENCE_NOT_CONFIGURED");
-    }
+    if (!process.env[GUINEA_DATABASE_ENV_KEY]) throw new Error("GUINEA_PERSISTENCE_NOT_CONFIGURED");
     const event = (payload as any)?.event ?? payload;
-    const receipt = await persistGovernmentEventViaPostgres(event);
-    return {
-      tenantId: context.tenantId,
-      receipt
-    };
+    return { tenantId: context.tenantId, receipt: await persistGovernmentEventViaPostgres(event) };
   });
 
   register("guinea.service.score", "Score la performance d'un service public guinéen à partir de KPI explicitement fournis.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "guinea:service:score", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    assessment: scoreDigitalService((payload as any)?.observation ?? payload)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "guinea:service:score", async ({ context, payload }) => ({ tenantId: context.tenantId, assessment: scoreDigitalService((payload as any)?.observation ?? payload) }));
 
   register("guinea.xroad.observe", "Agrège l'observabilité X-Road avec disponibilité, échecs, latence p95 et lineage de preuve.", {
-    context: RequestContext,
-    payload: z.unknown()
-  }, "guinea:xroad:observe", async ({ context, payload }) => ({
-    tenantId: context.tenantId,
-    health: summarizeXRoadHealth((payload as any)?.calls ?? payload)
-  }));
+    context: RequestContext, payload: z.unknown()
+  }, "guinea:xroad:observe", async ({ context, payload }) => ({ tenantId: context.tenantId, health: summarizeXRoadHealth((payload as any)?.calls ?? payload) }));
 
   register("guinea.procurement.assess_integrity", "Émet des signaux de risque explicables sur une procédure de commande publique sans produire d'accusation automatisée.", {
+    context: RequestContext, payload: z.unknown()
+  }, "guinea:procurement:assess", async ({ context, payload }) => ({ tenantId: context.tenantId, assessment: assessProcurementIntegrity((payload as any)?.observation ?? payload) }));
+
+  register("guinea.sandbox.normalize", "Normalise une fixture institutionnelle e-Service, X-Road ou e-Procurement vers les contrats canoniques V4-DEC-018 sans inventer de preuve.", {
+    context: RequestContext,
+    kind: z.enum(["eservice", "xroad", "procurement"]),
+    payload: z.unknown()
+  }, "guinea:sandbox:normalize", async ({ context, kind, payload }) => {
+    const normalized = kind === "eservice"
+      ? normalizeEServiceRecord(payload as any)
+      : kind === "xroad"
+        ? normalizeXRoadRecord(payload as any)
+        : normalizeProcurementRecord(payload as any);
+    return { tenantId: context.tenantId, kind, normalized };
+  });
+
+  register("guinea.process_mining.analyze", "Analyse des séquences administratives explicites et calcule cycle time et goulots sans inférence silencieuse.", {
     context: RequestContext,
     payload: z.unknown()
-  }, "guinea:procurement:assess", async ({ context, payload }) => ({
+  }, "guinea:process:analyze", async ({ context, payload }) => ({
     tenantId: context.tenantId,
-    assessment: assessProcurementIntegrity((payload as any)?.observation ?? payload)
+    process: mineAdministrativeProcess((payload as any)?.events ?? payload)
+  }));
+
+  register("guinea.executive.cockpit", "Produit un cockpit exécutif déterministe à partir de scores service, santé X-Road et signaux procurement déjà mesurés.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "guinea:executive:read", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    cockpit: buildExecutiveCockpit((payload as any)?.input ?? payload)
   }));
 
   return server;
 }
 
-const mode = process.argv.find(v => v.startsWith("--transport="))?.split("=")[1]
-  ?? process.env.MCP_TRANSPORT
-  ?? "http";
+const mode = process.argv.find(v => v.startsWith("--transport="))?.split("=")[1] ?? process.env.MCP_TRANSPORT ?? "http";
 
 if (mode === "stdio") {
   const server = buildServer();
@@ -293,30 +251,24 @@ if (mode === "stdio") {
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
       guineaDigitalStateControl: GENESIS_V4_GUINEA_DIGITAL_STATE_CONTROL_ANCHOR.assetId,
-      guineaPersistence: getGuineaPersistenceStatus(process.env).state
+      guineaPersistence: getGuineaPersistenceStatus(process.env).state,
+      guineaSandboxAdapters: "READY"
     });
   });
 
   app.post("/mcp", async (req, res) => {
     const server = buildServer();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true
-    });
-
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on("close", () => {
       void transport.close();
       void server.close();
     });
-
     try {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
       console.error(error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: "MCP_INTERNAL_ERROR" });
-      }
+      if (!res.headersSent) res.status(500).json({ error: "MCP_INTERNAL_ERROR" });
     }
   });
 
