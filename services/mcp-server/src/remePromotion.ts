@@ -1,14 +1,5 @@
-import type { CapitalizationPlan, CapitalizationProof } from "./livingIntellectualCapitalization.js";
-
-export type RemePromotionTarget = {
-  targetId: string;
-  type: "reme";
-  destinationRef: string;
-  action: "promote_candidate";
-  requiredEvidenceType: "connector_receipt";
-  idempotencyKey: string;
-  status: "PLANNED";
-};
+import { createHash } from "node:crypto";
+import type { CapitalizationPlan, CapitalizationProof, CapitalizationTarget } from "./livingIntellectualCapitalization.js";
 
 function required(value: unknown, code: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -17,21 +8,16 @@ function required(value: unknown, code: string): string {
   return value.trim();
 }
 
-function stableId(prefix: string, parts: string[]): string {
-  let hash = 2166136261;
-  for (const char of parts.join("|")) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `${prefix}-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+function digest(prefix: string, parts: unknown[]): string {
+  return `${prefix}-${createHash("sha256").update(JSON.stringify(parts)).digest("hex").slice(0, 32)}`;
 }
 
 export function compileRemePromotion(
   plan: CapitalizationPlan,
   proof: CapitalizationProof,
   destinationRef: string
-): RemePromotionTarget {
-  if (!plan || !proof || proof.planId !== plan.planId) {
+): CapitalizationTarget {
+  if (!plan || !proof || proof.planId !== plan.planId || proof.tenantId !== plan.tenantId) {
     throw new Error("REME_PROMOTION_PLAN_PROOF_MISMATCH");
   }
   if (proof.status !== "COMPLETE" || proof.nextGate !== "REME_CANDIDATE") {
@@ -41,12 +27,15 @@ export function compileRemePromotion(
   const destination = required(destinationRef, "REME_PROMOTION_DESTINATION_REQUIRED");
 
   return {
-    targetId: stableId("target", [plan.signalId, "reme", destination]),
+    tenantId: plan.tenantId,
+    targetId: digest("target", [plan.tenantId, plan.signalId, "reme", destination]),
     type: "reme",
     destinationRef: destination,
     action: "promote_candidate",
     requiredEvidenceType: "connector_receipt",
-    idempotencyKey: stableId("idem", [plan.fingerprint, "reme", destination]),
+    idempotencyKey: digest("idem", [plan.tenantId, plan.fingerprint, "reme", destination]),
+    executionNonce: digest("nonce", [plan.tenantId, plan.planId, "reme", destination]),
+    allowedConnectorIds: ["notion"],
     status: "PLANNED"
   };
 }
