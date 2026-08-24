@@ -39,6 +39,7 @@ export interface ValidationRelayEvidence {
   m6?: GateStatus;
   s7plus?: GateStatus;
   m8?: GateStatus;
+  /** @deprecated Legacy non-enforced compatibility only. New assurance is carried by releaseEvidenceBundle. */
   big4?: GateStatus;
   finalUrlOrArtifact?: string;
   healthcheckPassed?: boolean;
@@ -93,7 +94,8 @@ const EVIDENCE_CONTRACT = [
   "M6",
   "S7+",
   "M8",
-  "Big4_if_required",
+  "Independent_Assurance_Council_if_required",
+  "External_Assurance_only_if_explicitly_mandated",
   "final_url_or_artifact",
   "healthcheck",
   "rollback_ref",
@@ -124,6 +126,13 @@ function autonomyFor(input: ValidationRelayInput): AutonomyLevel {
 
 function bundleRequiredTarget(target: TargetDeliverable): boolean {
   return target === "url" || target === "service" || target === "infrastructure";
+}
+
+function enforcedBundleRequired(input: ValidationRelayInput): boolean {
+  if (!input.releaseEvidenceEnforced) return false;
+  return bundleRequiredTarget(input.targetDeliverable)
+    || input.riskClass === "high"
+    || input.riskClass === "regulated";
 }
 
 function output(
@@ -216,8 +225,13 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
     if (status !== "pass") gateBlockers.push(`${name} gate is ${status ?? "missing"}`);
   }
 
-  if ((input.riskClass === "high" || input.riskClass === "regulated") && big4 !== "pass") {
-    gateBlockers.push(`Big4 gate is ${big4 ?? "missing"}`);
+  // Legacy compatibility only: when Release Evidence enforcement is disabled,
+  // old high/regulated flows may still require the historic Big4 field.
+  // Enforced flows delegate assurance to Release Center + Independent Assurance Council.
+  if (!input.releaseEvidenceEnforced
+    && (input.riskClass === "high" || input.riskClass === "regulated")
+    && big4 !== "pass") {
+    gateBlockers.push(`Legacy Big4 gate is ${big4 ?? "missing"}`);
   }
 
   if (gateBlockers.length) {
@@ -237,7 +251,7 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
     );
   }
 
-  if (input.releaseEvidenceEnforced && bundleRequiredTarget(input.targetDeliverable)) {
+  if (enforcedBundleRequired(input)) {
     if (!bundle) {
       return output(
         input,
