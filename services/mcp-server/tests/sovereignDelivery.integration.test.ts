@@ -39,11 +39,11 @@ const aiEconomicsCertificate = compileComputeEconomicsPlan({
 function buildServiceBundle(overrides: Record<string, unknown> = {}) {
   const request = compileDeploymentRequest({
     assetId: "INF-DEPLOYBOT-001",
-    version: "0.4.0",
+    version: "0.6.0",
     commitSha: "abc123",
     environment: "production",
     provider: "render",
-    artifactRef: "oci://afriagenesis/mcp:0.4.0",
+    artifactRef: "oci://afriagenesis/mcp:0.6.0",
     healthPath: "/health",
     desiredHostname: "mcp.afriagenesis.com",
     sovereigntyDecisionRef: "SOV-DEPLOY-001"
@@ -80,11 +80,11 @@ function buildServiceBundle(overrides: Record<string, unknown> = {}) {
   expect(verifyDomainEvidence({ intent, evidence: domain }).state).toBe("HTTPS_VERIFIED");
 
   return compileReleaseEvidenceBundle({
-    releaseId: "REL-MCP-0.4.0",
+    releaseId: "REL-MCP-0.6.0",
     assetId: request.assetId,
     version: request.version,
     commitSha: request.commitSha,
-    ciRun: "MCP-CI-200",
+    ciRun: "MCP-CI-299",
     testSummary: "sovereign delivery suite passed",
     gates: { m6: "pass", s7plus: "pass", m8: "pass" },
     sovereigntyDecisionRef: request.sovereigntyDecisionRef,
@@ -99,7 +99,7 @@ function buildServiceBundle(overrides: Record<string, unknown> = {}) {
       checkedAt: "2026-08-20T02:02:00Z"
     },
     rollback: { reference: "rollback:dep-mcp-1", verified: true },
-    changelog: ["DeployBot Sovereign Delivery Runtime 0.4.0", "AI Economics Certificate"],
+    changelog: ["DeployBot Sovereign Delivery Runtime 0.6.0", "AI Economics Certificate", "Independent Assurance Council"],
     remeRef: "REME-REL-MCP-001",
     generatedAt: "2026-08-20T02:03:00Z",
     ...overrides
@@ -118,7 +118,7 @@ describe("Sovereign Delivery Runtime integration", () => {
     const relay = compileValidationRelay({
       validationRef: "CEO-VAL-MCP-001",
       assetId: "INF-DEPLOYBOT-001",
-      baselineVersion: "0.4.0",
+      baselineVersion: "0.6.0",
       targetDeliverable: "service",
       riskClass: "moderate",
       sourceRef: "github:lanickbusiness1/newlife",
@@ -165,9 +165,9 @@ describe("Sovereign Delivery Runtime integration", () => {
       .toThrow(/rollback/i);
   });
 
-  test("high-risk release fails without Big4 pass", () => {
+  test("high-risk release fails without Independent Assurance Council evidence", () => {
     const bundle = buildServiceBundle();
     expect(() => verifyReleaseEvidenceBundle(bundle, { riskClass: "high", targetDeliverable: "service" }))
-      .toThrow(/Big4/i);
+      .toThrow(/assurance/i);
   });
 });
