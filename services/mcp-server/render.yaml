@@ -11,3 +11,5 @@ services:
         value: http
       - key: NODE_ENV
         value: production
+      - key: GENESIS_GUINEA_DATABASE_URL
+        sync: false
