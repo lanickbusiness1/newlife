@@ -220,3 +220,62 @@ test('employability delta is explicit and bounded to canonical readiness scale',
   assert.throws(() => computeEmployabilityDelta(-1, 84), /0\.\.100/);
   assert.throws(() => computeEmployabilityDelta(67, 101), /0\.\.100/);
 });
+
+test('language mismatch is a hard gate and never publishes a score', () => {
+  const englishOnly = { ...disasterReady, id: 'english-only', languages: ['en'] };
+  const result = evaluateLearningOpportunity(englishOnly, maliHumanitarianCandidate);
+  assert.equal(result.eligibilityGate, 'FAIL');
+  assert.equal(result.recommendationScore, null);
+  assert.ok(result.blockingReasons.includes('LANGUAGE_INELIGIBLE'));
+});
+
+test('verified shorter and cheaper path ranks above an equivalent expensive long path', () => {
+  const context: CandidateLearningContext = {
+    ...maliHumanitarianCandidate,
+    skillGaps: ['procurement'],
+  };
+  const expensiveLong: LearningOpportunity = {
+    ...disasterReady,
+    id: 'expensive-long',
+    durationHours: 24,
+    learningCost: { amount: 150, currency: 'USD', verified: true },
+    credentialCost: { amount: 50, currency: 'USD', verified: true },
+    advertisedAsFreeCertification: false,
+  };
+  const ranked = rankLearningOpportunities([expensiveLong, disasterReady], context);
+  assert.equal(ranked[0].opportunityId, 'disasterready-procurement-logistics');
+  assert.ok((ranked[0].recommendationScore ?? 0) > (ranked[1].recommendationScore ?? 0));
+});
+
+test('course with no target gap closure fails closed', () => {
+  const unrelated = { ...disasterReady, id: 'unrelated', skills: ['accounting'] };
+  const result = evaluateLearningOpportunity(unrelated, maliHumanitarianCandidate);
+  assert.equal(result.eligibilityGate, 'FAIL');
+  assert.equal(result.recommendationScore, null);
+  assert.ok(result.blockingReasons.includes('NO_TARGET_GAP_CLOSURE'));
+});
+
+test('required assessment must be verified before recommendation', () => {
+  const assessmentUnknown = { ...disasterReady, id: 'assessment-unknown', assessmentVerified: null };
+  const result = evaluateLearningOpportunity(assessmentUnknown, maliHumanitarianCandidate);
+  assert.equal(result.eligibilityGate, 'FAIL');
+  assert.equal(result.recommendationScore, null);
+  assert.ok(result.blockingReasons.includes('ASSESSMENT_UNVERIFIED'));
+});
+
+test('stale source evidence fails closed when a verification freshness policy is configured', () => {
+  const stale = {
+    ...disasterReady,
+    id: 'stale-source',
+    sourceRetrievedAt: '2025-01-01T00:00:00Z',
+  };
+  const freshnessContext: CandidateLearningContext & { asOf: string; maxEvidenceAgeDays: number } = {
+    ...maliHumanitarianCandidate,
+    asOf: '2026-08-24T17:00:00Z',
+    maxEvidenceAgeDays: 180,
+  };
+  const result = evaluateLearningOpportunity(stale, freshnessContext);
+  assert.equal(result.eligibilityGate, 'FAIL');
+  assert.equal(result.recommendationScore, null);
+  assert.ok(result.blockingReasons.includes('EVIDENCE_STALE'));
+});
