@@ -98,6 +98,16 @@ describe("Compute & Inference Economics Control Layer", () => {
     })).toThrow(/token/i);
   });
 
+  test("rejects an unknown data classification received from runtime JSON", () => {
+    expect(() => compileComputeEconomicsPlan({
+      ...baseInput,
+      workload: {
+        ...baseInput.workload,
+        dataClassification: "secret-x" as any
+      }
+    } as any)).toThrow(/classification/i);
+  });
+
   test("emits a tamper-evident AI Economics Certificate", () => {
     const plan = compileComputeEconomicsPlan(baseInput);
     expect(plan.certificate.schemaVersion).toBe("1.0.0");
