@@ -4,11 +4,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import {
+  attestCapitalizationPlan,
   compileCapitalizationPlan,
   compileChatSignal,
   evaluateEditorialSignal,
   recordCapitalizationEvidence,
   receiptAttestationPayload,
+  type CapitalizationPlan,
   type CapitalizationReceipt,
   type CapitalizationTarget
 } from "../src/livingIntellectualCapitalization";
@@ -16,6 +18,7 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "../../..");
 const TEST_SECRET = "test-only-capitalization-receipt-secret";
+const TEST_PLAN_SECRET = "test-only-capitalization-planning-secret";
 
 function readSqlDirectory(relativePath: string): string {
   const directory = join(repoRoot, relativePath);
@@ -49,6 +52,14 @@ function connectorFor(target: CapitalizationTarget): string {
   return target.allowedConnectorIds[0];
 }
 
+function verifierFor(plan: CapitalizationPlan) {
+  return {
+    hmacSecret: TEST_SECRET,
+    planHmacSecret: TEST_PLAN_SECRET,
+    planAttestation: attestCapitalizationPlan(plan, TEST_PLAN_SECRET)
+  };
+}
+
 function signedReceipt(planId: string, tenantId: string, target: CapitalizationTarget, index: number): CapitalizationReceipt {
   const unsigned = {
     targetId: target.targetId,
@@ -59,10 +70,12 @@ function signedReceipt(planId: string, tenantId: string, target: CapitalizationT
     connectorId: connectorFor(target),
     nonce: target.executionNonce
   };
-  const attestation = createHmac("sha256", TEST_SECRET)
-    .update(receiptAttestationPayload(tenantId, planId, target, unsigned))
-    .digest("hex");
-  return { ...unsigned, attestation };
+  return {
+    ...unsigned,
+    attestation: createHmac("sha256", TEST_SECRET)
+      .update(receiptAttestationPayload(tenantId, planId, target, unsigned))
+      .digest("hex")
+  };
 }
 
 describe("V4-DEC-016 review security regressions", () => {
@@ -71,7 +84,6 @@ describe("V4-DEC-016 review security regressions", () => {
     const b = compileChatSignal(baseInput("tenant-b"));
     const planA = compileCapitalizationPlan(a, evaluateEditorialSignal(a));
     const planB = compileCapitalizationPlan(b, evaluateEditorialSignal(b));
-
     expect(a.fingerprint).toMatch(/^sigfp-[0-9a-f]{64}$/);
     expect(b.fingerprint).toMatch(/^sigfp-[0-9a-f]{64}$/);
     expect(a.fingerprint).not.toBe(b.fingerprint);
@@ -91,7 +103,6 @@ describe("V4-DEC-016 review security regressions", () => {
       confidence: 0.2,
       content: "Different unverified content reusing the same caller-controlled signal id must never inherit the approved gate result from another signal."
     });
-
     expect(() => compileCapitalizationPlan(substituted, gate)).toThrow("CAPITALIZATION_PLAN_GATE_BINDING_MISMATCH");
   });
 
@@ -99,17 +110,16 @@ describe("V4-DEC-016 review security regressions", () => {
     const signal = compileChatSignal(baseInput("tenant-a"));
     const plan = compileCapitalizationPlan(signal, evaluateEditorialSignal(signal));
     const receipts = plan.targets.map((target, index) => signedReceipt(plan.planId, plan.tenantId, target, index));
-
-    const complete = recordCapitalizationEvidence(plan, receipts, { hmacSecret: TEST_SECRET });
-    expect(complete.status).toBe("COMPLETE");
+    const verifier = verifierFor(plan);
+    expect(recordCapitalizationEvidence(plan, receipts, verifier).status).toBe("COMPLETE");
 
     const tampered = receipts.map(receipt => ({ ...receipt }));
     tampered[0] = { ...tampered[0], receiptRef: "receipt:tampered" };
-    expect(() => recordCapitalizationEvidence(plan, tampered, { hmacSecret: TEST_SECRET }))
+    expect(() => recordCapitalizationEvidence(plan, tampered, verifier))
       .toThrow("CAPITALIZATION_RECEIPT_ATTESTATION_INVALID");
 
     const wrongConnectorTarget = plan.targets.find(target => !target.allowedConnectorIds.includes("github"))!;
-    const wrongConnectorUnsigned = {
+    const unsigned = {
       targetId: wrongConnectorTarget.targetId,
       receiptRef: "receipt:wrong-connector",
       executedAt: "2026-08-24T02:40:00Z",
@@ -118,29 +128,21 @@ describe("V4-DEC-016 review security regressions", () => {
       nonce: wrongConnectorTarget.executionNonce
     };
     const wrongConnectorReceipt: CapitalizationReceipt = {
-      ...wrongConnectorUnsigned,
+      ...unsigned,
       attestation: createHmac("sha256", TEST_SECRET)
-        .update(receiptAttestationPayload(plan.tenantId, plan.planId, wrongConnectorTarget, wrongConnectorUnsigned))
+        .update(receiptAttestationPayload(plan.tenantId, plan.planId, wrongConnectorTarget, unsigned))
         .digest("hex")
     };
-    expect(() => recordCapitalizationEvidence(plan, [wrongConnectorReceipt], { hmacSecret: TEST_SECRET }))
+    expect(() => recordCapitalizationEvidence(plan, [wrongConnectorReceipt], verifier))
       .toThrow("CAPITALIZATION_RECEIPT_CONNECTOR_NOT_ALLOWED");
 
-    expect(() => recordCapitalizationEvidence(plan, receipts, { hmacSecret: "" }))
+    expect(() => recordCapitalizationEvidence(plan, receipts, { ...verifier, hmacSecret: "" }))
       .toThrow("CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
   });
 
   test("requires explicit RLS, table revokes and tenant-aware composite lineage constraints", () => {
     const migrations = readSqlDirectory("supabase/migrations");
-    const tables = [
-      "chat_signals",
-      "editorial_gate_evaluations",
-      "capitalization_plans",
-      "capitalization_targets",
-      "execution_receipts",
-      "proof_chains"
-    ];
-
+    const tables = ["chat_signals", "editorial_gate_evaluations", "capitalization_plans", "capitalization_targets", "execution_receipts", "proof_chains"];
     for (const table of tables) {
       expect(migrations).toContain(`alter table genesis_capitalization.${table} enable row level security`);
     }
@@ -155,12 +157,16 @@ describe("V4-DEC-016 review security regressions", () => {
     const signal = compileChatSignal(baseInput("tenant-a"));
     const plan = compileCapitalizationPlan(signal, evaluateEditorialSignal(signal));
     const receipts = plan.targets.map((target, index) => signedReceipt(plan.planId, plan.tenantId, target, index));
-
     expect(() => recordCapitalizationEvidence(plan, receipts, {
       hmacSecret: TEST_SECRET,
       planHmacSecret: "",
       planAttestation: ""
-    } as any)).toThrow("CAPITALIZATION_PLAN_ATTESTATION_REQUIRED");
+    })).toThrow("CAPITALIZATION_PLAN_ATTESTATION_REQUIRED");
+
+    const signed = verifierFor(plan);
+    const tamperedPlan = { ...plan, remeStatus: "NOT_ELIGIBLE" as const };
+    expect(() => recordCapitalizationEvidence(tamperedPlan, receipts, signed))
+      .toThrow("CAPITALIZATION_PLAN_ATTESTATION_INVALID");
 
     const indexSource = readFileSync(join(repoRoot, "services/mcp-server/src/index.ts"), "utf8");
     expect(indexSource).toContain("GENESIS_CAPITALIZATION_PLAN_HMAC_SECRET");
@@ -171,10 +177,9 @@ describe("V4-DEC-016 review security regressions", () => {
     const signal = compileChatSignal(baseInput("tenant-a"));
     const plan = compileCapitalizationPlan(signal, evaluateEditorialSignal(signal));
     const receipts = plan.targets.map((target, index) => signedReceipt(plan.planId, plan.tenantId, target, index));
-
-    const forward = recordCapitalizationEvidence(plan, receipts, { hmacSecret: TEST_SECRET });
-    const reverse = recordCapitalizationEvidence(plan, [...receipts].reverse(), { hmacSecret: TEST_SECRET });
-
+    const verifier = verifierFor(plan);
+    const forward = recordCapitalizationEvidence(plan, receipts, verifier);
+    const reverse = recordCapitalizationEvidence(plan, [...receipts].reverse(), verifier);
     expect(reverse.proofId).toBe(forward.proofId);
     expect(reverse.receipts.map(receipt => receipt.targetId)).toEqual(forward.receipts.map(receipt => receipt.targetId));
   });
