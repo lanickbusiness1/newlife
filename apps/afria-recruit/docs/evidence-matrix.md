@@ -63,3 +63,55 @@ Baseline applicative vérifiée avant cette fermeture documentaire : GitHub Acti
 `CODE + SYNTHETIC E2E + LIVE RLS ROLLBACK TESTS = TEST_PROVEN`
 
 Ce verdict signifie que le vertical slice est reproductible, testé sur fixtures synthétiques et que ses frontières RLS candidat/disclosure principales ont été exercées sur la base canonique sans persistance de fixture. Il ne signifie pas `PRODUCTION`, `M8 PASS`, `BIG4 PASS` ni efficacité commerciale prouvée.
+
+---
+
+## Addendum — Verified Learning & Credential Intelligence Engine™ — M6 Core — 24 août 2026
+
+Capacité canonique : `PRD-RECRUIT-001` / Candidate OS™ / Talent Intelligence Graph™.  
+Implémentation : `lib/domain/learning-credential-intelligence.ts`.  
+Contrat automatisé : `tests/unit/learning-credential-intelligence.test.ts`.  
+Plan : `docs/superpowers/plans/2026-08-24-verified-learning-credential-intelligence.md`.
+
+### Preuve TDD RED → GREEN
+
+| Cycle | Commit | GitHub Actions | Résultat | Preuve |
+|---|---|---:|---|---|
+| RED 1 | `56a24c82d9b4792f24e73c8ff4fc19001cffe591` | `#192` / `32758647461` | FAILURE attendu | module `learning-credential-intelligence` absent ; arrêt sur `Run unit tests` |
+| GREEN 1 | `d710a548926e1a628248c1521e64413e569558b9` | `#193` / `32758869227` | SUCCESS | moteur déterministe initial + pipeline complet vert |
+| RED 2 | `469a5789cd71868833f909f3cbe0f30b2a9772ce` | `#194` / `32759172890` | 83/84 PASS | seul échec : preuve obsolète non rejetée (`PASS` au lieu de `FAIL`) |
+| GREEN 2 | `3c0fd2ab09fc1f1e79a869d6e326e1aab2dc5f49` | `#195` / `32759439976` | SUCCESS | 84/84 unit tests + typecheck + build + 8/8 Playwright + scans source/bundle |
+
+### Comportements M6 Core automatisés
+
+| Contrôle | Preuve | Statut |
+|---|---|---|
+| Formation gratuite ≠ credential gratuit | classifications `FREE_CERTIFIED` / `FREE_LEARNING_PAID_CREDENTIAL` | PASS |
+| Éligibilité pays | Kaya/DHL hors géographie Mali → `COUNTRY_INELIGIBLE`, score `null` | PASS |
+| Éligibilité langue | cours EN-only pour contexte FR → `LANGUAGE_INELIGIBLE`, score `null` | PASS |
+| Spécialisation secteur | cold-chain sans fit santé → fail-closed ; avec fit santé → PASS | PASS |
+| Provenance primaire | preuve absente/partielle → `UNVERIFIED_CREDENTIAL`, score `null` | PASS |
+| Claim trompeur « certification gratuite » | credential payant annoncé gratuit → `MISLEADING_FREE_CERTIFICATION` | PASS |
+| Assessment | assessment requis mais non vérifié → `ASSESSMENT_UNVERIFIED` | PASS |
+| Fraîcheur des preuves | preuve dépassant `maxEvidenceAgeDays` → `EVIDENCE_STALE`, score `null` | PASS |
+| Normalisation skills | fleet/warehouse aliases déterministes, sans inférence de compétences non liées | PASS |
+| Gap closure | cours sans compétence cible → `NO_TARGET_GAP_CLOSURE`, score `null` | PASS |
+| Ranking coût/temps | à couverture égale, parcours plus court et moins coûteux classé devant | PASS |
+| Ranking AR-LCI-001 | DisasterReady priorisé sur le vecteur logistique testé | PASS |
+| Credential → Talent Passport™ | completion vérifiée → état `credential-evidenced` + provenance, sans écraser preuve supérieure | PASS |
+| Employability delta | calcul borné 0..100 ; exemple 67 → 84 = +17 | PASS |
+| Sécurité régression Candidate OS | workflow complet : audit, typecheck, build, Playwright, source/bundle scans | PASS |
+
+### Verdict spécifique à cette capacité
+
+`VERIFIED LEARNING & CREDENTIAL INTELLIGENCE ENGINE™ = M6 CORE TEST_PROVEN`
+
+Ce verdict porte sur le **cœur de domaine déterministe et ses contrats automatisés**. Il ne vaut pas preuve live de données réelles, ni `S7+ PASS`, ni `M8 PASS`, ni revue indépendante/Big4, ni déploiement production.
+
+### Frontière encore ouverte
+
+Le minimum live reste à exécuter avec autorisation et provenance réelles :
+
+`1 offre réelle sourcée + 1 profil candidat réel autorisé + ≥3 learning opportunities récupérées depuis leurs sources primaires + 1 rejet d’éligibilité + 1 claim trompeur + 1 pathway credential vérifié → ranking explicable → simulation Talent Passport™ → recalcul readiness/employability delta`.
+
+Statut release : **GO poursuite S7+ / HOLD M8 & PRODUCTION**.
