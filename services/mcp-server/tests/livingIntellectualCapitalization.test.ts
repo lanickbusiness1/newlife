@@ -5,11 +5,11 @@ import { describe, expect, test } from "vitest";
 import {
   compileCapitalizationPlan,
   compileChatSignal,
-  compileRemePromotion,
   evaluateEditorialSignal,
   GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR,
   recordCapitalizationEvidence
 } from "../src/livingIntellectualCapitalization";
+import { compileRemePromotion } from "../src/remePromotion";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "../../..");
@@ -193,6 +193,7 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
     expect(indexSource).toContain('"capitalization:plan"');
     expect(indexSource).toContain('register("genesis.capitalization.record_evidence"');
     expect(indexSource).toContain('"capitalization:evidence"');
+    expect(indexSource).toContain("compileRemePromotion");
     expect(GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.decisionId).toBe("V4-DEC-016");
   });
 
