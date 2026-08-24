@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { type LearningOpportunity } from '../../lib/domain/learning-credential-intelligence.js';
 import {
-  evaluateLearningOpportunity,
-  type CandidateLearningContext,
-  type LearningOpportunity,
-} from '../../lib/domain/learning-credential-intelligence.js';
+  evaluateLearningPathway,
+  type TypedCandidateLearningContext,
+} from '../../lib/domain/learning-pathway-eligibility.js';
 
 const disasterReady: LearningOpportunity = {
   id: 'disasterready-procurement-logistics',
@@ -31,7 +31,7 @@ const disasterReady: LearningOpportunity = {
 };
 
 test('a course cannot pretend to close a required non-skill eligibility gap', () => {
-  const context: CandidateLearningContext = {
+  const context: TypedCandidateLearningContext = {
     countryCode: 'ML',
     languages: ['fr', 'en'],
     targetSectors: ['humanitarian'],
@@ -47,7 +47,7 @@ test('a course cannot pretend to close a required non-skill eligibility gap', ()
     ],
   };
 
-  const result = evaluateLearningOpportunity(disasterReady, context);
+  const result = evaluateLearningPathway(disasterReady, context);
   assert.equal(result.eligibilityGate, 'FAIL');
   assert.equal(result.recommendationScore, null);
   assert.deepEqual(result.closedSkills, []);
@@ -56,7 +56,7 @@ test('a course cannot pretend to close a required non-skill eligibility gap', ()
 });
 
 test('a useful course stays REVIEW while another required eligibility gap remains open', () => {
-  const context: CandidateLearningContext = {
+  const context: TypedCandidateLearningContext = {
     countryCode: 'ML',
     languages: ['fr', 'en'],
     targetSectors: ['humanitarian'],
@@ -80,7 +80,7 @@ test('a useful course stays REVIEW while another required eligibility gap remain
     ],
   };
 
-  const result = evaluateLearningOpportunity(disasterReady, context);
+  const result = evaluateLearningPathway(disasterReady, context);
   assert.equal(result.eligibilityGate, 'REVIEW');
   assert.equal(result.decision, 'REVIEW');
   assert.ok((result.recommendationScore ?? 0) > 0);
