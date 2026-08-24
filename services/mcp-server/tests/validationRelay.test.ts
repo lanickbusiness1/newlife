@@ -1,9 +1,41 @@
 import { describe, expect, test } from "vitest";
+import { compileComputeEconomicsPlan } from "../src/computeEconomics";
 import { compileReleaseEvidenceBundle } from "../src/releaseCenter";
 import {
   compileValidationRelay,
   type ValidationRelayInput
 } from "../src/validationRelay";
+
+const aiEconomicsCertificate = compileComputeEconomicsPlan({
+  workload: {
+    workloadId: "WL-VALIDATION-RELAY",
+    dataClassification: "confidential",
+    inputTokensPerRequest: 1000,
+    outputTokensPerRequest: 500,
+    requestsPerMonth: 1000,
+    revenuePerMonthUsd: 1000,
+    minQualityScore: 0.8,
+    maxTtftMs: 1000,
+    maxInterTokenLatencyMs: 100
+  },
+  candidates: [{
+    provider: "provider-a",
+    model: "model-a",
+    accelerator: "gpu-a",
+    region: "africa-west",
+    inputUsdPerMillionTokens: 1,
+    outputUsdPerMillionTokens: 4,
+    ttftMs: 500,
+    interTokenLatencyMs: 40,
+    throughputTokensPerSecond: 120,
+    qualityScore: 0.86,
+    sovereigntyScore: 88,
+    lockInScore: 30,
+    energyWhPerThousandTokens: 0.8,
+    slaPercent: 99.95
+  }],
+  generatedAt: "2026-08-20T02:00:00Z"
+}).certificate;
 
 const baseInput: ValidationRelayInput = {
   validationRef: "CEO-VAL-2026-08-18-001",
@@ -29,6 +61,7 @@ function serviceBundle() {
     testSummary: "all tests passed",
     gates: { m6: "pass", s7plus: "pass", m8: "pass" },
     sovereigntyDecisionRef: "SOV-DEPLOY-001",
+    aiEconomicsCertificate,
     provider: {
       provider: "render",
       deploymentId: "dep-1",
@@ -53,7 +86,7 @@ function serviceBundle() {
       checkedAt: "2026-08-20T02:02:00Z"
     },
     rollback: { reference: "rollback:dep-1", verified: true },
-    changelog: ["Sovereign Delivery Runtime"],
+    changelog: ["Sovereign Delivery Runtime", "AI Economics Certificate"],
     remeRef: "REME-REL-001",
     generatedAt: "2026-08-20T02:03:00Z"
   });
