@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { compileComputeEconomicsPlan } from "../src/computeEconomics";
+import {
+  compileAssuranceReport,
+  compileIndependentAssurance
+} from "../src/independentAssurance";
 import { compileReleaseEvidenceBundle } from "../src/releaseCenter";
 import {
   compileValidationRelay,
@@ -51,17 +55,52 @@ const baseInput: ValidationRelayInput = {
   }
 };
 
-function serviceBundle() {
+function internalAssurance(snapshotSha = "abc123") {
+  const roles = [
+    "ARCHITECTURE_RUNTIME_AUDITOR",
+    "SECURITY_SUPPLY_CHAIN_AUDITOR",
+    "SOVEREIGNTY_COMPLIANCE_AUDITOR",
+    "ECONOMICS_FINOPS_AUDITOR",
+    "ADVERSARIAL_RED_TEAM_AUDITOR"
+  ] as const;
+  const specialistReports = roles.map(auditorRole => compileAssuranceReport({
+    auditorRole,
+    snapshotSha,
+    findings: [],
+    verdict: "PASS",
+    evidenceRefs: ["CI#303"],
+    generatedAt: "2026-08-24T15:48:00Z"
+  }));
+  const arbiterReport = compileAssuranceReport({
+    auditorRole: "ASSURANCE_ARBITER",
+    snapshotSha,
+    findings: [],
+    verdict: "PASS",
+    evidenceRefs: ["council:sealed"],
+    generatedAt: "2026-08-24T15:49:00Z"
+  });
+  return compileIndependentAssurance({
+    snapshotSha,
+    specialistReports,
+    arbiterReport,
+    externalMandate: false,
+    evidenceRef: "REME-IAC-RELAY",
+    generatedAt: "2026-08-24T15:50:00Z"
+  });
+}
+
+function serviceBundle(options: { assurance?: boolean } = {}) {
   return compileReleaseEvidenceBundle({
-    releaseId: "REL-MCP-0.4.0",
+    releaseId: "REL-MCP-0.6.0",
     assetId: "INF-DEPLOYBOT-001",
-    version: "0.4.0",
+    version: "0.6.0",
     commitSha: "abc123",
     ciRun: "run-release",
     testSummary: "all tests passed",
     gates: { m6: "pass", s7plus: "pass", m8: "pass" },
     sovereigntyDecisionRef: "SOV-DEPLOY-001",
     aiEconomicsCertificate,
+    independentAssurance: options.assurance ? internalAssurance("abc123") : undefined,
     provider: {
       provider: "render",
       deploymentId: "dep-1",
@@ -86,7 +125,7 @@ function serviceBundle() {
       checkedAt: "2026-08-20T02:02:00Z"
     },
     rollback: { reference: "rollback:dep-1", verified: true },
-    changelog: ["Sovereign Delivery Runtime", "AI Economics Certificate"],
+    changelog: ["Sovereign Delivery Runtime", "Independent Assurance Council"],
     remeRef: "REME-REL-001",
     generatedAt: "2026-08-20T02:03:00Z"
   });
@@ -176,7 +215,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     expect(output.blockers).toContain("Release Evidence Bundle required");
   });
 
-  test("returns DELIVERED_SERVICE from a verified release bundle", () => {
+  test("returns DELIVERED_SERVICE from a verified moderate release bundle", () => {
     const bundle = serviceBundle();
     const output = compileValidationRelay({
       ...baseInput,
@@ -187,6 +226,35 @@ describe("GENESIS V4 CEO Validation Relay", () => {
 
     expect(output.state).toBe("DELIVERED_SERVICE");
     expect(output.finalDeliverable).toBe("https://mcp.afriagenesis.com");
+  });
+
+  test("high-risk delivery uses INTERNAL_BIG4_PASS instead of the legacy big4 flag", () => {
+    const bundle = serviceBundle({ assurance: true });
+    const output = compileValidationRelay({
+      ...baseInput,
+      riskClass: "high",
+      targetDeliverable: "service",
+      releaseEvidenceEnforced: true,
+      evidence: { releaseEvidenceBundle: bundle }
+    });
+
+    expect(output.state).toBe("DELIVERED_SERVICE");
+    expect(output.blockers).toEqual([]);
+  });
+
+  test("high-risk enforced delivery without council evidence is rejected by Release Center, not legacy Big4 gate", () => {
+    const bundle = serviceBundle();
+    const output = compileValidationRelay({
+      ...baseInput,
+      riskClass: "high",
+      targetDeliverable: "service",
+      releaseEvidenceEnforced: true,
+      evidence: { releaseEvidenceBundle: bundle }
+    });
+
+    expect(output.state).toBe("DEPLOYED_UNVERIFIED");
+    expect(output.blockers.join(" ")).toMatch(/assurance/i);
+    expect(output.blockers.join(" ")).not.toMatch(/Big4 gate/i);
   });
 
   test("preserves APK delivery compatibility without public DNS", () => {
