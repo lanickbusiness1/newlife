@@ -23,9 +23,16 @@ import {
   evaluateKnowledgePromotion,
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
+import {
+  compileCapitalizationPlan,
+  compileChatSignal,
+  evaluateEditorialSignal,
+  GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR,
+  recordCapitalizationEvidence
+} from "./livingIntellectualCapitalization.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.6.0";
+const CONTROL_PLANE_REVISION = "0.7.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -68,9 +75,15 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
+    eces: {
+      status: "allowed",
+      gate: "G8.3",
+      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 0.7.0."
+    },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: [
+      "MCP package 0.3.0 / control-plane revision 0.7.0: deterministic planning does not itself perform external Notion, repository or database writes; connector receipts are required before end-to-end completion is claimed."
+    ]
   };
 }
 
@@ -217,6 +230,33 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
+  register("genesis.capitalization.evaluate_signal", "Normalise un signal conversationnel et applique l’Editorial Signal Gate™ de V4-DEC-016 sans promouvoir ChatGPT Memory comme source canonique.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "capitalization:evaluate", async ({ context, payload }) => {
+    const signal = compileChatSignal(payload as any);
+    const gate = evaluateEditorialSignal(signal, (payload as any)?.existingFingerprints);
+    return { tenantId: context.tenantId, signal, gate };
+  });
+
+  register("genesis.capitalization.compile_plan", "Compile un signal approuvé en contrats d’écriture idempotents vers Notion canonique, GENESIS V4, livre et produits/exécution.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "capitalization:plan", async ({ context, payload }) => {
+    const signal = compileChatSignal(payload as any);
+    const gate = evaluateEditorialSignal(signal, (payload as any)?.existingFingerprints);
+    const plan = compileCapitalizationPlan(signal, gate);
+    return { tenantId: context.tenantId, signal, gate, plan };
+  });
+
+  register("genesis.capitalization.record_evidence", "Ferme la chaîne de preuve V4-DEC-016 à partir des reçus d’exécution des connecteurs autorisés.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "capitalization:evidence", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    proof: recordCapitalizationEvidence((payload as any)?.plan, (payload as any)?.receipts ?? [])
+  }));
+
   return server;
 }
 
@@ -243,7 +283,8 @@ if (mode === "stdio") {
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
-      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
+      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
+      livingIntellectualCapitalization: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.assetId
     });
   });
 
