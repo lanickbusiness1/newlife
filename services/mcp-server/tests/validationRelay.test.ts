@@ -63,16 +63,20 @@ function internalAssurance(snapshotSha = "abc123") {
     "ECONOMICS_FINOPS_AUDITOR",
     "ADVERSARIAL_RED_TEAM_AUDITOR"
   ] as const;
-  const specialistReports = roles.map(auditorRole => compileAssuranceReport({
+  const specialistReports = roles.map((auditorRole, index) => compileAssuranceReport({
     auditorRole,
+    auditorId: `agent:assurance:relay:${index + 1}`,
+    executionContextId: `ctx:assurance:relay:${index + 1}`,
     snapshotSha,
     findings: [],
     verdict: "PASS",
-    evidenceRefs: ["CI#303"],
+    evidenceRefs: ["CI#316"],
     generatedAt: "2026-08-24T15:48:00Z"
   }));
   const arbiterReport = compileAssuranceReport({
     auditorRole: "ASSURANCE_ARBITER",
+    auditorId: "agent:assurance:relay:arbiter",
+    executionContextId: "ctx:assurance:relay:arbiter",
     snapshotSha,
     findings: [],
     verdict: "PASS",
@@ -83,6 +87,7 @@ function internalAssurance(snapshotSha = "abc123") {
     snapshotSha,
     specialistReports,
     arbiterReport,
+    builderAgentIds: ["agent:builder:relay-fixture"],
     externalMandate: false,
     evidenceRef: "REME-IAC-RELAY",
     generatedAt: "2026-08-24T15:50:00Z"
@@ -134,7 +139,6 @@ function serviceBundle(options: { assurance?: boolean } = {}) {
 describe("GENESIS V4 CEO Validation Relay", () => {
   test("takes the relay automatically after CEO validation and asks for build evidence next", () => {
     const output = compileValidationRelay(baseInput);
-
     expect(output.continueAutomatically).toBe(true);
     expect(output.humanApprovalRequired).toBe(false);
     expect(output.autonomyLevel).toBe("A3");
@@ -143,11 +147,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
   });
 
   test("stops only on an explicit A4 veto", () => {
-    const output = compileValidationRelay({
-      ...baseInput,
-      a4Vetoes: ["legal_commitment"]
-    });
-
+    const output = compileValidationRelay({ ...baseInput, a4Vetoes: ["legal_commitment"] });
     expect(output.state).toBe("BLOCKED_A4");
     expect(output.continueAutomatically).toBe(false);
     expect(output.humanApprovalRequired).toBe(true);
@@ -158,39 +158,25 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     const output = compileValidationRelay({
       ...baseInput,
       evidence: {
-        commitSha: "abc123",
-        ciRun: "run-1",
-        testsPassed: true,
-        m6: "pass",
-        s7plus: "pass",
-        m8: "pass",
+        commitSha: "abc123", ciRun: "run-1", testsPassed: true,
+        m6: "pass", s7plus: "pass", m8: "pass",
         finalUrlOrArtifact: "https://example.africa"
       }
     });
-
     expect(output.state).not.toBe("DELIVERED_URL");
-    expect(output.blockers).toEqual(expect.arrayContaining([
-      "Healthcheck proof missing",
-      "Rollback proof missing"
-    ]));
+    expect(output.blockers).toEqual(expect.arrayContaining(["Healthcheck proof missing", "Rollback proof missing"]));
   });
 
   test("keeps legacy terminal delivery compatible until bundle enforcement is activated", () => {
     const output = compileValidationRelay({
       ...baseInput,
       evidence: {
-        commitSha: "abc123",
-        ciRun: "run-2",
-        testsPassed: true,
-        m6: "pass",
-        s7plus: "pass",
-        m8: "pass",
+        commitSha: "abc123", ciRun: "run-2", testsPassed: true,
+        m6: "pass", s7plus: "pass", m8: "pass",
         finalUrlOrArtifact: "https://example.africa",
-        healthcheckPassed: true,
-        rollbackRef: "rollback:v1"
+        healthcheckPassed: true, rollbackRef: "rollback:v1"
       }
     });
-
     expect(output.state).toBe("DELIVERED_URL");
   });
 
@@ -199,18 +185,12 @@ describe("GENESIS V4 CEO Validation Relay", () => {
       ...baseInput,
       releaseEvidenceEnforced: true,
       evidence: {
-        commitSha: "abc123",
-        ciRun: "run-2",
-        testsPassed: true,
-        m6: "pass",
-        s7plus: "pass",
-        m8: "pass",
+        commitSha: "abc123", ciRun: "run-2", testsPassed: true,
+        m6: "pass", s7plus: "pass", m8: "pass",
         finalUrlOrArtifact: "https://example.africa",
-        healthcheckPassed: true,
-        rollbackRef: "rollback:v1"
+        healthcheckPassed: true, rollbackRef: "rollback:v1"
       }
     });
-
     expect(output.state).toBe("DEPLOYED_UNVERIFIED");
     expect(output.blockers).toContain("Release Evidence Bundle required");
   });
@@ -223,7 +203,6 @@ describe("GENESIS V4 CEO Validation Relay", () => {
       releaseEvidenceEnforced: true,
       evidence: { releaseEvidenceBundle: bundle }
     });
-
     expect(output.state).toBe("DELIVERED_SERVICE");
     expect(output.finalDeliverable).toBe("https://mcp.afriagenesis.com");
   });
@@ -237,7 +216,6 @@ describe("GENESIS V4 CEO Validation Relay", () => {
       releaseEvidenceEnforced: true,
       evidence: { releaseEvidenceBundle: bundle }
     });
-
     expect(output.state).toBe("DELIVERED_SERVICE");
     expect(output.blockers).toEqual([]);
   });
@@ -251,7 +229,6 @@ describe("GENESIS V4 CEO Validation Relay", () => {
       releaseEvidenceEnforced: true,
       evidence: { releaseEvidenceBundle: bundle }
     });
-
     expect(output.state).toBe("DEPLOYED_UNVERIFIED");
     expect(output.blockers.join(" ")).toMatch(/assurance/i);
     expect(output.blockers.join(" ")).not.toMatch(/Big4 gate/i);
@@ -263,18 +240,12 @@ describe("GENESIS V4 CEO Validation Relay", () => {
       targetDeliverable: "apk",
       releaseEvidenceEnforced: true,
       evidence: {
-        commitSha: "def456",
-        ciRun: "run-3",
-        testsPassed: true,
-        m6: "pass",
-        s7plus: "pass",
-        m8: "pass",
+        commitSha: "def456", ciRun: "run-3", testsPassed: true,
+        m6: "pass", s7plus: "pass", m8: "pass",
         finalUrlOrArtifact: "artifact://afria-app.apk",
-        healthcheckPassed: true,
-        rollbackRef: "rollback:apk-v1"
+        healthcheckPassed: true, rollbackRef: "rollback:apk-v1"
       }
     });
-
     expect(output.state).toBe("DELIVERED_APK");
   });
 });
