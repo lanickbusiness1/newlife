@@ -34,11 +34,11 @@ const compute = compileComputeEconomicsPlan({
 });
 
 const releaseInput = {
-  releaseId: "REL-MCP-0.5.0",
+  releaseId: "REL-MCP-0.6.0",
   assetId: "INF-DEPLOYBOT-001",
-  version: "0.5.0",
+  version: "0.6.0",
   commitSha: "abc123",
-  ciRun: "MCP-CI-258",
+  ciRun: "MCP-CI-299",
   testSummary: "all tests passed",
   gates: { m6: "pass" as const, s7plus: "pass" as const, m8: "pass" as const },
   sovereigntyDecisionRef: "SOV-DEPLOY-002",
@@ -69,7 +69,7 @@ const releaseInput = {
     checkedAt: "2026-08-24T11:28:00Z"
   },
   rollback: { reference: "rollback:dep-2", verified: true as const },
-  changelog: ["Add Compute & Inference Economics Control Layer"],
+  changelog: ["Add Compute & Inference Economics Control Layer", "Add Independent Assurance Council"],
   remeRef: "REME-REL-002",
   generatedAt: "2026-08-24T11:29:00Z"
 };
@@ -77,7 +77,7 @@ const releaseInput = {
 describe("Release Center AI economics integration", () => {
   test("upgrades release evidence schema and embeds the AI Economics Certificate", () => {
     const bundle = compileReleaseEvidenceBundle(releaseInput as any) as any;
-    expect(bundle.schemaVersion).toBe("1.1.0");
+    expect(bundle.schemaVersion).toBe("1.2.0");
     expect(bundle.aiEconomicsCertificate.sha256).toBe(compute.certificate.sha256);
   });
 
