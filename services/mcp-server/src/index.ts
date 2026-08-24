@@ -31,10 +31,11 @@ import {
   GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR,
   recordCapitalizationEvidence
 } from "./livingIntellectualCapitalization.js";
+import { loadAuthoritativeCapitalizationFingerprints } from "./capitalizationState.js";
 import { compileRemePromotion } from "./remePromotion.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.9.0";
+const CONTROL_PLANE_REVISION = "1.0.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -80,13 +81,25 @@ function governed(ctx: Context, tool: string, data: unknown) {
     eces: {
       status: "allowed",
       gate: "G8.3",
-      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 0.9.0."
+      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 1.0.0."
     },
     auditId,
     limitations: [
-      "MCP package 0.3.0 / control-plane revision 0.9.0: external writes remain connector-owned; evidence closure requires both a planning-authority HMAC attestation and tenant-bound HMAC-SHA256 connector receipts."
+      "MCP package 0.3.0 / control-plane revision 1.0.0: external writes remain connector-owned; deduplication is loaded from authoritative tenant state; evidence closure requires both planning-authority and connector HMAC attestations."
     ]
   };
+}
+
+async function authoritativeFingerprints(tenantId: string): Promise<string[]> {
+  return loadAuthoritativeCapitalizationFingerprints(
+    tenantId,
+    {
+      supabaseUrl: process.env.GENESIS_CAPITALIZATION_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "",
+      serviceRoleKey: process.env.GENESIS_CAPITALIZATION_SUPABASE_SERVICE_ROLE_KEY
+        ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+        ?? ""
+    }
+  );
 }
 
 function buildServer() {
@@ -232,21 +245,31 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
-  register("genesis.capitalization.evaluate_signal", "Normalise un signal conversationnel tenant-bound et applique l’Editorial Signal Gate™ de V4-DEC-016 sans promouvoir ChatGPT Memory comme source canonique.", {
+  register("genesis.capitalization.evaluate_signal", "Normalise un signal tenant-bound, charge l’état de déduplication autoritatif et applique l’Editorial Signal Gate™ de V4-DEC-016.", {
     context: RequestContext,
     payload: z.unknown()
   }, "capitalization:evaluate", async ({ context, payload }) => {
-    const signal = compileChatSignal({ ...(payload as any), tenantId: context.tenantId });
-    const gate = evaluateEditorialSignal(signal, (payload as any)?.existingFingerprints);
+    const existingFingerprints = await authoritativeFingerprints(context.tenantId);
+    const signal = compileChatSignal({
+      ...(payload as any),
+      tenantId: context.tenantId,
+      existingFingerprints
+    });
+    const gate = evaluateEditorialSignal(signal, existingFingerprints);
     return { tenantId: context.tenantId, signal, gate };
   });
 
-  register("genesis.capitalization.compile_plan", "Compile un signal approuvé en contrats d’écriture tenant-bound et signe le plan avec l’autorité capitalization:plan.", {
+  register("genesis.capitalization.compile_plan", "Charge la déduplication autoritative, compile un signal approuvé en contrats tenant-bound et signe le plan avec l’autorité capitalization:plan.", {
     context: RequestContext,
     payload: z.unknown()
   }, "capitalization:plan", async ({ context, payload }) => {
-    const signal = compileChatSignal({ ...(payload as any), tenantId: context.tenantId });
-    const gate = evaluateEditorialSignal(signal, (payload as any)?.existingFingerprints);
+    const existingFingerprints = await authoritativeFingerprints(context.tenantId);
+    const signal = compileChatSignal({
+      ...(payload as any),
+      tenantId: context.tenantId,
+      existingFingerprints
+    });
+    const gate = evaluateEditorialSignal(signal, existingFingerprints);
     const plan = compileCapitalizationPlan(signal, gate);
     const planHmacSecret = process.env.GENESIS_CAPITALIZATION_PLAN_HMAC_SECRET ?? "";
     const planAttestation = attestCapitalizationPlan(plan, planHmacSecret);
@@ -310,6 +333,7 @@ if (mode === "stdio") {
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
       livingIntellectualCapitalization: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.assetId,
+      capitalizationDedupState: "authoritative_supabase_rpc",
       capitalizationPlanTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.planTrust,
       capitalizationReceiptTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.receiptTrust
     });
