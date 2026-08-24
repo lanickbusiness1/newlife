@@ -1,0 +1,38 @@
+name: V4 DEC 018 Lockfile
+
+on:
+  push:
+    branches:
+      - feat/v4-dec-018-guinea-digital-state-control
+    paths:
+      - 'services/mcp-server/package.json'
+      - '.github/workflows/v4-dec-018-lockfile.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: feat/v4-dec-018-guinea-digital-state-control
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/mcp-server/package-lock.json
+      - name: Regenerate lockfile deterministically
+        working-directory: services/mcp-server
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit lockfile when changed
+        run: |
+          if git diff --quiet -- services/mcp-server/package-lock.json; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add services/mcp-server/package-lock.json
+          git commit -m 'build(v4-dec-018): regenerate MCP lockfile'
+          git push origin HEAD:feat/v4-dec-018-guinea-digital-state-control
