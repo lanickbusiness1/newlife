@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import type { DomainEvidence } from "./domainManager.js";
 import type { ProviderDeploymentEvidence } from "./deploymentOrchestrator.js";
+import {
+  verifyAiEconomicsCertificate,
+  type AiEconomicsCertificate
+} from "./computeEconomics.js";
 
 export type ReleaseRiskClass = "low" | "moderate" | "high" | "regulated";
 export type ReleaseTargetDeliverable = "url" | "apk" | "aab" | "service" | "infrastructure";
@@ -8,7 +12,7 @@ export type ReleaseTargetDeliverable = "url" | "apk" | "aab" | "service" | "infr
 type Pass = "pass";
 
 export interface ReleaseEvidenceBundle {
-  schemaVersion: "1.0.0";
+  schemaVersion: "1.1.0";
   releaseId: string;
   assetId: string;
   version: string;
@@ -22,6 +26,7 @@ export interface ReleaseEvidenceBundle {
     big4?: Pass;
   };
   sovereigntyDecisionRef: string;
+  aiEconomicsCertificate: AiEconomicsCertificate;
   provider: ProviderDeploymentEvidence;
   domain?: DomainEvidence;
   finalUrlOrArtifact: string;
@@ -85,6 +90,8 @@ export function compileReleaseEvidenceBundle(input: ReleaseEvidenceInput): Relea
   required(input.ciRun, "ciRun");
   required(input.testSummary, "testSummary");
   required(input.sovereigntyDecisionRef, "sovereigntyDecisionRef");
+  required(input.aiEconomicsCertificate?.workloadId, "aiEconomicsCertificate.workloadId");
+  required(input.aiEconomicsCertificate?.sha256, "aiEconomicsCertificate.sha256");
   required(input.finalUrlOrArtifact, "finalUrlOrArtifact");
   required(input.remeRef, "remeRef");
   required(input.generatedAt, "generatedAt");
@@ -94,7 +101,7 @@ export function compileReleaseEvidenceBundle(input: ReleaseEvidenceInput): Relea
   }
 
   const withoutHash: Omit<ReleaseEvidenceBundle, "sha256"> = {
-    schemaVersion: "1.0.0",
+    schemaVersion: "1.1.0",
     ...input
   };
 
@@ -107,8 +114,8 @@ export function compileReleaseEvidenceBundle(input: ReleaseEvidenceInput): Relea
 export function verifyReleaseEvidenceBundle(
   bundle: ReleaseEvidenceBundle,
   policy: { riskClass: ReleaseRiskClass; targetDeliverable: ReleaseTargetDeliverable }
-): { valid: true; sha256: string } {
-  if (bundle.schemaVersion !== "1.0.0") {
+): { valid: true; sha256: string; aiEconomicsCertificateSha256: string } {
+  if (bundle.schemaVersion !== "1.1.0") {
     throw new Error("DEPLOYBOT_RELEASE_SCHEMA_UNSUPPORTED");
   }
 
@@ -124,8 +131,12 @@ export function verifyReleaseEvidenceBundle(
   required(bundle.ciRun, "ciRun");
   required(bundle.testSummary, "testSummary");
   required(bundle.sovereigntyDecisionRef, "sovereigntyDecisionRef");
+  required(bundle.aiEconomicsCertificate?.workloadId, "aiEconomicsCertificate.workloadId");
+  required(bundle.aiEconomicsCertificate?.sha256, "aiEconomicsCertificate.sha256");
   required(bundle.finalUrlOrArtifact, "finalUrlOrArtifact");
   required(bundle.remeRef, "remeRef");
+
+  const economicsVerification = verifyAiEconomicsCertificate(bundle.aiEconomicsCertificate);
 
   if (bundle.gates.m6 !== "pass" || bundle.gates.s7plus !== "pass" || bundle.gates.m8 !== "pass") {
     throw new Error("DEPLOYBOT_RELEASE_GATES_INCOMPLETE: M6, S7+ and M8 must pass");
@@ -173,5 +184,9 @@ export function verifyReleaseEvidenceBundle(
     throw new Error("DEPLOYBOT_RELEASE_ROLLBACK_REQUIRED: verified rollback evidence is missing");
   }
 
-  return { valid: true, sha256: bundle.sha256 };
+  return {
+    valid: true,
+    sha256: bundle.sha256,
+    aiEconomicsCertificateSha256: economicsVerification.sha256
+  };
 }
