@@ -1,0 +1,166 @@
+name: Independent Assurance Council
+
+on:
+  push:
+    branches:
+      - feat/deploybot-sovereign-delivery-runtime
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: iac-council-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  council:
+    if: contains(github.event.head_commit.message, '[run-iac]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: services/mcp-server
+    env:
+      IAC_MODEL: afriagenesis-iac-qwen25-coder-7b-q4km
+      IAC_MODEL_SHA256: 509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c
+      IAC_RUNTIME_SHA256: f263a91280471b4c33c4999d7c76259c0f3a0a53a0b3e692b2c0b84380137a35
+      IAC_BASE_URL: http://127.0.0.1:8080/v1
+      IAC_MAX_TOKENS: '900'
+      IAC_TIMEOUT_MS: '300000'
+      IAC_BUILDER_AGENT_IDS: agent:builder:deploybot
+      IAC_EXTERNAL_MANDATE: 'false'
+      IAC_PROVIDER: github-actions-local-llama.cpp
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/mcp-server/package-lock.json
+
+      - name: Verify software snapshot
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+          npm run typecheck
+          npm test
+
+      - name: Build bounded PR evidence
+        run: |
+          git -C "$GITHUB_WORKSPACE" fetch origin main --depth=1
+          git -C "$GITHUB_WORKSPACE" diff --stat origin/main...HEAD > /tmp/pr64.diff
+          git -C "$GITHUB_WORKSPACE" diff origin/main...HEAD -- \
+            services/mcp-server/src/independentAssurance.ts \
+            services/mcp-server/src/assuranceCouncilExecutor.ts \
+            services/mcp-server/src/releaseCenter.ts \
+            services/mcp-server/src/validationRelay.ts \
+            services/mcp-server/src/computeEconomics.ts \
+            services/mcp-server/src/deploymentOrchestrator.ts \
+            .github/workflows/iac-council.yml \
+            render.yaml >> /tmp/pr64.diff
+          head -c 20000 /tmp/pr64.diff > /tmp/pr64-bounded.diff
+
+      - name: Download and verify pinned llama.cpp runtime
+        run: |
+          mkdir -p /tmp/llama-runtime
+          curl -fL --retry 4 --retry-all-errors \
+            -o /tmp/llama-runtime.tar.gz \
+            https://github.com/ggml-org/llama.cpp/releases/download/b10516/llama-b10516-bin-ubuntu-x64.tar.gz
+          echo "${IAC_RUNTIME_SHA256}  /tmp/llama-runtime.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/llama-runtime.tar.gz -C /tmp/llama-runtime
+          LLAMA_SERVER="$(find /tmp/llama-runtime -type f -name llama-server | head -n 1)"
+          test -n "$LLAMA_SERVER"
+          chmod +x "$LLAMA_SERVER"
+          echo "LLAMA_SERVER=$LLAMA_SERVER" >> "$GITHUB_ENV"
+
+      - name: Download and verify pinned Council model
+        run: |
+          curl -fL --retry 5 --retry-all-errors --connect-timeout 30 \
+            -o /tmp/iac-model.gguf \
+            'https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf?download=true'
+          echo "${IAC_MODEL_SHA256}  /tmp/iac-model.gguf" | sha256sum -c -
+
+      - name: Start isolated local inference API
+        run: |
+          "$LLAMA_SERVER" \
+            --model /tmp/iac-model.gguf \
+            --alias "$IAC_MODEL" \
+            --host 127.0.0.1 \
+            --port 8080 \
+            --ctx-size 32768 \
+            --threads 4 \
+            > /tmp/iac-llama-server.log 2>&1 &
+          echo $! > /tmp/iac-llama-server.pid
+          for attempt in $(seq 1 150); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/iac-llama-server.log
+          exit 1
+
+      - name: Execute six-context Independent Assurance Council
+        env:
+          SNAPSHOT_SHA: ${{ github.sha }}
+          IAC_DIFF_PATH: /tmp/pr64-bounded.diff
+          IAC_CI_EVIDENCE: "MCP CI + npm audit/typecheck/tests executed on this exact snapshot before Council"
+          IAC_EVIDENCE_REF: github-actions:${{ github.run_id }}:${{ github.sha }}
+          IAC_OUTPUT: ${{ github.workspace }}/services/mcp-server/artifacts/internal-assurance/${{ github.sha }}.json
+        run: npm run assurance:run
+
+      - name: Upload sealed Council evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: iac-council-${{ github.sha }}
+          path: services/mcp-server/artifacts/internal-assurance/${{ github.sha }}.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce Council verdict
+        id: verdict
+        run: |
+          ARTIFACT="artifacts/internal-assurance/${GITHUB_SHA}.json"
+          VERDICT="$(node -e "const a=require('./' + process.argv[1]); console.log(a.evidence.verdict)" "$ARTIFACT")"
+          echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
+          echo "Council verdict: $VERDICT"
+          test "$VERDICT" = "INTERNAL_BIG4_PASS"
+
+      - name: Publish IAC gate success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"success\",\"context\":\"iac-internal-big4\",\"description\":\"Independent Assurance Council passed\",\"target_url\":\"$RUN_URL\"}"
+
+      - name: Publish IAC gate failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"failure\",\"context\":\"iac-internal-big4\",\"description\":\"Independent Assurance Council requires remediation\",\"target_url\":\"$RUN_URL\"}"
+
+      - name: Stop local inference API
+        if: always()
+        run: |
+          if test -f /tmp/iac-llama-server.pid; then
+            kill "$(cat /tmp/iac-llama-server.pid)" 2>/dev/null || true
+          fi
