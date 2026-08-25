@@ -3,7 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 export const GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR = Object.freeze({
   decisionId: "V4-DEC-016",
   assetId: "GENESIS-V4-LIVING-INTELLECTUAL-CAPITALIZATION-LOOP",
-  version: "1.4.0",
+  version: "1.5.0",
   mode: "extension_not_framework",
   editorialGate: "Editorial Signal Gate™",
   planTrust: "HMAC-SHA256 planning authority attestation",
@@ -620,7 +620,16 @@ export function recordCapitalizationEvidence(
     proofId: digest("capproof", [
       plan.tenantId,
       plan.planId,
-      ...normalizedReceipts.map(receipt => `${receipt.targetId}:${receipt.status}:${receipt.receiptRef}:${receipt.connectorId}`)
+      ...normalizedReceipts.map(receipt => JSON.stringify({
+        targetId: receipt.targetId,
+        receiptRef: receipt.receiptRef,
+        executedAt: receipt.executedAt,
+        status: receipt.status,
+        artifactHash: receipt.artifactHash ?? null,
+        connectorId: receipt.connectorId,
+        nonce: receipt.nonce,
+        attestation: receipt.attestation
+      }))
     ]),
     planId: plan.planId,
     status,
