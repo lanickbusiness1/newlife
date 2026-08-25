@@ -4,6 +4,7 @@ import type { CanonicalDecisionType, ValidatedDecisionInput } from '../ai/persis
 import type { Json } from '../supabase/database.types.js';
 import type { CandidateContext, CandidateRepository } from '../repositories/candidate-context.js';
 import type { JobSpec } from '../domain/types.js';
+import { scoreApplicationReadinessFromCanonicalSources } from '../domain/application-readiness.js';
 import { findTruthConflicts } from '../domain/truth-consistency.js';
 import { CandidateHttpError } from '../http/errors.js';
 
@@ -145,6 +146,35 @@ export class CandidateOptimizerService {
       hashSource: { candidateId, jobSpec, context },
     });
     return { decisionId, jobSpec, analysis };
+  }
+
+  async applicationReadiness(candidateId: string, jobId: string) {
+    const [context, jobSpec] = await Promise.all([
+      this.deps.candidateRepository.loadContext(candidateId),
+      this.deps.jobRepository.getJobSpec(jobId),
+    ]);
+    if (!jobSpec) throw new CandidateHttpError(404, 'Job not found');
+
+    let readiness;
+    try {
+      readiness = scoreApplicationReadinessFromCanonicalSources(context, jobSpec);
+    } catch (error) {
+      if (error instanceof Error && /Canonical application readiness score requires/i.test(error.message)) {
+        throw new CandidateHttpError(409, 'Application readiness signals are incomplete');
+      }
+      throw error;
+    }
+
+    const decisionId = await this.persistArtifact({
+      candidateId,
+      jobId,
+      decisionType: 'assessment_score',
+      artifactKind: 'candidate_application_readiness_v1',
+      payload: readiness,
+      promptVersion: 'candidate-application-readiness-v1',
+      hashSource: { candidateId, jobSpec, context },
+    });
+    return { decisionId, jobSpec, readiness };
   }
 
   async rewrite(

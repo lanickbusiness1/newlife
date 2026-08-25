@@ -1,8 +1,10 @@
 import type { CandidateContext } from '../repositories/candidate-context.js';
 import type { DiagnosticFinding, JobSpec, RequirementCoverage } from '../domain/types.js';
+import type { ApplicationReadinessResult } from '../domain/application-readiness.js';
 
 export type DiagnosticResponse = { decisionId: string; diagnostic: { findings: DiagnosticFinding[] } };
 export type GapAnalysisResponse = { decisionId: string; jobSpec: JobSpec; analysis: { requirements: RequirementCoverage[] } };
+export type ReadinessResponse = { decisionId: string; jobSpec: JobSpec; readiness: ApplicationReadinessResult };
 export type VariantSections = {
   headline: string | null;
   summary: string | null;
@@ -47,6 +49,7 @@ export const candidateApi = {
   diagnostic: () => requestJson<DiagnosticResponse>('/api/candidate/diagnostic', { method: 'POST' }),
   jobs: () => requestJson<{ jobs: JobSpec[] }>('/api/candidate/jobs'),
   gapAnalysis: (jobId: string) => requestJson<GapAnalysisResponse>('/api/candidate/gap-analysis', { method: 'POST', body: JSON.stringify({ jobId }) }),
+  readiness: (jobId: string) => requestJson<ReadinessResponse>('/api/candidate/readiness', { method: 'POST', body: JSON.stringify({ jobId }) }),
   rewrite: (sourceRef: string, sourceStatement: string, jobId: string, consent: boolean) => requestJson<{ decisionId: string; rewrite: { text: string; usedMetrics: string[] }; consentId: string | null }>('/api/candidate/rewrite', {
     method: 'POST',
     body: JSON.stringify({ sourceRef, sourceStatement, jobId, consent, verifiedMetrics: [] }),

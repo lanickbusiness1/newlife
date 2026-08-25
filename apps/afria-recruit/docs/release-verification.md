@@ -99,3 +99,48 @@ Ces deux WARN appartiennent au contrat du démonstrateur investisseur ; ils ne d
 ## Gate suivant
 
 Staging authentifié avec comptes de test autorisés → revue sécurité indépendante → M6/S7+/M8 → décision explicite de fusion/publication.
+
+---
+
+## Checkpoint 24 août 2026 — Verified Learning & Credential Intelligence Engine™
+
+**Périmètre :** capacité P0 interne de `PRD-RECRUIT-001`, sans nouveau produit et sans nouveau schéma de données.  
+**Branche de preuve :** `feat/afria-recruit-ats-readiness-p0`.  
+**PR :** `#48`.  
+**Implémentation finale vérifiée :** `3c0fd2ab09fc1f1e79a869d6e326e1aab2dc5f49`.
+
+### TDD observé
+
+- RED `#192` — commit `56a24c82d9b4792f24e73c8ff4fc19001cffe591` : compilation de test échoue car le moteur n’existe pas encore.
+- GREEN `#193` — commit `d710a548926e1a628248c1521e64413e569558b9` : premier cœur déterministe vert sur tout le workflow.
+- RED hardening `#194` — commit `469a5789cd71868833f909f3cbe0f30b2a9772ce` : **83/84**, seul échec = source obsolète encore acceptée.
+- GREEN final `#195` — commit `3c0fd2ab09fc1f1e79a869d6e326e1aab2dc5f49` : **84/84 unit tests**, **0 vulnérabilité npm**, typecheck PASS, build Next.js PASS, **8/8 Playwright**, source scan PASS, public bundle scan PASS.
+
+### Contrats désormais prouvés
+
+- distinction entre learning gratuit et credential gratuit ;
+- country/language/sector eligibility fail-closed ;
+- provenance primaire obligatoire ;
+- assessment requis vérifié ;
+- politique de fraîcheur des sources avec `EVIDENCE_STALE` ;
+- détection du claim trompeur « certification gratuite » quand le credential est payant ;
+- normalisation conservative des skills ;
+- job-gap-to-course matching sans création de claim candidat ;
+- ranking déterministe intégrant gap closure, vérifiabilité, coût, durée et risque trompeur ;
+- aucun score publié si un hard gate échoue ;
+- completion credential vérifiée → skill `credential-evidenced` + provenance dans une copie immuable du Talent Passport™ ;
+- employability delta borné et explicite.
+
+### Verdict
+
+**M6 CORE TEST_PROVEN** pour le cœur déterministe de **Verified Learning & Credential Intelligence Engine™**.
+
+Ce statut **ne ferme pas** le M6 live/global de la release et ne vaut pas `S7+ PASS`, `M8 PASS`, revue Big4/indépendante, staging permanent, déploiement production ou performance réelle candidat.
+
+### Prochaine frontière obligatoire
+
+Exécuter le cas live autorisé et sourcé :
+
+`1 offre réelle + 1 candidat réel autorisé + ≥3 opportunités d’apprentissage récupérées depuis sources primaires → gates éligibilité/provenance/fraîcheur → ranking → completion credential simulée → Talent Passport™ vNext → readiness/employability delta → preuves S7+/M8`.
+
+Décision : **GO poursuite / HOLD release production**.

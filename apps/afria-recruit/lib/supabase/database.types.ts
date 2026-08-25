@@ -1,4 +1,4 @@
-// Candidate OS schema snapshot generated from the canonical AfrIA Recruit Supabase project on 2026-08-16.
+// Candidate OS schema snapshot generated from the canonical AfrIA Recruit Supabase project on 2026-08-22.
 // Scoped to tables consumed by apps/afria-recruit; regenerate when the live schema changes.
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 type CandidateRow={created_at:string;current_country_code:string|null;embedding_model:string|null;home_country_code:string|null;id:string;professional_title:string|null;profile_embedding:string|null;profile_status:string;public_code:string;scope:string;source_channel:string;summary:string|null;updated_at:string;user_id:string;verification_summary_status:string;visibility:string;years_experience:number|null};
@@ -12,7 +12,7 @@ type VerificationRow={candidate_id:string;claim_reference:string|null;claim_type
 type DocumentRow={candidate_id:string;document_type:string;id:string;mime_type:string|null;parsed_claim_status:string;parsed_data:Json;parsing_status:string;sha256:string|null;storage_bucket:string;storage_path:string;uploaded_at:string};
 type SkillCatalogRow={active:boolean;category:string;code:string;created_at:string;embedding:string|null;embedding_model:string|null;id:string;name_en:string;name_fr:string};
 type AiDecisionRow={candidate_id:string|null;confidence:number|null;created_at:string;decision_status:string;decision_type:string;human_review_required:boolean;id:string;input_hash:string;job_id:string|null;model_id:string;model_provider:string;output:Json;prompt_version:string};
-type JobRow={id:string;organization_id:string;title:string;description:string|null;work_mode:string;contract_type:string;seniority:string|null;openings:number;published_at:string|null;application_deadline:string|null;source_url:string|null;status:string;provenance_status:string;created_at:string;updated_at:string};
+type JobRow={id:string;organization_id:string;title:string;description:string|null;work_mode:string;contract_type:string;seniority:string|null;openings:number;published_at:string|null;application_deadline:string|null;source_url:string|null;status:string;provenance_status:string;raw_payload:Json;created_at:string;updated_at:string};
 type JobSkillRow={job_id:string;skill_id:string;importance:number;required:boolean;minimum_years:number|null};
 type JobLanguageRow={job_id:string;language_code:string;minimum_level:string;required:boolean};
 type JobLocationRow={id:string;job_id:string;country_code:string;city:string|null;is_primary:boolean;relocation_supported:boolean;visa_sponsorship_status:string};

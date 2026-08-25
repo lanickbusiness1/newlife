@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../supabase/database.types.js';
 import { persistValidatedDecision, type ValidatedDecisionInput } from '../ai/persist-decision.js';
 import type { JobSpec } from '../domain/types.js';
+import { parseJobReadinessCriteria } from '../repositories/readiness-source-parser.js';
 import type { DecisionStore, HumanReviewStore, JobRepository, OwnedDecision } from './candidate-optimizer-service.js';
 
 export class LiveDecisionStore implements DecisionStore {
@@ -37,7 +38,7 @@ export class LiveJobRepository implements JobRepository {
 
   async getJobSpec(id: string): Promise<JobSpec | null> {
     const [jobResult, skillsResult, languagesResult, locationsResult] = await Promise.all([
-      this.client.from('jobs').select('id,title,status').eq('id', id).eq('status', 'open').maybeSingle(),
+      this.client.from('jobs').select('id,title,status,raw_payload').eq('id', id).eq('status', 'open').maybeSingle(),
       this.client.from('job_skills').select('*').eq('job_id', id),
       this.client.from('job_languages').select('*').eq('job_id', id),
       this.client.from('job_locations').select('*').eq('job_id', id),
@@ -62,6 +63,7 @@ export class LiveJobRepository implements JobRepository {
         ...skillRows.map((row) => ({ id: `skill:${row.skill_id}`, kind: 'skill' as const, label: names.get(row.skill_id) ?? 'Compétence requise', required: row.required, skillId: row.skill_id, minimumYears: row.minimum_years ?? undefined })),
         ...(languagesResult.data ?? []).map((row) => ({ id: `language:${row.language_code}`, kind: 'language' as const, label: `${row.language_code.toUpperCase()} ${row.minimum_level}`, required: row.required, languageCode: row.language_code, minimumLevel: row.minimum_level })),
       ],
+      ...parseJobReadinessCriteria(jobResult.data.raw_payload),
     };
   }
 }
