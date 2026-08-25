@@ -1,110 +1,98 @@
-# AfrIA Recruit™ — Learning Pathway Governance Locks
+# AfrIA Recruit™ — Revenue Pilot Governance Policy
 
 ## Canonical identity
 
 - Product: `PRD-RECRUIT-001`
 - Capability: `Verified Learning & Credential Intelligence Engine™`
 - Guard: `Learning Pathway Eligibility Guard™`
-- Governance status: **LOCKED / NON-BYPASSABLE**
+- Commercial status: **COMMERCIAL BLOCK LIFTED / READY_TO_SELL — PAID PILOT**
 - Validation date: 2026-08-25
 - Release branch: `feat/afria-recruit-ats-readiness-p0`
 - Reference PR: `#48`
 
-## Purpose
+## CEO release decision — 25 August 2026
 
-These locks prevent AfrIA Recruit™ from converting a useful training recommendation into a false claim of candidate eligibility, readiness, or release maturity.
+The previous release lock that made real-data E2E, S7+, M8 and external review prerequisites to any commercial activation is lifted.
 
-## LOCK-LP-001 — Required-gap lock
+AfrIA Recruit™ MAY now be sold, demonstrated and operated as a **paid controlled pilot** on the surfaces already `TEST_PROVEN`.
 
-If any required eligibility gap remains open, the pathway MUST NOT return `PASS`.
+The following are no longer commercial-sale blockers:
 
-Canonical gap kinds:
+- real-data E2E completion;
+- S7+ completion;
+- M8 final approval;
+- Big4 / independent external review;
+- `PRODUCTION_PROVEN` status.
 
-`skill | language | education | experience | procedure | software | credential | license | other`
+Those controls remain maturity/scale gates where applicable. They MUST NOT be represented as already passed when they are not.
 
-Decision contract:
+## Revenue Pilot contract
 
-- useful course + all required gaps closed → normal eligibility evaluation may continue;
-- useful course + one or more required non-skill gaps still open → `REVIEW`;
-- course closes no target gap → `FAIL` for eligibility-remediation purpose;
-- unresolved or unsourced required gap → never promote to `PASS`.
+Allowed now:
 
-## LOCK-LP-002 — Evidence lock
+- prospecting and selling AfrIA Recruit™;
+- paid demonstrations and paid diagnostics;
+- bounded paid pilots with authorized users;
+- CV/application-readiness services;
+- verified learning/credential recommendations;
+- Talent Passport™ and gap-analysis services;
+- B2B/B2G pilot proposals and invoices;
+- collection of real revenue before M8/Big4;
+- use of authorized real candidate data inside the existing consent/RLS boundary.
 
-No learning or credential recommendation may be promoted to verified without adequate provenance.
+Not allowed to claim without evidence:
 
-Hard requirements include, where applicable:
+- `PRODUCTION_PROVEN`;
+- guaranteed hiring, interview, placement or employability uplift;
+- M8/S7+/external-review PASS when those gates have not passed;
+- regulatory or legal equivalence that has not been sourced and verified.
 
-- primary source URL;
-- evidence reference(s);
-- freshness policy;
-- country and language eligibility;
-- assessment condition;
-- verified learning cost;
-- verified credential cost;
-- credential issuer;
-- distinction between free learning and free certification.
+## HARD-001 — Truth lock — RETAINED
 
-A hard evidence failure MUST suppress the recommendation score where the canonical evaluator requires fail-closed behavior.
+No candidate fact, qualification, metric, credential equivalence or eligibility status may be fabricated.
 
-## LOCK-LP-003 — No misleading-free-certification lock
+- unsupported requirements remain explicit gaps;
+- a useful course cannot prove a distinct diploma, license, employer-specific procedure, language, experience or software requirement without source-backed equivalence;
+- paid-pilot status never changes evidence semantics.
 
-A course with free learning but a paid credential MUST NOT be represented as a free certification.
+## HARD-002 — Evidence lock — RETAINED
 
-`FREE_LEARNING_PAID_CREDENTIAL != FREE_CERTIFIED`
+Recommendations must preserve their actual evidence level.
 
-## LOCK-LP-004 — Candidate-truth lock
+- primary provenance where required;
+- freshness, country/language eligibility and assessment/cost status when material;
+- `FREE_LEARNING_PAID_CREDENTIAL != FREE_CERTIFIED`;
+- unknown evidence remains unknown rather than being promoted for sales convenience.
 
-Learning completion MUST NOT fabricate or infer unsupported candidate facts.
+## HARD-003 — Privacy / security lock — RETAINED
 
-- a credential may evidence only skills actually taught by the verified learning opportunity;
-- provenance must be attached to the skill evidence;
-- existing stronger evidence states must not be downgraded;
-- no credential may substitute automatically for a distinct education, license, employer-specific procedure, language, experience, or software requirement unless the source contract explicitly proves that equivalence.
+Commercial urgency does not disable security controls.
 
-## LOCK-LP-005 — PII boundary lock
+- consent where required;
+- candidate ownership and least privilege;
+- Supabase RLS boundaries;
+- no raw candidate PII in public GitHub evidence;
+- no client-side service-role secrets;
+- no synthetic production pollution to manufacture proof.
 
-Real candidate evidence may be used only under an authorized processing boundary.
+## HARD-004 — Human-impact lock — RETAINED
 
-- no raw CV or candidate PII in public GitHub evidence;
-- no synthetic pollution of production to manufacture a live proof;
-- live evidence bundles must be minimized and de-identified where repository persistence is unnecessary;
-- Supabase/RLS boundaries must remain enforced for any real-data E2E.
+AfrIA Recruit™ may recommend, score and prepare, but it must not silently make unsupported high-impact employment decisions or auto-submit applications where human approval is required by the current product contract.
 
-## LOCK-LP-006 — Release lock
+## SCALE-001 — M8/S7+/external review — MOVED AFTER FIRST CASH
 
-The following states are forbidden until their own evidence gates are satisfied:
+M8, S7+ and independent/external review are now **scale and institutional-production gates**, not first-revenue gates.
 
-- `S7+ PASS`
-- `M8 PASS`
-- external review PASS
-- production release
-- claims of real employability uplift
+They become mandatory before any release that is explicitly classified by the applicable governance contract as high-risk, regulated, sovereign/administrative decision-making, or institution-wide production scale.
 
-Current allowed status:
+They do not block:
 
-`M6 CORE + GAP-SEMANTICS TEST_PROVEN / HOLD REAL-DATA E2E / S7+ / M8 / PROD`
+`SELL → PAID PILOT → COLLECT → DELIVER → EVIDENCE → CASE STUDY → then HARDEN/SCALE`.
 
-## LOCK-LP-007 — Promotion lock
+## Current canonical commercial state
 
-No human, agent, workflow, UI, API, or future optimization layer may silently override these locks.
-
-Any override requires:
-
-1. an explicit canonical governance decision;
-2. a versioned contract change;
-3. new RED/GREEN tests covering the changed invariant;
-4. updated evidence and release documentation;
-5. re-evaluation through the applicable S7+/M8/external-review gates.
-
-## Provenance of the locks
-
-The locks are grounded in the 24–25 August 2026 live-source precheck and TDD hardening:
-
-- RED run `#199` — typed eligibility-gap contract absent;
-- GREEN run `#201` — `Learning Pathway Eligibility Guard™` and typed gaps proven;
-- final documentation head verification run `#202` — SUCCESS.
+`TEST_PROVEN + READY_TO_SELL + PAID_PILOT_AUTHORIZED / PRODUCTION_PROVEN NOT CLAIMED`
 
 ## Non-regression rule
 
-These locks are part of the canonical release contract for the learning/credential pathway. Future refactors MUST preserve them or deliberately version and re-approve the governance contract.
+Future agents and workflows must optimize for revenue without weakening HARD-001..004. Governance gates may delay scale, but must not be converted into imaginary blockers to prospecting, contracting, invoicing, paid pilot delivery or collection when the paid-pilot scope is already technically test-proven.
