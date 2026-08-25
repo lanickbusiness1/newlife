@@ -42,6 +42,8 @@ type FetchLike = (
   init?: RequestInit
 ) => Promise<Response>;
 
+type EnvLike = Record<string, string | undefined>;
+
 function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") {
     return JSON.stringify(value);
@@ -62,6 +64,18 @@ function requireText(value: string, code: string): string {
   const normalized = value?.trim();
   if (!normalized) throw new Error(code);
   return normalized;
+}
+
+export function corridorPersistenceConfigFromEnv(env: EnvLike): CorridorPersistenceConfig {
+  return {
+    supabaseUrl: env.GENESIS_CORRIDOR_SUPABASE_URL ?? env.SUPABASE_URL ?? "",
+    serviceRoleKey: env.GENESIS_CORRIDOR_SERVICE_ROLE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? ""
+  };
+}
+
+export function isCorridorPersistenceConfigured(env: EnvLike): boolean {
+  const config = corridorPersistenceConfigFromEnv(env);
+  return Boolean(config.supabaseUrl.trim() && config.serviceRoleKey.trim());
 }
 
 export function buildCorridorPersistenceRequest(
