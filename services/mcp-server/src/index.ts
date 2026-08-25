@@ -23,9 +23,24 @@ import {
   evaluateKnowledgePromotion,
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
+import {
+  attestCapitalizationPlan,
+  compileCapitalizationPlan,
+  compileChatSignal,
+  evaluateEditorialSignal,
+  GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR,
+  recordCapitalizationEvidence
+} from "./livingIntellectualCapitalization.js";
+import { loadAuthoritativeCapitalizationFingerprints } from "./capitalizationState.js";
+import { compileRemePromotion } from "./remePromotion.js";
+import {
+  bindVerifiedPrincipalToContext,
+  verifyMcpTransportBearer,
+  type McpVerifiedPrincipal
+} from "./transportAuth.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.6.0";
+const CONTROL_PLANE_REVISION = "1.2.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -68,13 +83,39 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
+    eces: {
+      status: "allowed",
+      gate: "G8.3",
+      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 1.2.0."
+    },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: [
+      "MCP package 0.3.0 / control-plane revision 1.2.0: HTTP identity/scopes are verified; receipt trust is isolated per connector; external writes remain connector-owned and deduplication is authoritative."
+    ]
   };
 }
 
-function buildServer() {
+async function authoritativeFingerprints(tenantId: string): Promise<string[]> {
+  return loadAuthoritativeCapitalizationFingerprints(
+    tenantId,
+    {
+      supabaseUrl: process.env.GENESIS_CAPITALIZATION_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "",
+      serviceRoleKey: process.env.GENESIS_CAPITALIZATION_SUPABASE_SERVICE_ROLE_KEY
+        ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+        ?? ""
+    }
+  );
+}
+
+function connectorReceiptSecrets(): Record<string, string> {
+  return {
+    notion: process.env.GENESIS_CAPITALIZATION_NOTION_RECEIPT_HMAC_SECRET ?? "",
+    github: process.env.GENESIS_CAPITALIZATION_GITHUB_RECEIPT_HMAC_SECRET ?? "",
+    deploybot: process.env.GENESIS_CAPITALIZATION_DEPLOYBOT_RECEIPT_HMAC_SECRET ?? ""
+  };
+}
+
+function buildServer(principal?: McpVerifiedPrincipal) {
   const server = new McpServer({
     name: "afriagenesis-intelligence-mcp",
     version: PACKAGE_VERSION
@@ -88,9 +129,12 @@ function buildServer() {
     handler: (args: any) => Promise<unknown>
   ) {
     server.tool(name, description, inputSchema, async (args: any) => {
-      const ctx = RequestContext.parse(args.context);
+      const parsedContext = RequestContext.parse(args.context);
+      const ctx = principal
+        ? bindVerifiedPrincipalToContext(principal, parsedContext)
+        : parsedContext;
       authorize(ctx, requiredScope);
-      const data = await handler(args);
+      const data = await handler({ ...args, context: ctx });
       return {
         content: [{ type: "text", text: JSON.stringify(governed(ctx, name, data)) }]
       };
@@ -217,6 +261,65 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
+  register("genesis.capitalization.evaluate_signal", "Normalise un signal tenant-bound, charge l’état de déduplication autoritatif et applique l’Editorial Signal Gate™ de V4-DEC-016.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "capitalization:evaluate", async ({ context, payload }) => {
+    const existingFingerprints = await authoritativeFingerprints(context.tenantId);
+    const signal = compileChatSignal({
+      ...(payload as any),
+      tenantId: context.tenantId,
+      existingFingerprints
+    });
+    const gate = evaluateEditorialSignal(signal, existingFingerprints);
+    return { tenantId: context.tenantId, signal, gate };
+  });
+
+  register("genesis.capitalization.compile_plan", "Charge la déduplication autoritative, compile un signal approuvé en contrats tenant-bound et signe le plan avec l’autorité capitalization:plan.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "capitalization:plan", async ({ context, payload }) => {
+    const existingFingerprints = await authoritativeFingerprints(context.tenantId);
+    const signal = compileChatSignal({
+      ...(payload as any),
+      tenantId: context.tenantId,
+      existingFingerprints
+    });
+    const gate = evaluateEditorialSignal(signal, existingFingerprints);
+    const plan = compileCapitalizationPlan(signal, gate);
+    const planHmacSecret = process.env.GENESIS_CAPITALIZATION_PLAN_HMAC_SECRET ?? "";
+    const planAttestation = attestCapitalizationPlan(plan, planHmacSecret);
+    return { tenantId: context.tenantId, signal, gate, plan, planAttestation };
+  });
+
+  register("genesis.capitalization.record_evidence", "Ferme V4-DEC-016 uniquement pour un plan authentifié émis par l’autorité de planification et des reçus attestés par les connecteurs autorisés.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "capitalization:evidence", async ({ context, payload }) => {
+    const plan = (payload as any)?.plan;
+    if (plan?.tenantId !== context.tenantId) throw new Error("CAPITALIZATION_PLAN_TENANT_MISMATCH");
+
+    const planHmacSecret = process.env.GENESIS_CAPITALIZATION_PLAN_HMAC_SECRET ?? "";
+    const allowedConnectorIds = process.env.GENESIS_CAPITALIZATION_TRUSTED_CONNECTORS
+      ?.split(",")
+      .map(value => value.trim())
+      .filter(Boolean);
+    const proof = recordCapitalizationEvidence(
+      plan,
+      (payload as any)?.receipts ?? [],
+      {
+        connectorHmacSecrets: connectorReceiptSecrets(),
+        planHmacSecret,
+        planAttestation: (payload as any)?.planAttestation ?? "",
+        allowedConnectorIds
+      }
+    );
+    const remePromotion = proof.status === "COMPLETE"
+      ? compileRemePromotion(plan, proof, (payload as any)?.remeDestinationRef ?? "R.E.M.E-VAL-001")
+      : null;
+    return { tenantId: context.tenantId, proof, remePromotion };
+  });
+
   return server;
 }
 
@@ -243,30 +346,41 @@ if (mode === "stdio") {
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
-      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
+      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
+      livingIntellectualCapitalization: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.assetId,
+      capitalizationDedupState: "authoritative_supabase_rpc",
+      capitalizationPlanTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.planTrust,
+      capitalizationReceiptTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.receiptTrust,
+      mcpHttpTransportAuth: "hmac_bearer_bound_principal"
     });
   });
 
   app.post("/mcp", async (req, res) => {
-    const server = buildServer();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true
-    });
-
-    res.on("close", () => {
-      void transport.close();
-      void server.close();
-    });
-
     try {
+      const principal = verifyMcpTransportBearer(
+        req.headers.authorization,
+        process.env.GENESIS_MCP_AUTH_HMAC_SECRET ?? ""
+      );
+      const server = buildServer(principal);
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true
+      });
+
+      res.on("close", () => {
+        void transport.close();
+        void server.close();
+      });
+
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
       console.error(error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: "MCP_INTERNAL_ERROR" });
-      }
+      const message = error instanceof Error ? error.message : "MCP_INTERNAL_ERROR";
+      const status = message.startsWith("MCP_TRANSPORT_AUTH") || message === "MCP_CONTEXT_IDENTITY_MISMATCH"
+        ? 401
+        : 500;
+      if (!res.headersSent) res.status(status).json({ error: status === 401 ? "MCP_UNAUTHORIZED" : "MCP_INTERNAL_ERROR" });
     }
   });
 
