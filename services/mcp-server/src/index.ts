@@ -27,9 +27,19 @@ import {
   assessCorridorValueCapture,
   GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR
 } from "./corridorValueCapture.js";
+import {
+  corridorPersistenceConfigFromEnv,
+  isCorridorPersistenceConfigured,
+  persistCorridorAssessmentViaRpc
+} from "./corridorPersistence.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.6.0";
+const CONTROL_PLANE_REVISION = "0.7.0";
+
+const CORRIDOR_PERSISTENCE_ENV = {
+  url: "GENESIS_CORRIDOR_SUPABASE_URL",
+  key: "GENESIS_CORRIDOR_SERVICE_ROLE_KEY"
+} as const;
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -72,9 +82,9 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
+    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with explicit corridor write separation." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane and Corridor Value Capture Engine are deterministic; external source ingestion, CRM/payment providers and canonical persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.7.0: corridor assessment remains deterministic and side-effect free; canonical corridor persistence is available only through the explicit corridor:write tool when its backend environment is configured and authorized. External source ingestion, CRM/payment providers and other persistence paths remain separately gated."]
   };
 }
 
@@ -157,13 +167,37 @@ function buildServer() {
     ...compileRevenueEngine(payload)
   }));
 
-  register("corridor.value_capture.assess", "Évalue un corridor stratégique et sa capture de valeur souveraine à partir d'inputs explicitement sourcés.", {
+  register("corridor.value_capture.assess", "Évalue un corridor stratégique et sa capture de valeur souveraine à partir d'inputs explicitement sourcés, sans effet de bord.", {
     context: RequestContext,
     payload: z.unknown()
   }, "corridor:assess", async ({ context, payload }) => ({
     tenantId: context.tenantId,
     assessment: assessCorridorValueCapture(payload as any)
   }));
+
+  register("corridor.value_capture.assess_and_persist", "Évalue puis persiste atomiquement un assessment corridor déjà relié à des preuves enregistrées. Échoue fermé si le backend ou les preuves manquent.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "corridor:write", async ({ context, payload }) => {
+    const assessment = assessCorridorValueCapture(payload as any);
+    const persistence = await persistCorridorAssessmentViaRpc(
+      corridorPersistenceConfigFromEnv(process.env),
+      {
+        tenantId: context.tenantId,
+        actorId: context.actorId,
+        agentId: context.agentId,
+        correlationId: context.correlationId
+      },
+      payload as any,
+      assessment
+    );
+
+    return {
+      tenantId: context.tenantId,
+      assessment,
+      persistence
+    };
+  });
 
   register("deploybot.validation_relay.compile", "Compile une validation CEO en state machine DeployBot A1-A3 jusqu’au livrable final ou veto A4.", {
     context: RequestContext,
@@ -257,7 +291,9 @@ if (mode === "stdio") {
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
       corridorValueCapture: GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR.assetId,
-      corridorValueCaptureVersion: GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR.version
+      corridorValueCaptureVersion: GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR.version,
+      corridorPersistenceRpc: isCorridorPersistenceConfigured(process.env) ? "configured" : "unconfigured",
+      corridorPersistenceEnv: [CORRIDOR_PERSISTENCE_ENV.url, CORRIDOR_PERSISTENCE_ENV.key]
     });
   });
 
