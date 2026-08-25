@@ -22,6 +22,11 @@ const repoRoot = join(__dirname, "../../..");
 const TEST_TENANT = "afriagenesis-core";
 const TEST_SECRET = "test-only-capitalization-receipt-secret";
 const TEST_PLAN_SECRET = "test-only-capitalization-planning-secret";
+const CONNECTOR_SECRETS = {
+  notion: TEST_SECRET,
+  github: TEST_SECRET,
+  deploybot: TEST_SECRET
+};
 
 function readSqlDirectory(relativePath: string): string {
   const directory = join(repoRoot, relativePath);
@@ -39,23 +44,24 @@ function connectorFor(target: CapitalizationTarget): string {
 
 function verifierFor(plan: CapitalizationPlan) {
   return {
-    hmacSecret: TEST_SECRET,
+    connectorHmacSecrets: CONNECTOR_SECRETS,
     planHmacSecret: TEST_PLAN_SECRET,
     planAttestation: attestCapitalizationPlan(plan, TEST_PLAN_SECRET)
   };
 }
 
 function signedReceipt(planId: string, tenantId: string, target: CapitalizationTarget, index: number): CapitalizationReceipt {
+  const connectorId = connectorFor(target);
   const unsigned = {
     targetId: target.targetId,
     receiptRef: `receipt:${target.targetId}:${index}`,
     executedAt: "2026-08-24T02:30:00Z",
     status: "success" as const,
     artifactHash: `sha256:${String(index + 1).padStart(2, "0")}`,
-    connectorId: connectorFor(target),
+    connectorId,
     nonce: target.executionNonce
   };
-  const attestation = createHmac("sha256", TEST_SECRET)
+  const attestation = createHmac("sha256", CONNECTOR_SECRETS[connectorId as keyof typeof CONNECTOR_SECRETS])
     .update(receiptAttestationPayload(tenantId, planId, target, unsigned))
     .digest("hex");
   return { ...unsigned, attestation };
@@ -219,7 +225,9 @@ describe("V4-DEC-016 Living Intellectual Capitalization Loop", () => {
     expect(indexSource).toContain('"capitalization:evidence"');
     expect(indexSource).toContain("compileRemePromotion");
     expect(indexSource).toContain("GENESIS_CAPITALIZATION_PLAN_HMAC_SECRET");
-    expect(indexSource).toContain("GENESIS_CAPITALIZATION_RECEIPT_HMAC_SECRET");
+    expect(indexSource).toContain("GENESIS_CAPITALIZATION_NOTION_RECEIPT_HMAC_SECRET");
+    expect(indexSource).toContain("GENESIS_CAPITALIZATION_GITHUB_RECEIPT_HMAC_SECRET");
+    expect(indexSource).toContain("GENESIS_CAPITALIZATION_DEPLOYBOT_RECEIPT_HMAC_SECRET");
     expect(GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.decisionId).toBe("V4-DEC-016");
   });
 
