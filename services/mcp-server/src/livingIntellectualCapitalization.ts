@@ -3,11 +3,11 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 export const GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR = Object.freeze({
   decisionId: "V4-DEC-016",
   assetId: "GENESIS-V4-LIVING-INTELLECTUAL-CAPITALIZATION-LOOP",
-  version: "1.3.0",
+  version: "1.4.0",
   mode: "extension_not_framework",
   editorialGate: "Editorial Signal Gate™",
   planTrust: "HMAC-SHA256 planning authority attestation",
-  receiptTrust: "HMAC-SHA256 connector attestation",
+  receiptTrust: "connector-specific HMAC-SHA256 attestation",
   destinations: [
     "notion_canonical",
     "genesis_v4",
@@ -124,7 +124,7 @@ export type CapitalizationReceipt = {
 };
 
 export type CapitalizationReceiptVerifier = {
-  hmacSecret: string;
+  connectorHmacSecrets: Record<string, string>;
   planHmacSecret: string;
   planAttestation: string;
   allowedConnectorIds?: string[];
@@ -193,6 +193,24 @@ function assertHmacSecret(secret: unknown, code: string): string {
   const value = required(secret, code);
   if (value.length < 32) throw new Error(code);
   return value;
+}
+
+function assertConnectorKeyring(keyring: unknown): asserts keyring is Record<string, string> {
+  if (!keyring || typeof keyring !== "object" || Array.isArray(keyring)) {
+    throw new Error("CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
+  }
+  const entries = Object.entries(keyring as Record<string, unknown>);
+  if (entries.length === 0 || !entries.some(([connectorId, secret]) => connectorId.trim().length > 0 && typeof secret === "string" && secret.length >= 32)) {
+    throw new Error("CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
+  }
+}
+
+function connectorHmacSecret(verifier: CapitalizationReceiptVerifier, connectorId: string): string {
+  assertConnectorKeyring(verifier?.connectorHmacSecrets);
+  return assertHmacSecret(
+    verifier.connectorHmacSecrets[connectorId],
+    "CAPITALIZATION_RECEIPT_CONNECTOR_KEY_UNAVAILABLE"
+  );
 }
 
 function buildSignalBinding(fields: {
@@ -527,12 +545,12 @@ function verifyReceiptAttestation(
   receipt: CapitalizationReceipt,
   verifier: CapitalizationReceiptVerifier
 ): void {
-  const secret = assertHmacSecret(verifier?.hmacSecret, "CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
   const connectorId = required(receipt.connectorId, "CAPITALIZATION_RECEIPT_CONNECTOR_REQUIRED");
   if (!target.allowedConnectorIds.includes(connectorId)
     || (verifier.allowedConnectorIds && !verifier.allowedConnectorIds.includes(connectorId))) {
     throw new Error("CAPITALIZATION_RECEIPT_CONNECTOR_NOT_ALLOWED");
   }
+  const secret = connectorHmacSecret(verifier, connectorId);
   if (receipt.nonce !== target.executionNonce) throw new Error("CAPITALIZATION_RECEIPT_NONCE_MISMATCH");
   if (!/^[0-9a-f]{64}$/i.test(receipt.attestation)) throw new Error("CAPITALIZATION_RECEIPT_ATTESTATION_INVALID");
 
@@ -562,7 +580,7 @@ export function recordCapitalizationEvidence(
   if (!plan || typeof plan !== "object") throw new Error("CAPITALIZATION_PROOF_INVALID_PLAN");
   if (!Array.isArray(receipts)) throw new Error("CAPITALIZATION_PROOF_INVALID_RECEIPTS");
   verifyPlanAttestation(plan, verifier);
-  assertHmacSecret(verifier?.hmacSecret, "CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
+  assertConnectorKeyring(verifier?.connectorHmacSecrets);
 
   const planned = new Map(plan.targets.map(item => [item.targetId, item]));
   const normalizedReceipts: CapitalizationReceipt[] = [];
