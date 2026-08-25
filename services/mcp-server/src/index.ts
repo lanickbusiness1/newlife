@@ -40,7 +40,7 @@ import {
 } from "./transportAuth.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "1.1.0";
+const CONTROL_PLANE_REVISION = "1.2.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -86,11 +86,11 @@ function governed(ctx: Context, tool: string, data: unknown) {
     eces: {
       status: "allowed",
       gate: "G8.3",
-      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 1.1.0."
+      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 1.2.0."
     },
     auditId,
     limitations: [
-      "MCP package 0.3.0 / control-plane revision 1.1.0: HTTP identity and scopes are derived from verified bearer credentials; external writes remain connector-owned; deduplication is authoritative; evidence closure requires signed plans and receipts."
+      "MCP package 0.3.0 / control-plane revision 1.2.0: HTTP identity/scopes are verified; receipt trust is isolated per connector; external writes remain connector-owned and deduplication is authoritative."
     ]
   };
 }
@@ -105,6 +105,14 @@ async function authoritativeFingerprints(tenantId: string): Promise<string[]> {
         ?? ""
     }
   );
+}
+
+function connectorReceiptSecrets(): Record<string, string> {
+  return {
+    notion: process.env.GENESIS_CAPITALIZATION_NOTION_RECEIPT_HMAC_SECRET ?? "",
+    github: process.env.GENESIS_CAPITALIZATION_GITHUB_RECEIPT_HMAC_SECRET ?? "",
+    deploybot: process.env.GENESIS_CAPITALIZATION_DEPLOYBOT_RECEIPT_HMAC_SECRET ?? ""
+  };
 }
 
 function buildServer(principal?: McpVerifiedPrincipal) {
@@ -292,7 +300,6 @@ function buildServer(principal?: McpVerifiedPrincipal) {
     if (plan?.tenantId !== context.tenantId) throw new Error("CAPITALIZATION_PLAN_TENANT_MISMATCH");
 
     const planHmacSecret = process.env.GENESIS_CAPITALIZATION_PLAN_HMAC_SECRET ?? "";
-    const hmacSecret = process.env.GENESIS_CAPITALIZATION_RECEIPT_HMAC_SECRET ?? "";
     const allowedConnectorIds = process.env.GENESIS_CAPITALIZATION_TRUSTED_CONNECTORS
       ?.split(",")
       .map(value => value.trim())
@@ -301,7 +308,7 @@ function buildServer(principal?: McpVerifiedPrincipal) {
       plan,
       (payload as any)?.receipts ?? [],
       {
-        hmacSecret,
+        connectorHmacSecrets: connectorReceiptSecrets(),
         planHmacSecret,
         planAttestation: (payload as any)?.planAttestation ?? "",
         allowedConnectorIds
