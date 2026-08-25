@@ -1,0 +1,101 @@
+import { test, expect } from '@playwright/test';
+
+const SYNTHETIC_TOKEN = 'e2e-synthetic-token';
+
+async function authenticate(page: import('@playwright/test').Page) {
+  await page.context().addCookies([{
+    name: 'afria_recruit_session',
+    value: SYNTHETIC_TOKEN,
+    url: 'http://127.0.0.1:4174',
+    httpOnly: true,
+    sameSite: 'Strict',
+  }]);
+}
+
+test('candidate completes the evidence-safe CV optimization flow', async ({ page }) => {
+  await authenticate(page);
+  await page.goto('/candidate/dashboard');
+
+  await expect(page.getByRole('heading', { name: /Candidate OS/i })).toBeVisible();
+  await expect(page.getByText('Responsable opérations humanitaires')).toBeVisible();
+  await page.getByRole('link', { name: 'Optimiser mon CV' }).click();
+
+  await expect(page).toHaveURL(/\/candidate\/cv-optimizer/);
+  await expect(page.getByRole('heading', { name: /Optimiser mon CV/i })).toBeVisible();
+  await expect(page.getByText('Gestion de projets')).toBeVisible();
+  await expect(page.getByText('EVIDENCED').first()).toBeVisible();
+  await expect(page.getByText('Logistique humanitaire')).toBeVisible();
+  await expect(page.getByText('DECLARED').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Lancer le diagnostic' }).click();
+  await expect(page.getByText(/compétence\(s\) restent déclaratives/i)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Choisir une offre cible' }).click();
+  await page.getByRole('radio', { name: /Responsable programmes régionaux/i }).check();
+  await page.getByRole('button', { name: 'Analyser les écarts' }).click();
+
+  const projectRow = page.getByTestId('gap-row-skill:skill-project');
+  await expect(projectRow).toContainText('Gestion de projets');
+  await expect(projectRow).toContainText('COVERED');
+
+  const financeRow = page.getByTestId('gap-row-skill:skill-finance');
+  await expect(financeRow).toContainText('Conformité financière');
+  await expect(financeRow).toContainText('GAP');
+  await expect(financeRow).toContainText(/Aucune compétence correspondante/i);
+  await expect(page.getByText(/Conformité financière.*VERIFIED/i)).toHaveCount(0);
+
+  await expect(page.getByRole('heading', { name: 'Application Readiness™' })).toBeVisible();
+  await expect(page.getByTestId('readiness-total')).toContainText('/100');
+  await expect(page.getByTestId('readiness-atsTechnical')).toContainText('/20');
+  await expect(page.getByTestId('readiness-jobMatch')).toContainText('/30');
+  await expect(page.getByTestId('readiness-semanticFit')).toContainText('/20');
+  await expect(page.getByTestId('readiness-evidence')).toContainText('/15');
+  await expect(page.getByTestId('readiness-institutionFit')).toContainText('/15');
+  await expect(page.getByTestId('readiness-atsTechnical')).toContainText('20/20');
+
+  await page.getByRole('button', { name: 'Générer les deux versions' }).click();
+  await expect(page.getByRole('heading', { name: 'CV ATS' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'CV humain' })).toBeVisible();
+  const atsFingerprint = await page.getByTestId('ats-fingerprint').textContent();
+  const humanFingerprint = await page.getByTestId('human-fingerprint').textContent();
+  expect(atsFingerprint).toBeTruthy();
+  expect(atsFingerprint).toBe(humanFingerprint);
+
+  await page.getByLabel('Raison de la validation').fill('Les faits présentés correspondent au profil synthétique et les gaps restent visibles.');
+  await page.getByRole('button', { name: 'Valider humainement' }).click();
+  await expect(page.getByText('Validation humaine enregistrée')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Préparer mon entretien' })).toBeVisible();
+});
+
+test('optimizer remains usable at 390x844 without horizontal overflow', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await authenticate(page);
+  await page.goto('/candidate/cv-optimizer');
+  await expect(page.getByRole('heading', { name: /Optimiser mon CV/i })).toBeVisible();
+  const sizes = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(sizes.scrollWidth).toBeLessThanOrEqual(sizes.clientWidth);
+  await context.close();
+});
+
+test('primary optimizer controls are reachable by keyboard', async ({ page }) => {
+  await authenticate(page);
+  await page.goto('/candidate/cv-optimizer');
+  await page.keyboard.press('Tab');
+  let foundDiagnostic = false;
+  for (let index = 0; index < 15; index += 1) {
+    const label = await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      return active?.innerText || active?.getAttribute('aria-label') || '';
+    });
+    if (/Lancer le diagnostic/i.test(label)) {
+      foundDiagnostic = true;
+      break;
+    }
+    await page.keyboard.press('Tab');
+  }
+  expect(foundDiagnostic).toBe(true);
+});

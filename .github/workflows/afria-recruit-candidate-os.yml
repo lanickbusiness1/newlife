@@ -1,0 +1,55 @@
+name: AfrIA Recruit Candidate OS
+
+on:
+  push:
+    branches:
+      - feat/afria-recruit-candidate-os-v1
+    paths:
+      - 'apps/afria-recruit/**'
+      - '.github/workflows/afria-recruit-candidate-os.yml'
+  pull_request:
+    paths:
+      - 'apps/afria-recruit/**'
+      - '.github/workflows/afria-recruit-candidate-os.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: afria-recruit-candidate-os-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/afria-recruit
+    steps:
+      - name: Checkout immutable revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Use Node.js 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: apps/afria-recruit/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Run unit tests
+        run: npm run test:unit
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build production artifact
+        run: npm run build
+      - name: Install Chromium for browser proof
+        run: npx playwright install --with-deps chromium
+      - name: Run Candidate OS browser proof
+        run: npm run test:e2e
+      - name: Scan source and synthetic fixtures
+        run: npm run scan:source
+      - name: Scan browser artifact
+        run: npm run scan:build
