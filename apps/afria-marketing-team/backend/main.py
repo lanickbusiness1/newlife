@@ -2,6 +2,7 @@ from typing import Literal
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from visibility import VisibilityAssessment, assess_visibility
+from authenticity import AuthenticityAssessment, assess_authenticity
 
 PRODUCT_STANDARD = "Production Product"
 ASSET_ID = "PRD-MKT-TEAM-001"
@@ -65,6 +66,10 @@ def policy_simulate(payload: PolicyRequest):
 @app.post("/visibility/assess")
 def visibility_assess(payload: VisibilityAssessment):
     return assess_visibility(payload)
+
+@app.post("/content/authenticity/assess")
+def content_authenticity_assess(payload: AuthenticityAssessment):
+    return assess_authenticity(payload)
 
 @app.post("/export/evidence")
 def export_evidence(payload: EvidenceRequest):
