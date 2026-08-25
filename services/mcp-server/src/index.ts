@@ -33,9 +33,14 @@ import {
 } from "./livingIntellectualCapitalization.js";
 import { loadAuthoritativeCapitalizationFingerprints } from "./capitalizationState.js";
 import { compileRemePromotion } from "./remePromotion.js";
+import {
+  bindVerifiedPrincipalToContext,
+  verifyMcpTransportBearer,
+  type McpVerifiedPrincipal
+} from "./transportAuth.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "1.0.0";
+const CONTROL_PLANE_REVISION = "1.1.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -81,11 +86,11 @@ function governed(ctx: Context, tool: string, data: unknown) {
     eces: {
       status: "allowed",
       gate: "G8.3",
-      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 1.0.0."
+      reason: "Scope validated; GENESIS V4 governed control plane active with Living Intellectual Capitalization revision 1.1.0."
     },
     auditId,
     limitations: [
-      "MCP package 0.3.0 / control-plane revision 1.0.0: external writes remain connector-owned; deduplication is loaded from authoritative tenant state; evidence closure requires both planning-authority and connector HMAC attestations."
+      "MCP package 0.3.0 / control-plane revision 1.1.0: HTTP identity and scopes are derived from verified bearer credentials; external writes remain connector-owned; deduplication is authoritative; evidence closure requires signed plans and receipts."
     ]
   };
 }
@@ -102,7 +107,7 @@ async function authoritativeFingerprints(tenantId: string): Promise<string[]> {
   );
 }
 
-function buildServer() {
+function buildServer(principal?: McpVerifiedPrincipal) {
   const server = new McpServer({
     name: "afriagenesis-intelligence-mcp",
     version: PACKAGE_VERSION
@@ -116,9 +121,12 @@ function buildServer() {
     handler: (args: any) => Promise<unknown>
   ) {
     server.tool(name, description, inputSchema, async (args: any) => {
-      const ctx = RequestContext.parse(args.context);
+      const parsedContext = RequestContext.parse(args.context);
+      const ctx = principal
+        ? bindVerifiedPrincipalToContext(principal, parsedContext)
+        : parsedContext;
       authorize(ctx, requiredScope);
-      const data = await handler(args);
+      const data = await handler({ ...args, context: ctx });
       return {
         content: [{ type: "text", text: JSON.stringify(governed(ctx, name, data)) }]
       };
@@ -335,28 +343,37 @@ if (mode === "stdio") {
       livingIntellectualCapitalization: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.assetId,
       capitalizationDedupState: "authoritative_supabase_rpc",
       capitalizationPlanTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.planTrust,
-      capitalizationReceiptTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.receiptTrust
+      capitalizationReceiptTrust: GENESIS_V4_LIVING_INTELLECTUAL_CAPITALIZATION_ANCHOR.receiptTrust,
+      mcpHttpTransportAuth: "hmac_bearer_bound_principal"
     });
   });
 
   app.post("/mcp", async (req, res) => {
-    const server = buildServer();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true
-    });
-
-    res.on("close", () => {
-      void transport.close();
-      void server.close();
-    });
-
     try {
+      const principal = verifyMcpTransportBearer(
+        req.headers.authorization,
+        process.env.GENESIS_MCP_AUTH_HMAC_SECRET ?? ""
+      );
+      const server = buildServer(principal);
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true
+      });
+
+      res.on("close", () => {
+        void transport.close();
+        void server.close();
+      });
+
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
       console.error(error);
-      if (!res.headersSent) res.status(500).json({ error: "MCP_INTERNAL_ERROR" });
+      const message = error instanceof Error ? error.message : "MCP_INTERNAL_ERROR";
+      const status = message.startsWith("MCP_TRANSPORT_AUTH") || message === "MCP_CONTEXT_IDENTITY_MISMATCH"
+        ? 401
+        : 500;
+      if (!res.headersSent) res.status(status).json({ error: status === 401 ? "MCP_UNAUTHORIZED" : "MCP_INTERNAL_ERROR" });
     }
   });
 
