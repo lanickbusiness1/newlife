@@ -20,6 +20,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "../../..");
 const TEST_SECRET = "test-only-capitalization-receipt-secret";
 const TEST_PLAN_SECRET = "test-only-capitalization-planning-secret";
+const CONNECTOR_SECRETS = {
+  notion: TEST_SECRET,
+  github: TEST_SECRET,
+  deploybot: TEST_SECRET
+};
 
 function readSqlDirectory(relativePath: string): string {
   const directory = join(repoRoot, relativePath);
@@ -55,25 +60,26 @@ function connectorFor(target: CapitalizationTarget): string {
 
 function verifierFor(plan: CapitalizationPlan) {
   return {
-    hmacSecret: TEST_SECRET,
+    connectorHmacSecrets: CONNECTOR_SECRETS,
     planHmacSecret: TEST_PLAN_SECRET,
     planAttestation: attestCapitalizationPlan(plan, TEST_PLAN_SECRET)
   };
 }
 
 function signedReceipt(planId: string, tenantId: string, target: CapitalizationTarget, index: number): CapitalizationReceipt {
+  const connectorId = connectorFor(target);
   const unsigned = {
     targetId: target.targetId,
     receiptRef: `receipt:${target.targetId}:${index}`,
     executedAt: "2026-08-24T02:40:00Z",
     status: "success" as const,
     artifactHash: `sha256:${String(index).padStart(2, "0")}`,
-    connectorId: connectorFor(target),
+    connectorId,
     nonce: target.executionNonce
   };
   return {
     ...unsigned,
-    attestation: createHmac("sha256", TEST_SECRET)
+    attestation: createHmac("sha256", CONNECTOR_SECRETS[connectorId as keyof typeof CONNECTOR_SECRETS])
       .update(receiptAttestationPayload(tenantId, planId, target, unsigned))
       .digest("hex")
   };
@@ -130,14 +136,14 @@ describe("V4-DEC-016 review security regressions", () => {
     };
     const wrongConnectorReceipt: CapitalizationReceipt = {
       ...unsigned,
-      attestation: createHmac("sha256", TEST_SECRET)
+      attestation: createHmac("sha256", CONNECTOR_SECRETS.github)
         .update(receiptAttestationPayload(plan.tenantId, plan.planId, wrongConnectorTarget, unsigned))
         .digest("hex")
     };
     expect(() => recordCapitalizationEvidence(plan, [wrongConnectorReceipt], verifier))
       .toThrow("CAPITALIZATION_RECEIPT_CONNECTOR_NOT_ALLOWED");
 
-    expect(() => recordCapitalizationEvidence(plan, receipts, { ...verifier, hmacSecret: "" }))
+    expect(() => recordCapitalizationEvidence(plan, receipts, { ...verifier, connectorHmacSecrets: {} }))
       .toThrow("CAPITALIZATION_RECEIPT_VERIFIER_UNAVAILABLE");
   });
 
@@ -159,7 +165,7 @@ describe("V4-DEC-016 review security regressions", () => {
     const plan = compileCapitalizationPlan(signal, evaluateEditorialSignal(signal));
     const receipts = plan.targets.map((target, index) => signedReceipt(plan.planId, plan.tenantId, target, index));
     expect(() => recordCapitalizationEvidence(plan, receipts, {
-      hmacSecret: TEST_SECRET,
+      connectorHmacSecrets: CONNECTOR_SECRETS,
       planHmacSecret: "",
       planAttestation: ""
     })).toThrow("CAPITALIZATION_PLAN_ATTESTATION_REQUIRED");
