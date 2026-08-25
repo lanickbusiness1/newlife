@@ -11,3 +11,7 @@ services:
         value: http
       - key: NODE_ENV
         value: production
+      - key: GENESIS_CORRIDOR_SUPABASE_URL
+        sync: false
+      - key: GENESIS_CORRIDOR_SERVICE_ROLE_KEY
+        sync: false
