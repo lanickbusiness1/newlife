@@ -3,7 +3,9 @@ import path from "node:path";
 import {
   OpenAICompatibleCouncilClient,
   runIndependentAssuranceCouncil,
-  type CouncilEvidenceByRole
+  type CouncilEvidenceByRole,
+  type CouncilInferenceRequest,
+  type CouncilModelClient
 } from "../src/assuranceCouncilExecutor.js";
 import { verifyIndependentAssurance } from "../src/independentAssurance.js";
 
@@ -15,7 +17,7 @@ function requiredEnv(name: string, fallback?: string): string {
   return value.trim();
 }
 
-async function boundedFile(relativePath: string, maxChars = 18_000): Promise<string> {
+async function boundedFile(relativePath: string, maxChars = 6_000): Promise<string> {
   const absolute = path.join(repoRoot, relativePath);
   const content = await readFile(absolute, "utf8");
   const bounded = content.length <= maxChars
@@ -24,7 +26,7 @@ async function boundedFile(relativePath: string, maxChars = 18_000): Promise<str
   return `FILE ${relativePath}\n${bounded}`;
 }
 
-async function optionalFile(relativePath: string, maxChars = 12_000): Promise<string | null> {
+async function optionalFile(relativePath: string, maxChars = 4_000): Promise<string | null> {
   try { return await boundedFile(relativePath, maxChars); } catch { return null; }
 }
 
@@ -52,7 +54,7 @@ async function buildEvidence(): Promise<CouncilEvidenceByRole> {
     boundedFile("docs/genesis-v4/V4-DEC-021-api-first-qualified-least-cost.md")
   ]);
   const diffEvidence = process.env.IAC_DIFF_PATH
-    ? await optionalFile(path.relative(repoRoot, path.resolve(process.env.IAC_DIFF_PATH)), 20_000)
+    ? await optionalFile(path.relative(repoRoot, path.resolve(process.env.IAC_DIFF_PATH)), 8_000)
     : null;
 
   return {
@@ -69,21 +71,50 @@ async function buildEvidence(): Promise<CouncilEvidenceByRole> {
 
 const snapshotSha = requiredEnv("SNAPSHOT_SHA", process.env.GITHUB_SHA);
 const baseUrl = requiredEnv("IAC_BASE_URL", "http://127.0.0.1:8080/v1");
-const model = requiredEnv("IAC_MODEL", "afriagenesis-iac-qwen25-coder-7b-q4km");
+const model = requiredEnv("IAC_MODEL", "afriagenesis-iac-qwen25-coder-3b-q4km");
 const generatedAt = process.env.IAC_GENERATED_AT ?? new Date().toISOString();
 const builderAgentIds = requiredEnv("IAC_BUILDER_AGENT_IDS", "agent:builder:deploybot")
   .split(",").map(value => value.trim()).filter(Boolean);
 const externalMandate = (process.env.IAC_EXTERNAL_MANDATE ?? "false").toLowerCase() === "true";
 const outputPath = path.resolve(process.env.IAC_OUTPUT ?? path.join(process.cwd(), "artifacts", "internal-assurance", `${snapshotSha}.json`));
 
-const client = new OpenAICompatibleCouncilClient({
+const baseClient = new OpenAICompatibleCouncilClient({
   baseUrl,
   model,
   apiKey: process.env.IAC_API_KEY,
-  maxTokens: Number(process.env.IAC_MAX_TOKENS ?? 900),
+  maxTokens: Number(process.env.IAC_MAX_TOKENS ?? 420),
   temperature: 0,
-  timeoutMs: Number(process.env.IAC_TIMEOUT_MS ?? 240_000)
+  timeoutMs: Number(process.env.IAC_TIMEOUT_MS ?? 210_000)
 });
+
+const inferenceTelemetry: Array<{
+  role: string;
+  auditorId: string;
+  executionContextId: string;
+  startedAt: string;
+  durationMs: number;
+  responseChars: number;
+}> = [];
+
+const tracedClient: CouncilModelClient = {
+  async complete(request: CouncilInferenceRequest): Promise<string> {
+    const startedAt = new Date().toISOString();
+    const startedMs = Date.now();
+    console.log(`IAC_ROLE_START=${request.role};auditor=${request.auditorId};context=${request.executionContextId}`);
+    const response = await baseClient.complete(request);
+    const durationMs = Date.now() - startedMs;
+    inferenceTelemetry.push({
+      role: request.role,
+      auditorId: request.auditorId,
+      executionContextId: request.executionContextId,
+      startedAt,
+      durationMs,
+      responseChars: response.length
+    });
+    console.log(`IAC_ROLE_DONE=${request.role};durationMs=${durationMs};responseChars=${response.length}`);
+    return response;
+  }
+};
 
 const result = await runIndependentAssuranceCouncil({
   snapshotSha,
@@ -92,7 +123,7 @@ const result = await runIndependentAssuranceCouncil({
   evidenceByRole: await buildEvidence(),
   generatedAt,
   evidenceRef: requiredEnv("IAC_EVIDENCE_REF", `github-actions:${process.env.GITHUB_RUN_ID ?? "local"}:${snapshotSha}`)
-}, client);
+}, tracedClient);
 
 verifyIndependentAssurance(result.evidence);
 await mkdir(path.dirname(outputPath), { recursive: true });
@@ -105,7 +136,8 @@ const artifact = {
     modelSha256: process.env.IAC_MODEL_SHA256 ?? null,
     runtimeSha256: process.env.IAC_RUNTIME_SHA256 ?? null,
     githubRunId: process.env.GITHUB_RUN_ID ?? null,
-    generatedAt
+    generatedAt,
+    inferenceTelemetry
   },
   ...result
 };
