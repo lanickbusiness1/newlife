@@ -196,8 +196,8 @@ describe("V4-DEC-016 review security regressions", () => {
     for (const table of ["chat_signals", "editorial_gate_evaluations", "execution_receipts", "proof_chains"]) {
       expect(migrations).toContain(`revoke update on genesis_capitalization.${table} from service_role`);
     }
-    expect(migrations).toContain("grant update on genesis_capitalization.capitalization_plans to service_role");
-    expect(migrations).toContain("grant update on genesis_capitalization.capitalization_targets to service_role");
+    expect(migrations).toContain("grant update (status, reme_status, blockers) on genesis_capitalization.capitalization_plans to service_role");
+    expect(migrations).toContain("grant update (status, updated_at) on genesis_capitalization.capitalization_targets to service_role");
   });
 
   test("derives an identical canonical plan when product references arrive in a different order", () => {
