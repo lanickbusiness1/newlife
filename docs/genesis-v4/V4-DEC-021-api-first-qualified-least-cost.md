@@ -23,3 +23,8 @@ Every Council run records provider/runtime, model, model artifact hash when avai
 ## Current zero-key route
 
 For the first internal Council, the preferred route is a pinned `llama.cpp` runtime on a GitHub Actions hosted runner using a pinned GGUF model artifact. Six independent inference requests are issued through the local OpenAI-compatible API. No model-provider API secret is required. If this route fails its quality or execution threshold, the Compute & Inference Economics Control Layer™ must escalate to the next qualified route rather than silently lowering assurance rigor.
+
+## Execution ledger
+
+- First live Council trigger: PR #64 / branch `feat/deploybot-sovereign-delivery-runtime`.
+- Trigger commits are execution requests only; they never imply a PASS. The sealed workflow artifact and deterministic Council verifier are the authority for the verdict.
