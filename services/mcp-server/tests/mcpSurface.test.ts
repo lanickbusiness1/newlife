@@ -17,6 +17,17 @@ describe("Sovereign Delivery MCP surface", () => {
     expect(source).toContain('register("deploybot.assurance.verify"');
   });
 
+  test("registers the four governed Distributed Market Capture Layer tools with explicit scopes", () => {
+    expect(source).toContain('register("genesis.market_capture.compile_cell"');
+    expect(source).toContain('MARKET_CAPTURE_TOOL_SCOPES["genesis.market_capture.compile_cell"]');
+    expect(source).toContain('register("genesis.market_capture.qualify_lead"');
+    expect(source).toContain('MARKET_CAPTURE_TOOL_SCOPES["genesis.market_capture.qualify_lead"]');
+    expect(source).toContain('register("genesis.market_capture.evaluate_economics"');
+    expect(source).toContain('MARKET_CAPTURE_TOOL_SCOPES["genesis.market_capture.evaluate_economics"]');
+    expect(source).toContain('register("genesis.market_capture.decide_scale"');
+    expect(source).toContain('MARKET_CAPTURE_TOOL_SCOPES["genesis.market_capture.decide_scale"]');
+  });
+
   test("publishes MCP package version 0.6.0 and control-plane revision 0.9.0", () => {
     expect(packageJson.version).toBe("0.6.0");
     expect(source).toContain('const PACKAGE_VERSION = "0.6.0"');
