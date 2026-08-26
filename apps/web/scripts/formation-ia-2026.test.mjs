@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { describe, it } from "node:test";
 
 const source = readFileSync(new URL("../app/formation-ia-2026/page.tsx", import.meta.url), "utf8");
 const lower = source.toLowerCase();
