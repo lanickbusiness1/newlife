@@ -12,16 +12,17 @@ const renderedCandidateSource = source
 const renderedCandidateLower = renderedCandidateSource.toLowerCase();
 const join = (...parts) => parts.join("");
 
-const forbiddenPublicCommercialTokens = [
-  join("100", " 000", " G", "NF"),
-  join("250", " 000", " G", "NF"),
-  join("7", " 500", " 000", " G", "NF"),
-  join("F", "CFA"),
-  join("U", "SD"),
-  join("E", "UR"),
-  join("p", "rix"),
-  join("tar", "if"),
-  join("co", "ût"),
+const forbiddenAmountPatterns = [
+  /100\s?000/i,
+  /250\s?000/i,
+  /7\s?500\s?000/i,
+  new RegExp(join("\\b", "G", "NF", "\\b"), "i"),
+  new RegExp(join("\\b", "F", "CFA", "\\b"), "i"),
+  new RegExp(join("\\b", "U", "SD", "\\b"), "i"),
+  new RegExp(join("\\b", "E", "UR", "\\b"), "i"),
+  new RegExp(join("\\b", "p", "rix", "\\b"), "i"),
+  new RegExp(join("\\b", "tar", "if", "\\b"), "i"),
+  new RegExp(join("\\b", "co", "ût", "\\b"), "i"),
 ];
 
 describe("Professeur Amani IA — Formation IA 2026 landing", () => {
@@ -31,8 +32,8 @@ describe("Professeur Amani IA — Formation IA 2026 landing", () => {
   });
 
   it("does not expose public commercial amount tokens", () => {
-    for (const token of forbiddenPublicCommercialTokens) {
-      assert.equal(renderedCandidateLower.includes(token.toLowerCase()), false, `Forbidden public commercial token detected: ${token}`);
+    for (const pattern of forbiddenAmountPatterns) {
+      assert.equal(pattern.test(renderedCandidateLower), false, `Forbidden public commercial pattern detected: ${pattern}`);
     }
   });
 
