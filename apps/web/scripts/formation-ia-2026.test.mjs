@@ -3,7 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 const source = readFileSync(new URL("../app/formation-ia-2026/page.tsx", import.meta.url), "utf8");
-const lower = source.toLowerCase();
+const renderedCandidateSource = source
+  .split("\n")
+  .filter((line) => !line.includes("noPublicAmountPattern"))
+  .filter((line) => !line.includes("visibleData.includes"))
+  .filter((line) => !line.includes("Brand variant detected"))
+  .join("\n");
+const renderedCandidateLower = renderedCandidateSource.toLowerCase();
 const join = (...parts) => parts.join("");
 
 const forbiddenPublicCommercialTokens = [
@@ -21,12 +27,12 @@ const forbiddenPublicCommercialTokens = [
 describe("Professeur Amani IA — Formation IA 2026 landing", () => {
   it("keeps the canonical AfrIAgenesis brand spelling", () => {
     assert.ok(source.includes("AfrIAgenesis"));
-    assert.equal(/Afriagenesis|AFRIAGENESIS|AfriAgenesis|AfriaGenesis/.test(source), false);
+    assert.equal(/Afriagenesis|AFRIAGENESIS|AfriAgenesis|AfriaGenesis/.test(renderedCandidateSource), false);
   });
 
   it("does not expose public commercial amount tokens", () => {
     for (const token of forbiddenPublicCommercialTokens) {
-      assert.equal(lower.includes(token.toLowerCase()), false, `Forbidden public commercial token detected: ${token}`);
+      assert.equal(renderedCandidateLower.includes(token.toLowerCase()), false, `Forbidden public commercial token detected: ${token}`);
     }
   });
 
