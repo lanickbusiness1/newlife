@@ -15,6 +15,13 @@ import { compileDomainIntent } from "./domainManager.js";
 import { compileReleaseEvidenceBundle, verifyReleaseEvidenceBundle } from "./releaseCenter.js";
 import { compileComputeEconomicsPlan, verifyAiEconomicsCertificate } from "./computeEconomics.js";
 import {
+  MARKET_CAPTURE_TOOL_SCOPES,
+  calculateRMCC,
+  compileMarketCaptureCell,
+  decideCellScale,
+  qualifyLead
+} from "./marketCapture.js";
+import {
   compileAssuranceReport,
   compileIndependentAssurance,
   verifyIndependentAssurance
@@ -37,6 +44,7 @@ const PACKAGE_VERSION = "0.6.0";
 const CONTROL_PLANE_REVISION = "0.9.0";
 const SOVEREIGN_DELIVERY_RUNTIME = "DEPLOYBOT_SOVEREIGN_DELIVERY_RUNTIME_0.6.0";
 const COMPUTE_INFERENCE_ECONOMICS_LAYER = "COMPUTE_INFERENCE_ECONOMICS_LAYER_0.5.0";
+const DISTRIBUTED_MARKET_CAPTURE_LAYER = "DISTRIBUTED_MARKET_CAPTURE_LAYER_0.1.0";
 const RELEASE_EVIDENCE_SCHEMA = "1.2.0";
 const INDEPENDENT_ASSURANCE_COUNCIL = "INDEPENDENT_ASSURANCE_COUNCIL_1.0.0";
 
@@ -170,6 +178,38 @@ function buildServer() {
   }, "revenue:plan", async ({ context, payload }) => ({
     tenantId: context.tenantId,
     ...compileRevenueEngine(payload)
+  }));
+
+  register("genesis.market_capture.compile_cell", "Compile une Market Capture Cell provider-neutral et applique les invariants de vérité avant activation.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, MARKET_CAPTURE_TOOL_SCOPES["genesis.market_capture.compile_cell"], async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    cell: compileMarketCaptureCell(payload as any)
+  }));
+
+  register("genesis.market_capture.qualify_lead", "Qualifie un lead uniquement à partir d'observations explicites sans fabriquer les champs absents.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, MARKET_CAPTURE_TOOL_SCOPES["genesis.market_capture.qualify_lead"], async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    qualification: qualifyLead(payload as any)
+  }));
+
+  register("genesis.market_capture.evaluate_economics", "Calcule RMCC et ratios secondaires uniquement à partir des valeurs économiques observées fournies.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, MARKET_CAPTURE_TOOL_SCOPES["genesis.market_capture.evaluate_economics"], async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    economics: calculateRMCC(payload as any)
+  }));
+
+  register("genesis.market_capture.decide_scale", "Décide KILL, HOLD ou SCALE selon les invariants M8 et les seuils économiques déterministes approuvés.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, MARKET_CAPTURE_TOOL_SCOPES["genesis.market_capture.decide_scale"], async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    decision: decideCellScale(payload as any)
   }));
 
   register("deploybot.validation_relay.compile", "Compile une validation CEO en state machine DeployBot A1-A3 jusqu’au livrable final ou veto A4.", {
@@ -335,6 +375,7 @@ if (mode === "stdio") {
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       sovereignDeliveryRuntime: SOVEREIGN_DELIVERY_RUNTIME,
       computeInferenceEconomicsLayer: COMPUTE_INFERENCE_ECONOMICS_LAYER,
+      distributedMarketCaptureLayer: DISTRIBUTED_MARKET_CAPTURE_LAYER,
       independentAssuranceCouncil: INDEPENDENT_ASSURANCE_COUNCIL,
       releaseEvidenceSchema: RELEASE_EVIDENCE_SCHEMA,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
