@@ -23,6 +23,10 @@ import {
   evaluateKnowledgePromotion,
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
+import {
+  evaluateCollectiveMarketPowerGate,
+  GENESIS_V4_COLLECTIVE_MARKET_POWER_GATE_ANCHOR
+} from "./collectiveMarketPowerGate.js";
 
 const PACKAGE_VERSION = "0.3.0";
 const CONTROL_PLANE_REVISION = "0.6.0";
@@ -70,7 +74,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane and Collective Market Power Gate are deterministic; external CRM, payment providers, partner relationships and canonical SQL persistence execute only when separately connected, migrated, evidenced and authorized."]
   };
 }
 
@@ -217,6 +221,14 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
+  register("genesis.market_power.evaluate", "Évalue le Collective Market Power Gate™ avant build et arbitre BUILD, BUY, INTEGRATE, LICENSE, JV ou COALITION selon distribution, economics, souveraineté et risques partenaires.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "strategy:evaluate", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    decision: evaluateCollectiveMarketPowerGate(payload as any)
+  }));
+
   return server;
 }
 
@@ -243,7 +255,9 @@ if (mode === "stdio") {
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
-      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
+      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
+      collectiveMarketPowerGate: GENESIS_V4_COLLECTIVE_MARKET_POWER_GATE_ANCHOR.assetId,
+      collectiveMarketPowerGateVersion: GENESIS_V4_COLLECTIVE_MARKET_POWER_GATE_ANCHOR.version
     });
   });
 
