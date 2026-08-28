@@ -44,6 +44,7 @@ describe("Collective Market Power Gate", () => {
           lawfulAccess: true,
           dataControl: 80,
           projectedRevenue: 2_400_000,
+          evidenceRefs: ["evidence://gimac-public-rail", "evidence://telco-access-due-diligence"],
           reach: { users: 20_000_000, merchants: 250_000, rails: 6, countries: 6 }
         }
       ]
@@ -104,6 +105,56 @@ describe("Collective Market Power Gate", () => {
     expect(result.recommendedOptionId).toBeNull();
     expect(result.rankings.every(option => option.eligible === false)).toBe(true);
     expect(result.blockers).toContain("NO_ELIGIBLE_OPTION");
+  });
+
+  test("does not recommend an unproven external coalition even when its commercial score is higher", () => {
+    const result = evaluateCollectiveMarketPowerGate({
+      capabilityId: "PAY-CM-003",
+      standaloneRevenue: 700_000,
+      options: [
+        {
+          id: "verified-internal-build",
+          mode: "BUILD",
+          distribution: 60,
+          regulatoryAccess: 65,
+          interoperability: 75,
+          economics: 68,
+          sovereignty: 95,
+          resilience: 82,
+          multiCountry: 40,
+          timeToMarket: 55,
+          reversibility: 95,
+          concentrationRisk: 5,
+          lawfulAccess: true,
+          dataControl: 100,
+          projectedRevenue: 700_000,
+          reach: { users: 200_000, merchants: 10_000, rails: 2, countries: 1 }
+        },
+        {
+          id: "unproven-super-coalition",
+          mode: "COALITION",
+          distribution: 100,
+          regulatoryAccess: 100,
+          interoperability: 100,
+          economics: 100,
+          sovereignty: 90,
+          resilience: 95,
+          multiCountry: 100,
+          timeToMarket: 100,
+          reversibility: 80,
+          concentrationRisk: 20,
+          lawfulAccess: true,
+          dataControl: 85,
+          projectedRevenue: 5_000_000,
+          reach: { users: 50_000_000, merchants: 500_000, rails: 8, countries: 12 }
+        }
+      ]
+    });
+
+    expect(result.decision).toBe("BUILD_CORE");
+    expect(result.recommendedOptionId).toBe("verified-internal-build");
+    expect(result.rankings.find(option => option.id === "unproven-super-coalition")?.blockers)
+      .toContain("UNVERIFIED_PARTNER_EVIDENCE");
   });
 
   test("fails closed instead of throwing when the runtime payload is malformed", () => {
