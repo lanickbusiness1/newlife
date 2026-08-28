@@ -106,6 +106,14 @@ describe("Collective Market Power Gate", () => {
     expect(result.blockers).toContain("NO_ELIGIBLE_OPTION");
   });
 
+  test("fails closed instead of throwing when the runtime payload is malformed", () => {
+    const result = evaluateCollectiveMarketPowerGate(null as any);
+
+    expect(result.decision).toBe("HOLD");
+    expect(result.recommendedOptionId).toBeNull();
+    expect(result.blockers).toContain("INVALID_INPUT");
+  });
+
   test("exposes the canonical GENESIS V4 decision identity", () => {
     expect(GENESIS_V4_COLLECTIVE_MARKET_POWER_GATE_ANCHOR.decisionId).toBe("V4-DEC-023");
     expect(GENESIS_V4_COLLECTIVE_MARKET_POWER_GATE_ANCHOR.assetId).toBe("GEN-V4-COLLECTIVE-MARKET-POWER-GATE-001");
