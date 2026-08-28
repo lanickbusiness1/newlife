@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const GENESIS_V4_COLLECTIVE_MARKET_POWER_GATE_ANCHOR = {
   decisionId: "V4-DEC-023",
   assetId: "GEN-V4-COLLECTIVE-MARKET-POWER-GATE-001",
@@ -62,6 +64,40 @@ export type CollectiveMarketPowerDecision = {
   anchor: typeof GENESIS_V4_COLLECTIVE_MARKET_POWER_GATE_ANCHOR;
 };
 
+const MarketPowerModeSchema = z.enum(["BUILD", "BUY", "INTEGRATE", "LICENSE", "JV", "COALITION"]);
+
+const DistributionReachSchema = z.object({
+  users: z.number().finite().nonnegative(),
+  merchants: z.number().finite().nonnegative(),
+  rails: z.number().finite().nonnegative(),
+  countries: z.number().finite().nonnegative()
+});
+
+const MarketPowerOptionSchema = z.object({
+  id: z.string().min(1),
+  mode: MarketPowerModeSchema,
+  distribution: z.number().finite(),
+  regulatoryAccess: z.number().finite(),
+  interoperability: z.number().finite(),
+  economics: z.number().finite(),
+  sovereignty: z.number().finite(),
+  resilience: z.number().finite(),
+  multiCountry: z.number().finite(),
+  timeToMarket: z.number().finite(),
+  reversibility: z.number().finite(),
+  concentrationRisk: z.number().finite(),
+  lawfulAccess: z.boolean(),
+  dataControl: z.number().finite(),
+  projectedRevenue: z.number().finite(),
+  reach: DistributionReachSchema
+});
+
+export const CollectiveMarketPowerInputSchema = z.object({
+  capabilityId: z.string().min(1),
+  standaloneRevenue: z.number().finite().nonnegative(),
+  options: z.array(MarketPowerOptionSchema)
+});
+
 const WEIGHTS = {
   distribution: 0.2,
   regulatoryAccess: 0.15,
@@ -111,7 +147,7 @@ function optionBlockers(option: MarketPowerOption): string[] {
 
 function distributionPower(reach: DistributionReach): number {
   return [reach.users, reach.merchants, reach.rails, reach.countries]
-    .map(value => (Number.isFinite(value) ? Math.max(0, value) : 0))
+    .map(value => Math.max(0, value))
     .reduce((total, value) => total + value, 0);
 }
 
@@ -121,10 +157,31 @@ function decisionForMode(mode: MarketPowerMode): CollectiveMarketPowerDecision["
   return "GO_PARTNER";
 }
 
+function invalidDecision(input: unknown): CollectiveMarketPowerDecision {
+  const capabilityId = typeof input === "object" && input !== null && "capabilityId" in input && typeof (input as any).capabilityId === "string"
+    ? (input as any).capabilityId
+    : "unknown";
+
+  return {
+    capabilityId,
+    decision: "HOLD",
+    recommendedOptionId: null,
+    collectiveDistributionPower: 0,
+    coalitionRevenueMultiplier: 0,
+    rankings: [],
+    blockers: ["INVALID_INPUT"],
+    anchor: GENESIS_V4_COLLECTIVE_MARKET_POWER_GATE_ANCHOR
+  };
+}
+
 export function evaluateCollectiveMarketPowerGate(
-  input: CollectiveMarketPowerInput
+  input: unknown
 ): CollectiveMarketPowerDecision {
-  const rankings = (Array.isArray(input.options) ? input.options : [])
+  const parsed = CollectiveMarketPowerInputSchema.safeParse(input);
+  if (!parsed.success) return invalidDecision(input);
+
+  const data: CollectiveMarketPowerInput = parsed.data;
+  const rankings = data.options
     .map(option => {
       const blockers = optionBlockers(option);
       return {
@@ -143,7 +200,7 @@ export function evaluateCollectiveMarketPowerGate(
 
   if (!winner) {
     return {
-      capabilityId: input.capabilityId,
+      capabilityId: data.capabilityId,
       decision: "HOLD",
       recommendedOptionId: null,
       collectiveDistributionPower: 0,
@@ -154,16 +211,12 @@ export function evaluateCollectiveMarketPowerGate(
     };
   }
 
-  const standaloneRevenue = Number.isFinite(input.standaloneRevenue)
-    ? Math.max(0, input.standaloneRevenue)
-    : 0;
-
-  const multiplier = standaloneRevenue > 0
-    ? round(Math.max(0, winner.projectedRevenue) / standaloneRevenue)
+  const multiplier = data.standaloneRevenue > 0
+    ? round(Math.max(0, winner.projectedRevenue) / data.standaloneRevenue)
     : 0;
 
   return {
-    capabilityId: input.capabilityId,
+    capabilityId: data.capabilityId,
     decision: decisionForMode(winner.mode),
     recommendedOptionId: winner.id,
     collectiveDistributionPower: distributionPower(winner.reach),
