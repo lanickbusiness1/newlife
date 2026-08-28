@@ -38,6 +38,7 @@ export type MarketPowerOption = {
   lawfulAccess: boolean;
   dataControl: number;
   projectedRevenue: number;
+  evidenceRefs: string[];
   reach: DistributionReach;
 };
 
@@ -89,6 +90,7 @@ const MarketPowerOptionSchema = z.object({
   lawfulAccess: z.boolean(),
   dataControl: z.number().finite(),
   projectedRevenue: z.number().finite(),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
   reach: DistributionReachSchema
 });
 
@@ -141,6 +143,9 @@ function optionBlockers(option: MarketPowerOption): string[] {
   if (bounded(option.concentrationRisk) >= 80) blockers.push("CRITICAL_PARTNER_CONCENTRATION");
   if (bounded(option.dataControl) < 40) blockers.push("INSUFFICIENT_DATA_CONTROL");
   if (option.projectedRevenue < 0) blockers.push("NEGATIVE_PROJECTED_REVENUE");
+  if (option.mode !== "BUILD" && option.evidenceRefs.length === 0) {
+    blockers.push("UNVERIFIED_PARTNER_EVIDENCE");
+  }
 
   return blockers;
 }
