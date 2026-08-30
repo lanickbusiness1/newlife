@@ -3,6 +3,14 @@ import { CASH_ACTIVATION, buildWhatsAppActivationLink, summarizeDayOneTarget } f
 import { AGENTS, generateLeadEnginePlan, runAgent } from "./agents";
 import { CANONICAL_PRODUCT, CRM_STAGES, PRODUCT_SECTIONS, type AgentContext } from "./domain";
 import { exportEvidenceJson, exportHtmlReport, exportMarketingPlanMarkdown } from "./exporters";
+import {
+  OUTBOUND_EVIDENCE_GATE,
+  buildOutboundDraft,
+  canTransitionOutboundStatus,
+  classifyChannelActivation,
+  summarizeOutboundEvidence,
+  type ProspectOutboundRecord
+} from "./outboundEvidenceGate";
 import { simulatePolicy } from "./policy";
 import { assessProductionReadiness, calculateRevenueMath } from "./revenueEngine";
 import { saveWorkspace } from "./storage";
@@ -51,6 +59,24 @@ const initialVisibility: VisibilityAssessment = {
   investorPresence: 5
 };
 
+const initialOutboundRecords: ProspectOutboundRecord[] = [
+  {
+    id: "lot-a-001",
+    leadName: "Prospect réel Lot A",
+    company: "Entreprise cible",
+    country: "Bénin",
+    segment: "PME",
+    channel: "whatsapp",
+    status: "prepared",
+    offer: "Starter Revenue Engine",
+    amountFcfa: 49900,
+    phone: "+229 61 10 73 73",
+    message:
+      "Bonjour, je vous propose un diagnostic express AfrIA Marketing Team™ pour clarifier votre offre, vos messages et votre relance commerciale en 48h.",
+    evidenceRefs: []
+  }
+];
+
 export default function App() {
   const [context, setContext] = useState(initialContext);
   const [visibilityInput, setVisibilityInput] = useState(initialVisibility);
@@ -62,6 +88,13 @@ export default function App() {
     () => assessEnterpriseVisibility({ ...visibilityInput, country: context.country }),
     [visibilityInput, context.country]
   );
+  const outboundDraft = useMemo(() => buildOutboundDraft(initialOutboundRecords[0]), []);
+  const outboundSummary = useMemo(() => summarizeOutboundEvidence(initialOutboundRecords), []);
+  const outboundTransition = useMemo(
+    () => canTransitionOutboundStatus(initialOutboundRecords[0], "sent"),
+    []
+  );
+  const whatsappActivation = classifyChannelActivation("whatsapp", false);
   const revenue = calculateRevenueMath({ presentations: 10000, expectedSalesPerHundred: 4, averagePrice: 49900 });
   const readiness = assessProductionReadiness({
     offerReady: true,
@@ -95,7 +128,14 @@ export default function App() {
       revenue,
       readiness,
       visibility,
-      cashActivation: CASH_ACTIVATION
+      cashActivation: CASH_ACTIVATION,
+      outboundEvidence: {
+        gate: OUTBOUND_EVIDENCE_GATE,
+        draft: outboundDraft,
+        summary: outboundSummary,
+        transition: outboundTransition,
+        channel: whatsappActivation
+      }
     });
     setSaved(`Sauvegardé ${record.savedAt}`);
   }
@@ -120,6 +160,7 @@ export default function App() {
           <span>Commercial: {readiness.commercialStatus}</span>
           <span>Revenue: {readiness.productionRevenueReady ? "CASH_PROVEN" : "À ENCAISSER"}</span>
           <span>S7+ SEND: {sendPolicy.state}</span>
+          <span>Outbound proof: {outboundSummary.sentWithProof}/{outboundSummary.totalProspects}</span>
         </aside>
       </section>
 
@@ -199,6 +240,25 @@ export default function App() {
       </section>
 
       <section className="grid">
+        <article className="panel wide">
+          <h2>{OUTBOUND_EVIDENCE_GATE.name}</h2>
+          <p>{OUTBOUND_EVIDENCE_GATE.doctrine}</p>
+          <div className="evidence-grid">
+            <div><b>Prospects</b><span>{outboundSummary.totalProspects}</span></div>
+            <div><b>Préparés sans preuve</b><span>{outboundSummary.preparedWithoutSendProof}</span></div>
+            <div><b>Envoyés prouvés</b><span>{outboundSummary.sentWithProof}</span></div>
+            <div><b>Réponses prouvées</b><span>{outboundSummary.repliesWithProof}</span></div>
+            <div><b>Paiements prouvés</b><span>{outboundSummary.paymentsWithProof}</span></div>
+          </div>
+          <p>Transition vers Message envoyé : <b>{outboundTransition.allowed ? "autorisée" : "refusée sans preuve"}</b></p>
+          <p>{outboundTransition.reason}</p>
+          <p>Canal WhatsApp : <b>{whatsappActivation.status}</b> · blocage produit : <b>{whatsappActivation.productBlocked ? "oui" : "non"}</b></p>
+          <a className="button-link" href={outboundDraft} target="_blank" rel="noreferrer">Ouvrir brouillon WhatsApp prouvé</a>
+          <ul>{OUTBOUND_EVIDENCE_GATE.strictRules.map(rule => <li key={rule}>{rule}</li>)}</ul>
+        </article>
+      </section>
+
+      <section className="grid">
         <article className="panel">
           <h2>Cash Activation</h2>
           <p>{CASH_ACTIVATION.noImaginaryBlockersRule}</p>
@@ -218,6 +278,7 @@ export default function App() {
           <details><summary>JSON evidence</summary><pre>{exportEvidenceJson(exportPayload)}</pre></details>
           <details><summary>HTML report</summary><pre>{exportHtmlReport(exportPayload)}</pre></details>
           <details><summary>Enterprise visibility evidence</summary><pre>{JSON.stringify(visibility, null, 2)}</pre></details>
+          <details><summary>Outbound evidence gate</summary><pre>{JSON.stringify({ outboundSummary, outboundTransition, whatsappActivation }, null, 2)}</pre></details>
         </article>
       </section>
 
