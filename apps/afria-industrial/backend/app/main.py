@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 
 from app.api.telemetry import build_telemetry_router
+from app.api.evidence import build_evidence_router
 from app.core.config import Settings
 from app.persistence.sqlite import connect_sqlite, initialize_schema
 from app.services.telemetry import TelemetryService
+from app.services.evidence import EvidenceService
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -33,6 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {'mode': cfg.system_mode, 'source': 'local'}
 
     app.include_router(build_telemetry_router(telemetry_service))
+    app.include_router(build_evidence_router(EvidenceService(conn)))
     return app
 
 
