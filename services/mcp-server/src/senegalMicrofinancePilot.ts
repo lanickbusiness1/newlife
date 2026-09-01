@@ -88,7 +88,7 @@ export const SENEGAL_MICROFINANCE_OFFICIAL_EVIDENCE = {
   }
 } as const satisfies Record<string, OfficialEvidenceRecord>;
 
-const KNOWN_OFFICIAL_EVIDENCE_REFS = new Set(
+const KNOWN_OFFICIAL_EVIDENCE_REFS = new Set<string>(
   Object.values(SENEGAL_MICROFINANCE_OFFICIAL_EVIDENCE).map(record => record.id)
 );
 
