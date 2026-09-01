@@ -1,7 +1,7 @@
 name: MCP CI
 on:
   push:
-    branches: [main]
+    branches: [main, feat/deploybot-sovereign-delivery-runtime]
     paths:
       - 'services/mcp-server/**'
       - 'render.yaml'
@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: mcp-ci-${{ github.event.pull_request.number || github.ref }}
@@ -37,3 +38,27 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Publish branch CI success status
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"success\",\"context\":\"mcp-ci-branch-proof\",\"description\":\"MCP CI passed\",\"target_url\":\"$RUN_URL\"}"
+      - name: Publish branch CI failure status
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"failure\",\"context\":\"mcp-ci-branch-proof\",\"description\":\"MCP CI failed\",\"target_url\":\"$RUN_URL\"}"
