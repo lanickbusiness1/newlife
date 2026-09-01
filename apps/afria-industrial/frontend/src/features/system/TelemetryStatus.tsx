@@ -1,0 +1,1 @@
+import type {TelemetryQuality} from '../../domain/types';export function TelemetryStatus({quality}:{quality:TelemetryQuality}){const label=quality==='GOOD'?'Live / valide':quality==='STALE'?'Stale — donnée ancienne':quality==='SUSPECT'?'Suspect — à vérifier':'Invalide';return <span className={`telemetry-status quality-${quality.toLowerCase()}`}>{label}</span>}

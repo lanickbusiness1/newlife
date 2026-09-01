@@ -1,0 +1,2 @@
+import type { SourceKind, SystemMode } from '../../domain/types';
+export function SystemBanner({mode,source}:{mode:SystemMode;source:SourceKind|string}){const simulation=source==='SIMULATOR';return <section className={`system-banner mode-${mode.toLowerCase()}`} aria-label="État système"><strong>{mode}</strong><span>{simulation?'MODE SIMULATION — données synthétiques, aucune usine réelle':`Source ${source}`}</span></section>}
