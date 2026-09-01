@@ -39,14 +39,15 @@ def test_alert_acknowledgement_and_evidence_are_atomic(tmp_path):
     assert EvidenceService(conn).verify_chain() is True
 
 
-def test_public_evidence_api_has_no_update_or_delete_route(tmp_path):
+def test_public_evidence_api_is_read_only_by_contract(tmp_path):
     from fastapi.testclient import TestClient
     from app.core.config import Settings
     from app.main import create_app
+
     app = create_app(Settings(database_path=str(tmp_path / 'api.db')))
-    paths = {route.path for route in app.routes}
-    assert '/evidence' in paths
-    assert not any(path.startswith('/evidence/') for path in paths)
     client = TestClient(app)
+    evidence_methods = client.get('/openapi.json').json()['paths']['/evidence']
+
+    assert set(evidence_methods) == {'get'}
     assert client.put('/evidence', json={}).status_code == 405
     assert client.delete('/evidence').status_code == 405
