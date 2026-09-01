@@ -61,6 +61,8 @@ This release is deliberately read-only with respect to industrial control equipm
 
 The product will live inside the existing `lanickbusiness1/newlife` monorepo, following the established AfrIA product pattern rather than introducing a separate repository or premature microservice split.
 
+Canonical structure:
+
 ```text
 apps/afria-industrial/
 ├── README.md
@@ -71,6 +73,10 @@ apps/afria-industrial/
 │   │   ├── domain/
 │   │   ├── services/
 │   │   ├── adapters/
+│   │   │   ├── contracts.py
+│   │   │   ├── simulator.py
+│   │   │   ├── mqtt.py
+│   │   │   └── opcua.py
 │   │   ├── persistence/
 │   │   └── main.py
 │   ├── tests/
@@ -86,10 +92,6 @@ apps/afria-industrial/
 │   ├── scenarios/
 │   ├── generator/
 │   └── tests/
-├── adapters/
-│   ├── contracts/
-│   ├── mqtt/
-│   └── opcua/
 ├── docs/
 │   ├── architecture.md
 │   ├── threat-model-ot.md
@@ -103,6 +105,22 @@ apps/afria-industrial/
 ```
 
 The backend remains a modular monolith for v1.0. Internal module boundaries must be explicit enough to permit future extraction, but no network microservices are created without demonstrated scaling or isolation need.
+
+### 3.1 Technology choices for the proof release
+
+These choices are fixed for v1.0 to remove implementation ambiguity and stay aligned with patterns already present in `newlife`:
+
+- Backend: Python 3.12, FastAPI, Pydantic v2, Uvicorn.
+- Backend tests: pytest + httpx.
+- Frontend: React + TypeScript + Vite.
+- Frontend tests: Vitest for pure/UI logic where needed.
+- Proof persistence: local SQLite in WAL mode behind repository interfaces.
+- Telemetry/evidence timestamps: UTC internally; site timezone retained as metadata.
+- Authentication for the proof release: environment-provisioned API keys mapped to RBAC roles; no credentials are committed. OIDC/SSO is deferred to a separate production ADR.
+- Containers: Docker Compose, with persistent local volume for SQLite data.
+- Core runtime must have no mandatory cloud dependency.
+
+SQLite is intentionally selected for the proof/edge release because it minimizes moving parts, supports offline operation, and is adequate for the acceptance workload. A PostgreSQL-compatible persistence adapter is a future extension, not a v1.0 dependency.
 
 ## 4. Core Domain Model
 
@@ -153,6 +171,7 @@ Required fields:
 - metric
 - unit
 - timestamp
+- received_at
 - value
 - quality
 - source
@@ -197,13 +216,17 @@ Append-only record with:
 - timestamp
 - input_hash
 - output_hash
+- previous_record_hash
+- record_hash
 - source_refs
 - decision
 - metadata
 
+The `previous_record_hash` + `record_hash` fields create a tamper-evident chain for proof-release evidence. This is not described as a blockchain.
+
 ## 5. Telemetry and Adapter Model
 
-All protocol integrations terminate in one normalized ingestion contract. The business logic never depends directly on a vendor SDK.
+All protocol integrations terminate in one normalized ingestion contract. Business logic never depends directly on a vendor SDK.
 
 ### Adapter contract
 
@@ -220,14 +243,14 @@ No write method exists in the v1.0 adapter contract.
 ### v1.0 adapters
 
 1. Simulator adapter — required and fully implemented.
-2. MQTT read adapter — reference implementation or controlled integration path.
-3. OPC UA read adapter — reference implementation or controlled integration path.
+2. MQTT read adapter — reference implementation behind the same contract.
+3. OPC UA read adapter — reference implementation behind the same contract.
 
-If third-party protocol libraries are unavailable in CI, the contracts and mocks remain testable and the production adapter is marked `PROVIDER_PENDING`; this must not block the simulator-backed acceptance release.
+The MQTT and OPC UA adapters must not become hard dependencies of the simulator-backed acceptance path. If a protocol library cannot run in a specific CI environment, its contract/mocks remain testable and that adapter is reported `PROVIDER_PENDING`; this cannot block the simulator-backed `TEST_PROVEN` state.
 
 ## 6. Simulator Design
 
-The simulator is not decorative demo data. It is a deterministic industrial test harness.
+The simulator is a deterministic industrial test harness, not decorative demo data.
 
 Initial scenario set:
 
@@ -411,7 +434,9 @@ Minimum endpoints:
 
 All mutating endpoints require authenticated role checks. No endpoint for machine actuation exists.
 
-## 12. RBAC
+## 12. Authentication and RBAC
+
+Proof-release authentication uses API keys provisioned through environment variables and mapped to roles. The backend stores/computes only secure comparisons; raw API keys are never placed in source control, frontend bundles, or evidence records.
 
 Roles:
 
@@ -425,7 +450,7 @@ Viewer permissions plus alert acknowledgement and operational annotations.
 Operator permissions plus asset metadata configuration, threshold configuration, and adapter configuration.
 
 ### Admin
-Engineer permissions plus identity/role administration and site-level settings.
+Engineer permissions plus role mapping and site-level settings.
 
 No role receives machine write privileges in v1.0 because the capability does not exist.
 
@@ -444,7 +469,7 @@ The evidence ledger captures:
 - health/degraded-mode transition;
 - test and acceptance run summaries where practical.
 
-Evidence records are append-only through the public application API. Administrative compaction, if ever introduced, is outside v1.0.
+Evidence records are append-only through the public application API. The application verifies the hash chain during health/diagnostic checks. Administrative compaction, if ever introduced, is outside v1.0.
 
 ## 14. Offline-First and Synchronization
 
@@ -461,19 +486,24 @@ Required behavior:
 - duplicate events are idempotently rejected;
 - conflicting metadata updates are explicitly surfaced, not silently overwritten.
 
-The system must expose `ONLINE`, `DEGRADED`, and `OFFLINE_EDGE` modes.
+The system exposes `ONLINE`, `DEGRADED`, and `OFFLINE_EDGE` modes.
+
+### 14.1 Proof-release upstream
+
+v1.0 does not depend on a real cloud control plane. Synchronization is implemented behind a transport interface. Acceptance uses a deterministic local/mock upstream receiver that can be switched available/unavailable to prove queuing, outage behavior, replay ordering, and idempotency. A real remote control-plane destination is deferred.
 
 ## 15. Persistence
 
-v1.0 must use a persistence abstraction so simulator/local development and future production deployments can differ.
+The proof implementation uses SQLite in WAL mode behind repository interfaces.
 
-Minimum logical stores:
-- relational metadata store for sites/lines/assets/users/configuration;
-- time-series capable telemetry store or a relational implementation that preserves time ordering for the proof release;
-- append-only evidence store;
+Logical stores/tables cover:
+- sites, lines, assets, users/role mappings, and configuration;
+- telemetry ordered by event timestamp plus receipt timestamp;
+- anomalies and alerts;
+- append-only evidence chain;
 - local sync queue.
 
-The first implementation may use PostgreSQL-compatible storage if it satisfies the acceptance workload. The design must not hard-code cloud-only services.
+The persistence API must isolate domain/service code from SQLite-specific SQL so a future PostgreSQL adapter can be introduced without changing KPI, anomaly, readiness, or API business logic.
 
 ## 16. OT Security / S7+ Controls
 
@@ -483,7 +513,7 @@ Mandatory controls:
 - least-privilege RBAC;
 - separate secrets/configuration per environment;
 - structured audit logging;
-- signed or hashed evidence records where applicable;
+- tamper-evident evidence hash chain;
 - input validation and bounded batch sizes;
 - rate limiting for exposed APIs;
 - secure defaults for CORS and network bind interfaces;
@@ -507,10 +537,11 @@ The implementation must explicitly handle:
 - stop claiming live data;
 - raise data-quality alert after configured threshold.
 
-### Database unavailable
+### Database unavailable or locked
 - health readiness fails;
-- ingestion returns controlled error or queues locally where supported;
-- no silent data loss.
+- ingestion returns a controlled error or uses the local queue only when the relevant write path is designed to do so;
+- no silent data loss;
+- recovery is observable.
 
 ### Upstream sync unavailable
 - switch to DEGRADED/OFFLINE_EDGE;
@@ -540,6 +571,8 @@ Development is TDD-first.
 - anomaly methods;
 - readiness scoring;
 - role permissions;
+- API-key authentication behavior;
+- evidence hash-chain validation;
 - idempotency;
 - data-quality classification.
 
@@ -556,7 +589,7 @@ Development is TDD-first.
 - stale telemetry;
 - malformed payloads;
 - duplicate batches;
-- database recovery;
+- SQLite lock/recovery scenario where practical;
 - clock skew.
 
 ### Security tests
@@ -564,11 +597,12 @@ Development is TDD-first.
 - role boundary tests;
 - oversize batch rejection;
 - invalid source/provenance rejection;
-- no actuation endpoints exposed.
+- no actuation endpoints exposed;
+- raw secrets absent from evidence/log outputs.
 
 ### Acceptance scenario
 
-A single command starts the stack. The simulator creates a site with representative assets and begins telemetry. A controlled anomaly is injected. The system must:
+A single documented command starts the stack. The simulator creates a site with representative assets and begins telemetry. A controlled anomaly is injected. The system must:
 
 1. show the site and assets;
 2. ingest telemetry;
@@ -594,10 +628,9 @@ Docker Compose or equivalent container runtime on a single industrial edge host.
 Required containers/logical processes:
 - backend API;
 - frontend;
-- persistence;
 - simulator in demo/test mode only.
 
-Protocol adapters may run in-process for v1.0.
+SQLite persists on a mounted local volume; no separate database container is required for v1.0. Protocol adapters run in the backend process for v1.0.
 
 No external cloud dependency is mandatory for core local operation.
 
@@ -613,7 +646,8 @@ Required operational signals:
 - sync queue depth;
 - persistence latency/error count;
 - adapter health;
-- system mode.
+- system mode;
+- evidence-chain integrity status.
 
 Logs must be structured and must not include secrets.
 
@@ -630,7 +664,7 @@ Any synchronization outside the local/site environment must be policy-controlled
 - encryption state;
 - evidence record.
 
-The v1.0 proof implementation should use synthetic data only unless a separate authorized data set is provided.
+The v1.0 proof implementation uses synthetic data only unless a separate authorized data set is explicitly provided.
 
 ## 22. Commercial Wedge
 
@@ -666,7 +700,7 @@ Requires:
 
 ### S7+ — Security
 Requires:
-- RBAC tests;
+- authentication/RBAC tests;
 - read-only OT boundary proof;
 - secret scan;
 - dependency review;
@@ -718,7 +752,7 @@ The implementation plan must decompose work in this order:
 6. anomaly engine;
 7. alert/evidence flow;
 8. readiness assessment;
-9. RBAC/security boundaries;
+9. authentication/RBAC boundaries;
 10. offline queue/sync semantics;
 11. API composition;
 12. frontend cockpit;
@@ -738,7 +772,7 @@ v1.0 is done only when all conditions are true:
 - no machine-control write path exists;
 - Docker execution is documented and reproducible;
 - health/degraded/offline states are visible;
-- evidence ledger captures required transitions;
+- evidence ledger captures required transitions and verifies its hash chain;
 - readiness assessment is generated from explicit evidence/assumptions;
 - rollback and recovery procedures are documented;
 - M6 and S7+ evidence is complete;
@@ -753,6 +787,8 @@ Separate ADRs are required for:
 - proprietary vendor SDKs;
 - camera/vision runtime;
 - multi-site cloud control plane;
+- OIDC/enterprise SSO;
+- PostgreSQL/multi-node persistence;
 - Kubernetes or distributed microservice architecture;
 - regulated critical-infrastructure production deployment;
 - formal predictive-maintenance ML model training on client data.
