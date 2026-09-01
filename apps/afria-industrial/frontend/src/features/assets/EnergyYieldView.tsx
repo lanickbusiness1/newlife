@@ -1,0 +1,1 @@
+import type {OperationalMetrics} from '../../domain/types';export function EnergyYieldView({metrics}:{metrics:OperationalMetrics|null}){return <section><h2>Énergie & rendement</h2><p>Dernière télémétrie reçue : <strong>{metrics?.telemetry_freshness??'aucune'}</strong></p><p className="muted">Aucun gain énergétique n’est revendiqué sans baseline mesurée.</p></section>}

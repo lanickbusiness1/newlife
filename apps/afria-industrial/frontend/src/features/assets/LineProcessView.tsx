@@ -1,0 +1,1 @@
+export function LineProcessView(){return <section><h2>Lignes & process</h2><p className="empty">Les KPI OEE/MTBF/MTTR apparaissent dès que les points de production requis sont disponibles.</p></section>}

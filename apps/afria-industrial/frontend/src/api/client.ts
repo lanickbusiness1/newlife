@@ -1,0 +1,5 @@
+import type { Alert, Asset, OperationalMetrics, Site, SystemState } from '../domain/types';
+declare global { interface Window { __AFRIA_INDUSTRIAL_CONFIG__?: { apiBaseUrl?: string; proofApiKey?: string }; } }
+const runtime=()=>window.__AFRIA_INDUSTRIAL_CONFIG__??{}; const base=()=>runtime().apiBaseUrl??'http://localhost:8000';
+async function request<T>(path:string,init:RequestInit={}):Promise<T>{const headers=new Headers(init.headers);const key=runtime().proofApiKey;if(key)headers.set('X-API-Key',key);if(init.body)headers.set('Content-Type','application/json');const response=await fetch(`${base()}${path}`,{...init,headers});if(!response.ok)throw new Error(`${response.status} ${response.statusText}`);return response.json() as Promise<T>}
+export const api={system:()=>request<SystemState>('/system/mode'),metrics:()=>request<OperationalMetrics>('/system/metrics'),sites:()=>request<Site[]>('/sites'),assets:()=>request<Asset[]>('/assets'),alerts:()=>request<Alert[]>('/alerts'),acknowledgeAlert:(alertId:string)=>request<Alert>(`/alerts/${alertId}/acknowledge`,{method:'POST',body:JSON.stringify({actor:'operator',acknowledged_at:new Date().toISOString()})})};

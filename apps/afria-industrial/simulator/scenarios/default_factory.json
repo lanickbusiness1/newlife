@@ -1,0 +1,9 @@
+{
+  "site": {"site_id": "demo-bj-01", "name": "Synthetic Agro Factory", "country": "BJ", "industry": "agro"},
+  "lines": [{"line_id": "packing-01", "name": "Packing Line", "rated_capacity": 100, "unit": "units/hour"}],
+  "assets": [
+    {"asset_id": "motor-01", "line_id": "packing-01", "asset_type": "motor", "scenario": "bearing_temperature_drift"},
+    {"asset_id": "pump-01", "line_id": "packing-01", "asset_type": "pump", "scenario": "pump_cavitation"},
+    {"asset_id": "conveyor-01", "line_id": "packing-01", "asset_type": "conveyor", "scenario": "conveyor_microstops"}
+  ]
+}

@@ -1,0 +1,1 @@
+import {render,screen} from '@testing-library/react';import {describe,expect,test} from 'vitest';import {SystemBanner} from './SystemBanner';describe('SystemBanner',()=>{test('simulated source is unmistakably labelled',()=>{render(<SystemBanner mode="ONLINE" source="SIMULATOR"/>);expect(screen.getByText(/simulation/i)).toBeInTheDocument()})});
