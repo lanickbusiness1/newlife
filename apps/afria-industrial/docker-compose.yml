@@ -1,9 +1,12 @@
 services:
   backend:
     build: ./backend
-    env_file: .env
     environment:
+      AFRIA_INDUSTRIAL_API_KEYS: ${AFRIA_INDUSTRIAL_API_KEYS:?AFRIA_INDUSTRIAL_API_KEYS is required}
+      AFRIA_INDUSTRIAL_CORS_ORIGINS: ${AFRIA_INDUSTRIAL_CORS_ORIGINS:-http://localhost:8080}
       AFRIA_INDUSTRIAL_DATABASE_PATH: /data/industrial.db
+      AFRIA_INDUSTRIAL_MUTATION_RATE_LIMIT: ${AFRIA_INDUSTRIAL_MUTATION_RATE_LIMIT:-10}
+      AFRIA_INDUSTRIAL_MUTATION_RATE_WINDOW_SECONDS: ${AFRIA_INDUSTRIAL_MUTATION_RATE_WINDOW_SECONDS:-60}
     volumes:
       - industrial-data:/data
     ports:
