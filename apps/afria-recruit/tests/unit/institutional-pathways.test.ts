@@ -154,3 +154,37 @@ test('ladder ranks apply before prepare and skip regardless of higher ineligible
     ['UN-YPP-2026', 'UN-JPO', 'UN-YPP-BLOCKED'],
   );
 });
+
+test('missing rule sourceRef is rejected as invalid normalized source data', () => {
+  const pathway: InstitutionalPathway = {
+    ...basePathway,
+    hardRules: [{
+      id: 'age',
+      kind: 'age',
+      label: 'Maximum age',
+      sourceRef: '',
+      maximum: 32,
+    }],
+  };
+  assert.throws(() => evaluatePathwayEligibility(pathway, eligibleProfile), /sourceRef/i);
+});
+
+test('fit score outside 0 to 100 is rejected', () => {
+  assert.throws(
+    () => recommendInstitutionalPathway(basePathway, eligibleProfile, 101),
+    /fit score/i,
+  );
+});
+
+test('missing rule operand is rejected instead of becoming candidate review', () => {
+  const pathway: InstitutionalPathway = {
+    ...basePathway,
+    hardRules: [{
+      id: 'education',
+      kind: 'education',
+      label: 'Education threshold',
+      sourceRef: basePathway.sourceRef,
+    }],
+  };
+  assert.throws(() => evaluatePathwayEligibility(pathway, eligibleProfile), /education/i);
+});
