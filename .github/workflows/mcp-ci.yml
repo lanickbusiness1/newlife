@@ -52,4 +52,11 @@ jobs:
           path: services/mcp-server/build.log
       # Security remains fail-closed. It runs after quality checks so the CI record
       # preserves test/build evidence even when a dependency advisory vetoes release.
-      - run: npm audit --audit-level=high
+      - name: Dependency audit
+        run: npm audit --audit-level=high --json 2>&1 | tee npm-audit.json
+      - name: Upload dependency audit diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dependency-audit-diagnostics
+          path: services/mcp-server/npm-audit.json
