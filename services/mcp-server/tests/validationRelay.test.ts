@@ -66,6 +66,55 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     expect(output.nextAction).toMatch(/infrastructure/i);
   });
 
+  test("requires explicit proof that the PIG critical-failure set is empty", () => {
+    const output = compileValidationRelay({
+      ...baseInput,
+      evidence: {
+        commitSha: "critical-proof-required",
+        ciRun: "run-critical-proof-required",
+        testsPassed: true,
+        productionInfrastructureGate: "pass",
+        productionReadinessScore: 100,
+        productionInfrastructureEvidenceRef: "reme://PIG-001/release-proof",
+        m6: "pass",
+        s7plus: "pass",
+        m8: "pass"
+      }
+    });
+
+    expect(output.state).toBe("GATES_PENDING");
+    expect(output.blockers).toContain("Production critical failures proof is missing or invalid");
+  });
+
+  test.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 101])(
+    "rejects invalid Production Readiness Score %s instead of allowing M6",
+    score => {
+      const output = compileValidationRelay({
+        ...baseInput,
+        evidence: {
+          commitSha: "invalid-score",
+          ciRun: "run-invalid-score",
+          testsPassed: true,
+          productionInfrastructureGate: "pass",
+          productionReadinessScore: score,
+          productionCriticalFailures: [],
+          productionInfrastructureEvidenceRef: "reme://PIG-001/release-proof",
+          m6: "pass",
+          s7plus: "pass",
+          m8: "pass"
+        }
+      });
+
+      expect(output.state).toBe("CORRECTING");
+      expect(output.blockers.some(item => item.includes("Production Readiness Score is invalid"))).toBe(true);
+    }
+  );
+
+  test("rejects a malformed relay payload with a controlled relay validation error", () => {
+    expect(() => compileValidationRelay(null as unknown as ValidationRelayInput))
+      .toThrowError(/GENESIS_V4_VALIDATION_RELAY_INVALID/);
+  });
+
   test("never claims a delivered URL without healthcheck and rollback evidence", () => {
     const output = compileValidationRelay({
       ...baseInput,
