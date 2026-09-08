@@ -3,6 +3,10 @@ import {
   compileValidationRelay,
   type ValidationRelayInput
 } from "../src/validationRelay";
+import {
+  PRODUCTION_CONTROL_IDS,
+  type ProductionInfrastructureGateInput
+} from "../src/productionInfrastructureGate";
 
 const baseInput: ValidationRelayInput = {
   validationRef: "CEO-VAL-2026-08-18-001",
@@ -17,6 +21,21 @@ const baseInput: ValidationRelayInput = {
     productionDelegated: true
   }
 };
+
+function fullyProvenPigInput(): ProductionInfrastructureGateInput {
+  return {
+    assetId: "INF-DEPLOYBOT-001",
+    releaseId: "release-relay-proof",
+    environment: "preproduction",
+    multiTenant: true,
+    controls: Object.fromEntries(
+      PRODUCTION_CONTROL_IDS.map(id => [id, {
+        status: "pass" as const,
+        evidenceRefs: [`reme://${id}/proof`]
+      }])
+    ) as ProductionInfrastructureGateInput["controls"]
+  };
+}
 
 const pigEvidence = {
   productionInfrastructureGate: "pass" as const,
@@ -84,6 +103,31 @@ describe("GENESIS V4 CEO Validation Relay", () => {
 
     expect(output.state).toBe("GATES_PENDING");
     expect(output.blockers).toContain("Production critical failures proof is missing or invalid");
+  });
+
+  test("does not trust a self-declared PIG pass when raw PIG evaluation fails", () => {
+    const failingPigInput = fullyProvenPigInput();
+    failingPigInput.controls.tls_https = {
+      status: "fail",
+      evidenceRefs: ["reme://tls/failed-scan"]
+    };
+
+    const output = compileValidationRelay({
+      ...baseInput,
+      evidence: {
+        commitSha: "forged-pig-pass",
+        ciRun: "run-forged-pig-pass",
+        testsPassed: true,
+        ...pigEvidence,
+        productionInfrastructureInput: failingPigInput,
+        m6: "pass",
+        s7plus: "pass",
+        m8: "pass"
+      } as any
+    });
+
+    expect(output.state).toBe("CORRECTING");
+    expect(output.blockers.some(item => item.includes("recomputed PIG decision"))).toBe(true);
   });
 
   test.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 101])(
