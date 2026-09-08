@@ -158,7 +158,7 @@ function nonEmpty(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function hasEvidence(control: ProductionControlEvidence | undefined): control is ProductionControlEvidence {
+function hasEvidence(control: ProductionControlEvidence | undefined): boolean {
   return Boolean(
     control
       && control.status === "pass"
