@@ -154,8 +154,42 @@ const EVIDENCE_CONTRACT = [
   "evaluated_at"
 ];
 
+const PRODUCTION_ENVIRONMENTS = new Set<ProductionInfrastructureGateInput["environment"]>([
+  "development",
+  "preproduction",
+  "production"
+]);
+
 function nonEmpty(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertProductionInfrastructureGateInput(
+  input: unknown
+): asserts input is ProductionInfrastructureGateInput {
+  if (!isRecord(input)) {
+    throw new Error("GENESIS_V4_PIG_INVALID: payload must be an object");
+  }
+
+  if (!nonEmpty(input.assetId) || !nonEmpty(input.releaseId)) {
+    throw new Error("GENESIS_V4_PIG_INVALID: assetId and releaseId are required");
+  }
+
+  if (typeof input.environment !== "string" || !PRODUCTION_ENVIRONMENTS.has(input.environment as ProductionInfrastructureGateInput["environment"])) {
+    throw new Error("GENESIS_V4_PIG_INVALID: environment must be development, preproduction or production");
+  }
+
+  if (typeof input.multiTenant !== "boolean") {
+    throw new Error("GENESIS_V4_PIG_INVALID: multiTenant must be boolean");
+  }
+
+  if (!isRecord(input.controls)) {
+    throw new Error("GENESIS_V4_PIG_INVALID: controls must be an object");
+  }
 }
 
 function hasEvidence(control: ProductionControlEvidence | undefined): boolean {
@@ -174,11 +208,9 @@ function emptyDomainScores(): Record<ProductionDomain, ProductionDomainScore> {
 }
 
 export function evaluateProductionInfrastructureGate(
-  input: ProductionInfrastructureGateInput
+  input: unknown
 ): ProductionInfrastructureGateResult {
-  if (!nonEmpty(input.assetId) || !nonEmpty(input.releaseId)) {
-    throw new Error("GENESIS_V4_PIG_INVALID: assetId and releaseId are required");
-  }
+  assertProductionInfrastructureGateInput(input);
 
   const domainScores = emptyDomainScores();
   const blockers: string[] = [];
