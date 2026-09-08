@@ -94,4 +94,15 @@ describe("GENESIS V4 Production Infrastructure Gate", () => {
     expect(result.exemptions).toContain("tenant_isolation:single_tenant");
     expect(result.decision).toBe("PASS_TO_M6");
   });
+
+  test("rejects a malformed runtime payload with a gate-specific validation error", () => {
+    const malformed = {
+      assetId: "INF-DEPLOYBOT-001",
+      releaseId: "release-malformed",
+      environment: "preproduction",
+      multiTenant: true
+    } as unknown as ProductionInfrastructureGateInput;
+
+    expect(() => evaluateProductionInfrastructureGate(malformed)).toThrowError(/GENESIS_V4_PIG_INVALID/);
+  });
 });
