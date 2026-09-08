@@ -1,3 +1,9 @@
+import {
+  evaluateProductionInfrastructureGate,
+  type ProductionInfrastructureGateInput,
+  type ProductionInfrastructureGateResult
+} from "./productionInfrastructureGate.js";
+
 export const GENESIS_V4_VALIDATION_RELAY_ANCHOR = {
   genome: "GENESIS_V4",
   assetId: "INF-DEPLOYBOT-001",
@@ -35,6 +41,7 @@ export interface ValidationRelayEvidence {
   productionReadinessScore?: number;
   productionCriticalFailures?: string[];
   productionInfrastructureEvidenceRef?: string;
+  productionInfrastructureInput?: ProductionInfrastructureGateInput;
   m6?: GateStatus;
   s7plus?: GateStatus;
   m8?: GateStatus;
@@ -91,6 +98,7 @@ const EVIDENCE_CONTRACT = [
   "Production_Readiness_Score",
   "Production_Critical_Failures",
   "Production_Infrastructure_Evidence_Ref",
+  "Production_Infrastructure_Raw_Input",
   "M6",
   "S7+",
   "M8",
@@ -172,6 +180,36 @@ function output(
   };
 }
 
+function sameStringSet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const a = [...left].sort();
+  const b = [...right].sort();
+  return a.every((value, index) => value === b[index]);
+}
+
+function recomputePig(
+  rawInput: ProductionInfrastructureGateInput | undefined,
+  expectedAssetId: string,
+  blockers: string[]
+): ProductionInfrastructureGateResult | null {
+  if (!rawInput) {
+    blockers.push("Production Infrastructure raw input is missing; Relay cannot verify the PIG decision");
+    return null;
+  }
+
+  try {
+    const result = evaluateProductionInfrastructureGate(rawInput);
+    if (result.assetId !== expectedAssetId) {
+      blockers.push(`recomputed PIG asset mismatch: ${result.assetId} != ${expectedAssetId}`);
+    }
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown PIG evaluation error";
+    blockers.push(`recomputed PIG evaluation failed: ${message}`);
+    return null;
+  }
+}
+
 export function compileValidationRelay(input: unknown): ValidationRelayOutput {
   assertValidationRelayInput(input);
 
@@ -216,6 +254,7 @@ export function compileValidationRelay(input: unknown): ValidationRelayOutput {
 
   const infrastructureBlockers: string[] = [];
   let invalidReadinessScore = false;
+  let recomputedFailed = false;
 
   if (evidence.productionInfrastructureGate !== "pass") {
     infrastructureBlockers.push(`Production Infrastructure Gate is ${evidence.productionInfrastructureGate ?? "missing"}`);
@@ -245,10 +284,41 @@ export function compileValidationRelay(input: unknown): ValidationRelayOutput {
     infrastructureBlockers.push("Production Infrastructure evidence reference is missing");
   }
 
+  const recomputed = recomputePig(
+    evidence.productionInfrastructureInput,
+    input.assetId,
+    infrastructureBlockers
+  );
+
+  if (!recomputed) {
+    recomputedFailed = true;
+  } else {
+    if (recomputed.decision !== "PASS_TO_M6") {
+      recomputedFailed = true;
+      infrastructureBlockers.push(`recomputed PIG decision is ${recomputed.decision}, not PASS_TO_M6`);
+    }
+
+    if (typeof evidence.productionReadinessScore === "number" && recomputed.score !== evidence.productionReadinessScore) {
+      recomputedFailed = true;
+      infrastructureBlockers.push(`recomputed PIG score ${recomputed.score}/100 does not match declared score ${evidence.productionReadinessScore}/100`);
+    }
+
+    if (Array.isArray(evidence.productionCriticalFailures)
+      && !sameStringSet(recomputed.criticalFailures, evidence.productionCriticalFailures)) {
+      recomputedFailed = true;
+      infrastructureBlockers.push("recomputed PIG critical failures do not match declared critical failures");
+    }
+
+    if (recomputed.assetId !== input.assetId) {
+      recomputedFailed = true;
+    }
+  }
+
   if (infrastructureBlockers.length) {
     const failed = evidence.productionInfrastructureGate === "fail"
       || evidence.productionInfrastructureGate === "conditional"
       || invalidReadinessScore
+      || recomputedFailed
       || (
         typeof evidence.productionReadinessScore === "number"
         && Number.isFinite(evidence.productionReadinessScore)
