@@ -284,15 +284,16 @@ export function compileValidationRelay(input: unknown): ValidationRelayOutput {
     infrastructureBlockers.push("Production Infrastructure evidence reference is missing");
   }
 
+  const hasRawPigInput = Boolean(evidence.productionInfrastructureInput);
   const recomputed = recomputePig(
     evidence.productionInfrastructureInput,
     input.assetId,
     infrastructureBlockers
   );
 
-  if (!recomputed) {
+  if (hasRawPigInput && !recomputed) {
     recomputedFailed = true;
-  } else {
+  } else if (recomputed) {
     if (recomputed.decision !== "PASS_TO_M6") {
       recomputedFailed = true;
       infrastructureBlockers.push(`recomputed PIG decision is ${recomputed.decision}, not PASS_TO_M6`);
