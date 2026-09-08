@@ -18,6 +18,13 @@ const baseInput: ValidationRelayInput = {
   }
 };
 
+const pigEvidence = {
+  productionInfrastructureGate: "pass" as const,
+  productionReadinessScore: 100,
+  productionCriticalFailures: [] as string[],
+  productionInfrastructureEvidenceRef: "reme://PIG-001/release-proof"
+};
+
 describe("GENESIS V4 CEO Validation Relay", () => {
   test("takes the relay automatically after CEO validation and asks for build evidence next", () => {
     const output = compileValidationRelay(baseInput);
@@ -59,13 +66,14 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     expect(output.nextAction).toMatch(/infrastructure/i);
   });
 
-  test("never claims a delivered URL without gates, healthcheck and rollback evidence", () => {
+  test("never claims a delivered URL without healthcheck and rollback evidence", () => {
     const output = compileValidationRelay({
       ...baseInput,
       evidence: {
         commitSha: "abc123",
         ciRun: "run-1",
         testsPassed: true,
+        ...pigEvidence,
         m6: "pass",
         s7plus: "pass",
         m8: "pass",
@@ -87,6 +95,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
         commitSha: "abc123",
         ciRun: "run-2",
         testsPassed: true,
+        ...pigEvidence,
         m6: "pass",
         s7plus: "pass",
         m8: "pass",
@@ -110,6 +119,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
         commitSha: "def456",
         ciRun: "run-3",
         testsPassed: true,
+        ...pigEvidence,
         m6: "pass",
         s7plus: "pass",
         m8: "pass",
