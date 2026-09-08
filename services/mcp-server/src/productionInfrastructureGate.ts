@@ -192,13 +192,16 @@ function assertProductionInfrastructureGateInput(
   }
 }
 
-function hasEvidence(control: ProductionControlEvidence | undefined): boolean {
+function hasEvidenceRefs(control: ProductionControlEvidence | undefined): boolean {
   return Boolean(
     control
-      && control.status === "pass"
       && Array.isArray(control.evidenceRefs)
       && control.evidenceRefs.some(nonEmpty)
   );
+}
+
+function hasEvidence(control: ProductionControlEvidence | undefined): boolean {
+  return Boolean(control && control.status === "pass" && hasEvidenceRefs(control));
 }
 
 function emptyDomainScores(): Record<ProductionDomain, ProductionDomainScore> {
@@ -225,10 +228,18 @@ export function evaluateProductionInfrastructureGate(
     domain.total += policy.weight;
 
     if (id === "tenant_isolation" && input.multiTenant === false) {
-      score += policy.weight;
-      domain.earned += policy.weight;
-      evaluatedControls += 1;
-      exemptions.push("tenant_isolation:single_tenant");
+      const control = input.controls.tenant_isolation;
+      evaluatedControls += control ? 1 : 0;
+
+      if (control?.status === "not_applicable" && hasEvidenceRefs(control)) {
+        score += policy.weight;
+        domain.earned += policy.weight;
+        exemptions.push("tenant_isolation:single_tenant:evidence_proven");
+        continue;
+      }
+
+      blockers.push("tenant_isolation:single_tenant_evidence_missing");
+      criticalFailures.push("tenant_isolation");
       continue;
     }
 
