@@ -22,28 +22,30 @@ const baseInput: ValidationRelayInput = {
   }
 };
 
-function fullyProvenPigInput(): ProductionInfrastructureGateInput {
+function fullyProvenPigInput(releaseId: string): ProductionInfrastructureGateInput {
   return {
     assetId: "INF-DEPLOYBOT-001",
-    releaseId: "release-relay-proof",
+    releaseId,
     environment: "preproduction",
     multiTenant: true,
     controls: Object.fromEntries(
       PRODUCTION_CONTROL_IDS.map(id => [id, {
         status: "pass" as const,
-        evidenceRefs: [`reme://${id}/proof`]
+        evidenceRefs: [`reme://${releaseId}/${id}/proof`]
       }])
     ) as ProductionInfrastructureGateInput["controls"]
   };
 }
 
-const pigEvidence = {
-  productionInfrastructureGate: "pass" as const,
-  productionReadinessScore: 100,
-  productionCriticalFailures: [] as string[],
-  productionInfrastructureEvidenceRef: "reme://PIG-001/release-proof",
-  productionInfrastructureInput: fullyProvenPigInput()
-};
+function pigEvidenceFor(commitSha: string) {
+  return {
+    productionInfrastructureGate: "pass" as const,
+    productionReadinessScore: 100,
+    productionCriticalFailures: [] as string[],
+    productionInfrastructureEvidenceRef: `reme://PIG-001/${commitSha}`,
+    productionInfrastructureInput: fullyProvenPigInput(commitSha)
+  };
+}
 
 describe("GENESIS V4 CEO Validation Relay", () => {
   test("takes the relay automatically after CEO validation and asks for build evidence next", () => {
@@ -95,7 +97,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
         testsPassed: true,
         productionInfrastructureGate: "pass",
         productionReadinessScore: 100,
-        productionInfrastructureEvidenceRef: "reme://PIG-001/release-proof",
+        productionInfrastructureEvidenceRef: "reme://PIG-001/critical-proof-required",
         m6: "pass",
         s7plus: "pass",
         m8: "pass"
@@ -107,7 +109,8 @@ describe("GENESIS V4 CEO Validation Relay", () => {
   });
 
   test("does not trust a self-declared PIG pass when raw PIG evaluation fails", () => {
-    const failingPigInput = fullyProvenPigInput();
+    const commitSha = "forged-pig-pass";
+    const failingPigInput = fullyProvenPigInput(commitSha);
     failingPigInput.controls.tls_https = {
       status: "fail",
       evidenceRefs: ["reme://tls/failed-scan"]
@@ -116,10 +119,10 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     const output = compileValidationRelay({
       ...baseInput,
       evidence: {
-        commitSha: "forged-pig-pass",
+        commitSha,
         ciRun: "run-forged-pig-pass",
         testsPassed: true,
-        ...pigEvidence,
+        ...pigEvidenceFor(commitSha),
         productionInfrastructureInput: failingPigInput,
         m6: "pass",
         s7plus: "pass",
@@ -143,7 +146,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
           productionInfrastructureGate: "pass",
           productionReadinessScore: score,
           productionCriticalFailures: [],
-          productionInfrastructureEvidenceRef: "reme://PIG-001/release-proof",
+          productionInfrastructureEvidenceRef: "reme://PIG-001/invalid-score",
           m6: "pass",
           s7plus: "pass",
           m8: "pass"
@@ -161,13 +164,14 @@ describe("GENESIS V4 CEO Validation Relay", () => {
   });
 
   test("never claims a delivered URL without healthcheck and rollback evidence", () => {
+    const commitSha = "abc123";
     const output = compileValidationRelay({
       ...baseInput,
       evidence: {
-        commitSha: "abc123",
+        commitSha,
         ciRun: "run-1",
         testsPassed: true,
-        ...pigEvidence,
+        ...pigEvidenceFor(commitSha),
         m6: "pass",
         s7plus: "pass",
         m8: "pass",
@@ -183,13 +187,14 @@ describe("GENESIS V4 CEO Validation Relay", () => {
   });
 
   test("returns DELIVERED_URL only when the complete evidence contract is satisfied", () => {
+    const commitSha = "abc123";
     const output = compileValidationRelay({
       ...baseInput,
       evidence: {
-        commitSha: "abc123",
+        commitSha,
         ciRun: "run-2",
         testsPassed: true,
-        ...pigEvidence,
+        ...pigEvidenceFor(commitSha),
         m6: "pass",
         s7plus: "pass",
         m8: "pass",
@@ -206,14 +211,15 @@ describe("GENESIS V4 CEO Validation Relay", () => {
   });
 
   test("maps Android APK delivery to DELIVERED_APK", () => {
+    const commitSha = "def456";
     const output = compileValidationRelay({
       ...baseInput,
       targetDeliverable: "apk",
       evidence: {
-        commitSha: "def456",
+        commitSha,
         ciRun: "run-3",
         testsPassed: true,
-        ...pigEvidence,
+        ...pigEvidenceFor(commitSha),
         m6: "pass",
         s7plus: "pass",
         m8: "pass",
