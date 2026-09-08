@@ -33,7 +33,9 @@ jobs:
           cache: npm
           cache-dependency-path: services/mcp-server/package-lock.json
       - run: npm ci --ignore-scripts
-      - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # Security remains fail-closed. It runs after quality checks so the CI record
+      # preserves test/build evidence even when a dependency advisory vetoes release.
+      - run: npm audit --audit-level=high
