@@ -33,6 +33,32 @@ jobs:
           cache: npm
           cache-dependency-path: services/mcp-server/package-lock.json
       - run: npm ci --ignore-scripts
+      - name: Dependency remediation probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ls fast-uri qs --all > dependency-tree-before.txt || true
+          cp package-lock.json package-lock.before.json
+          npm audit fix --package-lock-only --ignore-scripts
+          npm ci --ignore-scripts
+          npm ls fast-uri qs --all > dependency-tree-after.txt || true
+          npm audit --audit-level=high --json > npm-audit-after-fix.json || true
+          git diff -- package-lock.json > package-lock-security-fix.patch || true
+      - name: Upload dependency remediation candidate
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dependency-remediation-candidate
+          path: |
+            services/mcp-server/package-lock.json
+            services/mcp-server/package-lock.before.json
+            services/mcp-server/dependency-tree-before.txt
+            services/mcp-server/dependency-tree-after.txt
+            services/mcp-server/npm-audit-after-fix.json
+            services/mcp-server/package-lock-security-fix.patch
+      - name: Require committed dependency remediation
+        shell: bash
+        run: git diff --exit-code -- package-lock.json
       - name: Typecheck
         shell: bash
         run: |
