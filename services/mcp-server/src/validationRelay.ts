@@ -102,9 +102,33 @@ const EVIDENCE_CONTRACT = [
 ];
 
 const PRODUCTION_READINESS_THRESHOLD = 85;
+const TARGET_DELIVERABLES = new Set<TargetDeliverable>(["url", "apk", "aab", "service", "infrastructure"]);
+const RISK_CLASSES = new Set<RiskClass>(["low", "moderate", "high", "regulated"]);
 
 function text(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertValidationRelayInput(input: unknown): asserts input is ValidationRelayInput {
+  if (!isRecord(input)) {
+    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: payload must be an object");
+  }
+
+  if (!text(input.validationRef) || !text(input.assetId) || !text(input.baselineVersion)) {
+    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: validationRef, assetId and baselineVersion are required");
+  }
+
+  if (typeof input.targetDeliverable !== "string" || !TARGET_DELIVERABLES.has(input.targetDeliverable as TargetDeliverable)) {
+    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: targetDeliverable is invalid");
+  }
+
+  if (typeof input.riskClass !== "string" || !RISK_CLASSES.has(input.riskClass as RiskClass)) {
+    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: riskClass is invalid");
+  }
 }
 
 function terminalState(target: TargetDeliverable): RelayState {
@@ -148,10 +172,8 @@ function output(
   };
 }
 
-export function compileValidationRelay(input: ValidationRelayInput): ValidationRelayOutput {
-  if (!text(input.validationRef) || !text(input.assetId) || !text(input.baselineVersion)) {
-    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: validationRef, assetId and baselineVersion are required");
-  }
+export function compileValidationRelay(input: unknown): ValidationRelayOutput {
+  assertValidationRelayInput(input);
 
   if (input.a4Vetoes?.length) {
     return output(
@@ -193,17 +215,32 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
   }
 
   const infrastructureBlockers: string[] = [];
+  let invalidReadinessScore = false;
+
   if (evidence.productionInfrastructureGate !== "pass") {
     infrastructureBlockers.push(`Production Infrastructure Gate is ${evidence.productionInfrastructureGate ?? "missing"}`);
   }
-  if (typeof evidence.productionReadinessScore !== "number") {
+
+  if (evidence.productionReadinessScore === undefined) {
     infrastructureBlockers.push("Production Readiness Score is missing");
+  } else if (
+    typeof evidence.productionReadinessScore !== "number"
+    || !Number.isFinite(evidence.productionReadinessScore)
+    || evidence.productionReadinessScore < 0
+    || evidence.productionReadinessScore > 100
+  ) {
+    invalidReadinessScore = true;
+    infrastructureBlockers.push("Production Readiness Score is invalid; expected a finite number between 0 and 100");
   } else if (evidence.productionReadinessScore < PRODUCTION_READINESS_THRESHOLD) {
     infrastructureBlockers.push(`Production Readiness Score is ${evidence.productionReadinessScore}/100 (<${PRODUCTION_READINESS_THRESHOLD})`);
   }
-  if (evidence.productionCriticalFailures?.length) {
+
+  if (!Array.isArray(evidence.productionCriticalFailures)) {
+    infrastructureBlockers.push("Production critical failures proof is missing or invalid");
+  } else if (evidence.productionCriticalFailures.length > 0) {
     infrastructureBlockers.push(`Production critical failures: ${evidence.productionCriticalFailures.join(", ")}`);
   }
+
   if (!text(evidence.productionInfrastructureEvidenceRef)) {
     infrastructureBlockers.push("Production Infrastructure evidence reference is missing");
   }
@@ -211,8 +248,14 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
   if (infrastructureBlockers.length) {
     const failed = evidence.productionInfrastructureGate === "fail"
       || evidence.productionInfrastructureGate === "conditional"
-      || (typeof evidence.productionReadinessScore === "number" && evidence.productionReadinessScore < PRODUCTION_READINESS_THRESHOLD)
-      || Boolean(evidence.productionCriticalFailures?.length);
+      || invalidReadinessScore
+      || (
+        typeof evidence.productionReadinessScore === "number"
+        && Number.isFinite(evidence.productionReadinessScore)
+        && evidence.productionReadinessScore >= 0
+        && evidence.productionReadinessScore < PRODUCTION_READINESS_THRESHOLD
+      )
+      || (Array.isArray(evidence.productionCriticalFailures) && evidence.productionCriticalFailures.length > 0);
     return output(
       input,
       failed ? "CORRECTING" : "GATES_PENDING",
