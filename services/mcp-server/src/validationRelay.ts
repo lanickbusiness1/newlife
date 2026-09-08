@@ -31,6 +31,10 @@ export interface ValidationRelayEvidence {
   commitSha?: string;
   ciRun?: string;
   testsPassed?: boolean;
+  productionInfrastructureGate?: GateStatus;
+  productionReadinessScore?: number;
+  productionCriticalFailures?: string[];
+  productionInfrastructureEvidenceRef?: string;
   m6?: GateStatus;
   s7plus?: GateStatus;
   m8?: GateStatus;
@@ -83,6 +87,10 @@ const EVIDENCE_CONTRACT = [
   "commit_sha",
   "CI_run",
   "test_summary",
+  "Production_Infrastructure_Gate",
+  "Production_Readiness_Score",
+  "Production_Critical_Failures",
+  "Production_Infrastructure_Evidence_Ref",
   "M6",
   "S7+",
   "M8",
@@ -92,6 +100,8 @@ const EVIDENCE_CONTRACT = [
   "rollback_ref",
   "R.E.M.E_ref"
 ];
+
+const PRODUCTION_READINESS_THRESHOLD = 85;
 
 function text(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -179,6 +189,35 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
         ? "Diagnose, patch, rerun tests and CI automatically; do not return the task to the CEO."
         : "Run the full CI contract and persist the test evidence.",
       blockers
+    );
+  }
+
+  const infrastructureBlockers: string[] = [];
+  if (evidence.productionInfrastructureGate !== "pass") {
+    infrastructureBlockers.push(`Production Infrastructure Gate is ${evidence.productionInfrastructureGate ?? "missing"}`);
+  }
+  if (typeof evidence.productionReadinessScore !== "number") {
+    infrastructureBlockers.push("Production Readiness Score is missing");
+  } else if (evidence.productionReadinessScore < PRODUCTION_READINESS_THRESHOLD) {
+    infrastructureBlockers.push(`Production Readiness Score is ${evidence.productionReadinessScore}/100 (<${PRODUCTION_READINESS_THRESHOLD})`);
+  }
+  if (evidence.productionCriticalFailures?.length) {
+    infrastructureBlockers.push(`Production critical failures: ${evidence.productionCriticalFailures.join(", ")}`);
+  }
+  if (!text(evidence.productionInfrastructureEvidenceRef)) {
+    infrastructureBlockers.push("Production Infrastructure evidence reference is missing");
+  }
+
+  if (infrastructureBlockers.length) {
+    const failed = evidence.productionInfrastructureGate === "fail"
+      || evidence.productionInfrastructureGate === "conditional"
+      || (typeof evidence.productionReadinessScore === "number" && evidence.productionReadinessScore < PRODUCTION_READINESS_THRESHOLD)
+      || Boolean(evidence.productionCriticalFailures?.length);
+    return output(
+      input,
+      failed ? "CORRECTING" : "GATES_PENDING",
+      "Run the Production Infrastructure Gate policy-as-code, remediate infrastructure gaps automatically, persist evidence, then proceed to M6.",
+      infrastructureBlockers
     );
   }
 
