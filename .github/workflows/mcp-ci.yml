@@ -56,13 +56,14 @@ jobs:
         with:
           name: build-diagnostics
           path: services/mcp-server/build.log
-      # Security remains fail-closed. It runs after quality checks so the CI record
-      # preserves test/build evidence even when a dependency advisory vetoes release.
+      # Security remains fail-closed. Moderate, high and critical dependency advisories
+      # veto release. The audit runs after quality checks so the CI record preserves
+      # test/build evidence even when the supply-chain gate blocks promotion.
       - name: Dependency audit
         shell: bash
         run: |
           set -o pipefail
-          npm audit --audit-level=high --json 2>&1 | tee npm-audit.json
+          npm audit --audit-level=moderate --json 2>&1 | tee npm-audit.json
       - name: Upload dependency audit diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
