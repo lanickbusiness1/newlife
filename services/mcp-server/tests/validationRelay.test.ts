@@ -41,6 +41,24 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     expect(output.blockers).toContain("A4:legal_commitment");
   });
 
+  test("requires the Production Infrastructure Gate before M6 can be accepted", () => {
+    const output = compileValidationRelay({
+      ...baseInput,
+      evidence: {
+        commitSha: "pig-required",
+        ciRun: "run-pig-required",
+        testsPassed: true,
+        m6: "pass",
+        s7plus: "pass",
+        m8: "pass"
+      }
+    });
+
+    expect(output.state).toBe("GATES_PENDING");
+    expect(output.blockers).toContain("Production Infrastructure Gate is missing");
+    expect(output.nextAction).toMatch(/infrastructure/i);
+  });
+
   test("never claims a delivered URL without gates, healthcheck and rollback evidence", () => {
     const output = compileValidationRelay({
       ...baseInput,
