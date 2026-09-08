@@ -11,6 +11,10 @@ import {
 } from "./revenueEngine.js";
 import { compileValidationRelay, GENESIS_V4_VALIDATION_RELAY_ANCHOR } from "./validationRelay.js";
 import {
+  evaluateProductionInfrastructureGate,
+  GENESIS_V4_PRODUCTION_INFRASTRUCTURE_GATE_ANCHOR
+} from "./productionInfrastructureGate.js";
+import {
   decideNextAction,
   evaluateOutcome,
   GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR,
@@ -25,7 +29,7 @@ import {
 } from "./chatgptControlPlane.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.6.0";
+const CONTROL_PLANE_REVISION = "0.7.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -68,9 +72,9 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
+    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0 and Production Infrastructure Gate PIG-001." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.7.0: Revenue Engine, Production Infrastructure Gate, World Model Runtime and ChatGPT Native Control Plane are deterministic; external infrastructure scanners, CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized. PIG evidence must originate from real CI/runtime controls; the evaluator never fabricates proof."]
   };
 }
 
@@ -161,6 +165,14 @@ function buildServer() {
     ...compileValidationRelay(payload)
   }));
 
+  register("deploybot.production_infrastructure_gate.evaluate", "Évalue le Production Infrastructure Gate™ fail-closed entre Build et M6: score >=85/100, preuves obligatoires et zéro échec critique Security/Auth/Availability/Recovery.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "deploy:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    ...evaluateProductionInfrastructureGate(payload as any)
+  }));
+
   register("world.reconstruct_state", "Reconstruit un World State depuis des observations explicitement sourcées et conserve leur lineage de preuve.", {
     context: RequestContext,
     payload: z.unknown()
@@ -242,6 +254,8 @@ if (mode === "stdio") {
       revenueEngineVersion: GENESIS_V4_REVENUE_ENGINE_ANCHOR.version,
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
+      productionInfrastructureGate: GENESIS_V4_PRODUCTION_INFRASTRUCTURE_GATE_ANCHOR.policyId,
+      productionReadinessThreshold: GENESIS_V4_PRODUCTION_INFRASTRUCTURE_GATE_ANCHOR.threshold,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
     });
