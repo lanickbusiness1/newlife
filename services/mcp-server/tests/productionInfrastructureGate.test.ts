@@ -84,14 +84,28 @@ describe("GENESIS V4 Production Infrastructure Gate", () => {
     expect(result.blockers.some(item => item.includes("evidence"))).toBe(true);
   });
 
-  test("automatically exempts tenant isolation only for an explicitly single-tenant product", () => {
+  test("blocks a single-tenant exemption when tenant-isolation evidence is missing", () => {
     const input = fullyProvenInput({ multiTenant: false });
     delete input.controls.tenant_isolation;
 
     const result = evaluateProductionInfrastructureGate(input);
 
+    expect(result.decision).toBe("BLOCK_CRITICAL");
+    expect(result.criticalFailures).toContain("tenant_isolation");
+    expect(result.blockers).toContain("tenant_isolation:single_tenant_evidence_missing");
+  });
+
+  test("allows tenant-isolation exemption only with explicit single-tenant evidence", () => {
+    const input = fullyProvenInput({ multiTenant: false });
+    input.controls.tenant_isolation = {
+      status: "not_applicable",
+      evidenceRefs: ["reme://tenant-model/single-tenant-proof"]
+    };
+
+    const result = evaluateProductionInfrastructureGate(input);
+
     expect(result.score).toBe(100);
-    expect(result.exemptions).toContain("tenant_isolation:single_tenant");
+    expect(result.exemptions).toContain("tenant_isolation:single_tenant:evidence_proven");
     expect(result.decision).toBe("PASS_TO_M6");
   });
 
