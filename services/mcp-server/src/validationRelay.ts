@@ -299,6 +299,11 @@ export function compileValidationRelay(input: unknown): ValidationRelayOutput {
       infrastructureBlockers.push(`recomputed PIG decision is ${recomputed.decision}, not PASS_TO_M6`);
     }
 
+    if (recomputed.releaseId !== evidence.commitSha) {
+      recomputedFailed = true;
+      infrastructureBlockers.push(`PIG release mismatch: ${recomputed.releaseId} != current commit ${evidence.commitSha}`);
+    }
+
     if (typeof evidence.productionReadinessScore === "number" && recomputed.score !== evidence.productionReadinessScore) {
       recomputedFailed = true;
       infrastructureBlockers.push(`recomputed PIG score ${recomputed.score}/100 does not match declared score ${evidence.productionReadinessScore}/100`);
