@@ -41,7 +41,8 @@ const pigEvidence = {
   productionInfrastructureGate: "pass" as const,
   productionReadinessScore: 100,
   productionCriticalFailures: [] as string[],
-  productionInfrastructureEvidenceRef: "reme://PIG-001/release-proof"
+  productionInfrastructureEvidenceRef: "reme://PIG-001/release-proof",
+  productionInfrastructureInput: fullyProvenPigInput()
 };
 
 describe("GENESIS V4 CEO Validation Relay", () => {
@@ -123,7 +124,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
         m6: "pass",
         s7plus: "pass",
         m8: "pass"
-      } as any
+      }
     });
 
     expect(output.state).toBe("CORRECTING");
