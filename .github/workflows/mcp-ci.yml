@@ -4,11 +4,15 @@ on:
     branches: [main]
     paths:
       - 'services/mcp-server/**'
+      - 'supabase/migrations/**'
+      - 'supabase/rollbacks/**'
       - 'render.yaml'
       - '.github/workflows/mcp-ci.yml'
   pull_request:
     paths:
       - 'services/mcp-server/**'
+      - 'supabase/migrations/**'
+      - 'supabase/rollbacks/**'
       - 'render.yaml'
       - '.github/workflows/mcp-ci.yml'
 
