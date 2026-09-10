@@ -23,6 +23,10 @@ import {
   GENESIS_V4_DFRE_EXECUTION_ADAPTER_ANCHOR
 } from "./dfreExecutionAdapter.js";
 import {
+  compileIndustrialDependencyReadiness,
+  GENESIS_V4_INDUSTRIAL_DEPENDENCY_ADAPTER_ANCHOR
+} from "./industrialDependencyAdapter.js";
+import {
   decideNextAction,
   evaluateOutcome,
   GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR,
@@ -37,7 +41,7 @@ import {
 } from "./chatgptControlPlane.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.9.0";
+const CONTROL_PLANE_REVISION = "0.10.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -80,9 +84,9 @@ function governed(ctx: Context, tool: string, data: unknown) {
     confidence: 0.78,
     freshness: { status: "generated", checkedAt: new Date().toISOString() },
     contradictions: [],
-    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0, Production Infrastructure Gate PIG-001, Delivery-to-Bankability Gate V4-DEC-036 and DFRE Execution Adapter." },
+    eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0, Production Infrastructure Gate PIG-001, Delivery-to-Bankability Gate V4-DEC-036, DFRE Execution Adapter and Industrial Dependency Adapter." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.9.0: Revenue Engine, Production Infrastructure Gate, Delivery-to-Bankability Gate, DFRE Execution Adapter, World Model Runtime and ChatGPT Native Control Plane are deterministic; external infrastructure scanners, CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized. PIG, delivery and DFRE evidence must originate from real CI/runtime/commissioning/finance controls; evaluators never fabricate proof."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.10.0: Revenue Engine, Production Infrastructure Gate, Delivery-to-Bankability Gate, DFRE Execution Adapter, Industrial Dependency Adapter, World Model Runtime and ChatGPT Native Control Plane are deterministic; external infrastructure scanners, CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized. PIG, delivery, DFRE and industrial dependency evidence must originate from real CI/runtime/commissioning/finance/site controls; evaluators never fabricate proof."]
   };
 }
 
@@ -197,6 +201,14 @@ function buildServer() {
     ...compileDfreExecutionReadiness(payload)
   }));
 
+  register("industry.dependency_readiness.compile", "Résout le Dependency Graph industriel V4-DEC-036 de façon fail-closed : chaque catégorie doit être vérifiée, partielle, bloquée, inconnue ou explicitement non applicable avec justification et preuve.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "industry:plan", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    ...compileIndustrialDependencyReadiness(payload)
+  }));
+
   register("world.reconstruct_state", "Reconstruit un World State depuis des observations explicitement sourcées et conserve leur lineage de preuve.", {
     context: RequestContext,
     payload: z.unknown()
@@ -284,6 +296,8 @@ if (mode === "stdio") {
       deliveryToBankabilityVersion: GENESIS_V4_DELIVERY_TO_BANKABILITY_ANCHOR.version,
       dfreExecutionAdapter: GENESIS_V4_DFRE_EXECUTION_ADAPTER_ANCHOR.assetId,
       dfreExecutionAdapterVersion: GENESIS_V4_DFRE_EXECUTION_ADAPTER_ANCHOR.version,
+      industrialDependencyAdapter: GENESIS_V4_INDUSTRIAL_DEPENDENCY_ADAPTER_ANCHOR.assetId,
+      industrialDependencyAdapterVersion: GENESIS_V4_INDUSTRIAL_DEPENDENCY_ADAPTER_ANCHOR.version,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
     });
