@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/v4-dec-036-dependency-remediation.yml'
+      - 'services/mcp-server/src/validationRelay.ts'
+      - 'services/mcp-server/tests/validationRelay*.test.ts'
 
 permissions:
   contents: write
