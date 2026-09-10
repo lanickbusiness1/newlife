@@ -3,8 +3,7 @@ name: V4-DEC-035 IP-to-Capital Gate CI
 on:
   pull_request:
     paths:
-      - 'services/mcp-server/src/ipToCapitalReadinessGate.ts'
-      - 'services/mcp-server/tests/ipToCapitalReadinessGate.test.ts'
+      - 'services/mcp-server/**'
       - '.github/workflows/v4-dec-035-ip-to-capital-gate-ci.yml'
 
 permissions:
@@ -28,6 +27,8 @@ jobs:
           cache: npm
           cache-dependency-path: services/mcp-server/package-lock.json
       - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=moderate
       - run: npm run typecheck
       - run: npx vitest run tests/ipToCapitalReadinessGate.test.ts
+      - run: npm test
       - run: npm run build
