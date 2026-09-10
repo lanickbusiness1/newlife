@@ -1,3 +1,9 @@
+import {
+  evaluateProductionInfrastructureGate,
+  type ProductionInfrastructureGateInput,
+  type ProductionInfrastructureGateResult
+} from "./productionInfrastructureGate.js";
+
 export const GENESIS_V4_VALIDATION_RELAY_ANCHOR = {
   genome: "GENESIS_V4",
   assetId: "INF-DEPLOYBOT-001",
@@ -31,6 +37,11 @@ export interface ValidationRelayEvidence {
   commitSha?: string;
   ciRun?: string;
   testsPassed?: boolean;
+  productionInfrastructureGate?: GateStatus;
+  productionReadinessScore?: number;
+  productionCriticalFailures?: string[];
+  productionInfrastructureEvidenceRef?: string;
+  productionInfrastructureInput?: ProductionInfrastructureGateInput;
   m6?: GateStatus;
   s7plus?: GateStatus;
   m8?: GateStatus;
@@ -83,6 +94,11 @@ const EVIDENCE_CONTRACT = [
   "commit_sha",
   "CI_run",
   "test_summary",
+  "Production_Infrastructure_Gate",
+  "Production_Readiness_Score",
+  "Production_Critical_Failures",
+  "Production_Infrastructure_Evidence_Ref",
+  "Production_Infrastructure_Raw_Input",
   "M6",
   "S7+",
   "M8",
@@ -93,8 +109,34 @@ const EVIDENCE_CONTRACT = [
   "R.E.M.E_ref"
 ];
 
+const PRODUCTION_READINESS_THRESHOLD = 85;
+const TARGET_DELIVERABLES = new Set<TargetDeliverable>(["url", "apk", "aab", "service", "infrastructure"]);
+const RISK_CLASSES = new Set<RiskClass>(["low", "moderate", "high", "regulated"]);
+
 function text(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertValidationRelayInput(input: unknown): asserts input is ValidationRelayInput {
+  if (!isRecord(input)) {
+    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: payload must be an object");
+  }
+
+  if (!text(input.validationRef) || !text(input.assetId) || !text(input.baselineVersion)) {
+    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: validationRef, assetId and baselineVersion are required");
+  }
+
+  if (typeof input.targetDeliverable !== "string" || !TARGET_DELIVERABLES.has(input.targetDeliverable as TargetDeliverable)) {
+    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: targetDeliverable is invalid");
+  }
+
+  if (typeof input.riskClass !== "string" || !RISK_CLASSES.has(input.riskClass as RiskClass)) {
+    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: riskClass is invalid");
+  }
 }
 
 function terminalState(target: TargetDeliverable): RelayState {
@@ -138,10 +180,38 @@ function output(
   };
 }
 
-export function compileValidationRelay(input: ValidationRelayInput): ValidationRelayOutput {
-  if (!text(input.validationRef) || !text(input.assetId) || !text(input.baselineVersion)) {
-    throw new Error("GENESIS_V4_VALIDATION_RELAY_INVALID: validationRef, assetId and baselineVersion are required");
+function sameStringSet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const a = [...left].sort();
+  const b = [...right].sort();
+  return a.every((value, index) => value === b[index]);
+}
+
+function recomputePig(
+  rawInput: ProductionInfrastructureGateInput | undefined,
+  expectedAssetId: string,
+  blockers: string[]
+): ProductionInfrastructureGateResult | null {
+  if (!rawInput) {
+    blockers.push("Production Infrastructure raw input is missing; Relay cannot verify the PIG decision");
+    return null;
   }
+
+  try {
+    const result = evaluateProductionInfrastructureGate(rawInput);
+    if (result.assetId !== expectedAssetId) {
+      blockers.push(`recomputed PIG asset mismatch: ${result.assetId} != ${expectedAssetId}`);
+    }
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown PIG evaluation error";
+    blockers.push(`recomputed PIG evaluation failed: ${message}`);
+    return null;
+  }
+}
+
+export function compileValidationRelay(input: unknown): ValidationRelayOutput {
+  assertValidationRelayInput(input);
 
   if (input.a4Vetoes?.length) {
     return output(
@@ -179,6 +249,94 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
         ? "Diagnose, patch, rerun tests and CI automatically; do not return the task to the CEO."
         : "Run the full CI contract and persist the test evidence.",
       blockers
+    );
+  }
+
+  const infrastructureBlockers: string[] = [];
+  let invalidReadinessScore = false;
+  let recomputedFailed = false;
+
+  if (evidence.productionInfrastructureGate !== "pass") {
+    infrastructureBlockers.push(`Production Infrastructure Gate is ${evidence.productionInfrastructureGate ?? "missing"}`);
+  }
+
+  if (evidence.productionReadinessScore === undefined) {
+    infrastructureBlockers.push("Production Readiness Score is missing");
+  } else if (
+    typeof evidence.productionReadinessScore !== "number"
+    || !Number.isFinite(evidence.productionReadinessScore)
+    || evidence.productionReadinessScore < 0
+    || evidence.productionReadinessScore > 100
+  ) {
+    invalidReadinessScore = true;
+    infrastructureBlockers.push("Production Readiness Score is invalid; expected a finite number between 0 and 100");
+  } else if (evidence.productionReadinessScore < PRODUCTION_READINESS_THRESHOLD) {
+    infrastructureBlockers.push(`Production Readiness Score is ${evidence.productionReadinessScore}/100 (<${PRODUCTION_READINESS_THRESHOLD})`);
+  }
+
+  if (!Array.isArray(evidence.productionCriticalFailures)) {
+    infrastructureBlockers.push("Production critical failures proof is missing or invalid");
+  } else if (evidence.productionCriticalFailures.length > 0) {
+    infrastructureBlockers.push(`Production critical failures: ${evidence.productionCriticalFailures.join(", ")}`);
+  }
+
+  if (!text(evidence.productionInfrastructureEvidenceRef)) {
+    infrastructureBlockers.push("Production Infrastructure evidence reference is missing");
+  }
+
+  const hasRawPigInput = Boolean(evidence.productionInfrastructureInput);
+  const recomputed = recomputePig(
+    evidence.productionInfrastructureInput,
+    input.assetId,
+    infrastructureBlockers
+  );
+
+  if (hasRawPigInput && !recomputed) {
+    recomputedFailed = true;
+  } else if (recomputed) {
+    if (recomputed.decision !== "PASS_TO_M6") {
+      recomputedFailed = true;
+      infrastructureBlockers.push(`recomputed PIG decision is ${recomputed.decision}, not PASS_TO_M6`);
+    }
+
+    if (recomputed.releaseId !== evidence.commitSha) {
+      recomputedFailed = true;
+      infrastructureBlockers.push(`PIG release mismatch: ${recomputed.releaseId} != current commit ${evidence.commitSha}`);
+    }
+
+    if (typeof evidence.productionReadinessScore === "number" && recomputed.score !== evidence.productionReadinessScore) {
+      recomputedFailed = true;
+      infrastructureBlockers.push(`recomputed PIG score ${recomputed.score}/100 does not match declared score ${evidence.productionReadinessScore}/100`);
+    }
+
+    if (Array.isArray(evidence.productionCriticalFailures)
+      && !sameStringSet(recomputed.criticalFailures, evidence.productionCriticalFailures)) {
+      recomputedFailed = true;
+      infrastructureBlockers.push("recomputed PIG critical failures do not match declared critical failures");
+    }
+
+    if (recomputed.assetId !== input.assetId) {
+      recomputedFailed = true;
+    }
+  }
+
+  if (infrastructureBlockers.length) {
+    const failed = evidence.productionInfrastructureGate === "fail"
+      || evidence.productionInfrastructureGate === "conditional"
+      || invalidReadinessScore
+      || recomputedFailed
+      || (
+        typeof evidence.productionReadinessScore === "number"
+        && Number.isFinite(evidence.productionReadinessScore)
+        && evidence.productionReadinessScore >= 0
+        && evidence.productionReadinessScore < PRODUCTION_READINESS_THRESHOLD
+      )
+      || (Array.isArray(evidence.productionCriticalFailures) && evidence.productionCriticalFailures.length > 0);
+    return output(
+      input,
+      failed ? "CORRECTING" : "GATES_PENDING",
+      "Run the Production Infrastructure Gate policy-as-code, remediate infrastructure gaps automatically, persist evidence, then proceed to M6.",
+      infrastructureBlockers
     );
   }
 

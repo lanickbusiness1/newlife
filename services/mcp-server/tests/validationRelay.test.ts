@@ -3,6 +3,10 @@ import {
   compileValidationRelay,
   type ValidationRelayInput
 } from "../src/validationRelay";
+import {
+  PRODUCTION_CONTROL_IDS,
+  type ProductionInfrastructureGateInput
+} from "../src/productionInfrastructureGate";
 
 const baseInput: ValidationRelayInput = {
   validationRef: "CEO-VAL-2026-08-18-001",
@@ -17,6 +21,31 @@ const baseInput: ValidationRelayInput = {
     productionDelegated: true
   }
 };
+
+function fullyProvenPigInput(releaseId: string): ProductionInfrastructureGateInput {
+  return {
+    assetId: "INF-DEPLOYBOT-001",
+    releaseId,
+    environment: "preproduction",
+    multiTenant: true,
+    controls: Object.fromEntries(
+      PRODUCTION_CONTROL_IDS.map(id => [id, {
+        status: "pass" as const,
+        evidenceRefs: [`reme://${releaseId}/${id}/proof`]
+      }])
+    ) as ProductionInfrastructureGateInput["controls"]
+  };
+}
+
+function pigEvidenceFor(commitSha: string) {
+  return {
+    productionInfrastructureGate: "pass" as const,
+    productionReadinessScore: 100,
+    productionCriticalFailures: [] as string[],
+    productionInfrastructureEvidenceRef: `reme://PIG-001/${commitSha}`,
+    productionInfrastructureInput: fullyProvenPigInput(commitSha)
+  };
+}
 
 describe("GENESIS V4 CEO Validation Relay", () => {
   test("takes the relay automatically after CEO validation and asks for build evidence next", () => {
@@ -41,13 +70,108 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     expect(output.blockers).toContain("A4:legal_commitment");
   });
 
-  test("never claims a delivered URL without gates, healthcheck and rollback evidence", () => {
+  test("requires the Production Infrastructure Gate before M6 can be accepted", () => {
     const output = compileValidationRelay({
       ...baseInput,
       evidence: {
-        commitSha: "abc123",
+        commitSha: "pig-required",
+        ciRun: "run-pig-required",
+        testsPassed: true,
+        m6: "pass",
+        s7plus: "pass",
+        m8: "pass"
+      }
+    });
+
+    expect(output.state).toBe("GATES_PENDING");
+    expect(output.blockers).toContain("Production Infrastructure Gate is missing");
+    expect(output.nextAction).toMatch(/infrastructure/i);
+  });
+
+  test("requires explicit proof that the PIG critical-failure set is empty", () => {
+    const output = compileValidationRelay({
+      ...baseInput,
+      evidence: {
+        commitSha: "critical-proof-required",
+        ciRun: "run-critical-proof-required",
+        testsPassed: true,
+        productionInfrastructureGate: "pass",
+        productionReadinessScore: 100,
+        productionInfrastructureEvidenceRef: "reme://PIG-001/critical-proof-required",
+        m6: "pass",
+        s7plus: "pass",
+        m8: "pass"
+      }
+    });
+
+    expect(output.state).toBe("GATES_PENDING");
+    expect(output.blockers).toContain("Production critical failures proof is missing or invalid");
+  });
+
+  test("does not trust a self-declared PIG pass when raw PIG evaluation fails", () => {
+    const commitSha = "forged-pig-pass";
+    const failingPigInput = fullyProvenPigInput(commitSha);
+    failingPigInput.controls.tls_https = {
+      status: "fail",
+      evidenceRefs: ["reme://tls/failed-scan"]
+    };
+
+    const output = compileValidationRelay({
+      ...baseInput,
+      evidence: {
+        commitSha,
+        ciRun: "run-forged-pig-pass",
+        testsPassed: true,
+        ...pigEvidenceFor(commitSha),
+        productionInfrastructureInput: failingPigInput,
+        m6: "pass",
+        s7plus: "pass",
+        m8: "pass"
+      }
+    });
+
+    expect(output.state).toBe("CORRECTING");
+    expect(output.blockers.some(item => item.includes("recomputed PIG decision"))).toBe(true);
+  });
+
+  test.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 101])(
+    "rejects invalid Production Readiness Score %s instead of allowing M6",
+    score => {
+      const output = compileValidationRelay({
+        ...baseInput,
+        evidence: {
+          commitSha: "invalid-score",
+          ciRun: "run-invalid-score",
+          testsPassed: true,
+          productionInfrastructureGate: "pass",
+          productionReadinessScore: score,
+          productionCriticalFailures: [],
+          productionInfrastructureEvidenceRef: "reme://PIG-001/invalid-score",
+          m6: "pass",
+          s7plus: "pass",
+          m8: "pass"
+        }
+      });
+
+      expect(output.state).toBe("CORRECTING");
+      expect(output.blockers.some(item => item.includes("Production Readiness Score is invalid"))).toBe(true);
+    }
+  );
+
+  test("rejects a malformed relay payload with a controlled relay validation error", () => {
+    expect(() => compileValidationRelay(null as unknown as ValidationRelayInput))
+      .toThrowError(/GENESIS_V4_VALIDATION_RELAY_INVALID/);
+  });
+
+  test("never claims a delivered URL without healthcheck and rollback evidence", () => {
+    const commitSha = "abc123";
+    const output = compileValidationRelay({
+      ...baseInput,
+      evidence: {
+        commitSha,
         ciRun: "run-1",
         testsPassed: true,
+        ...pigEvidenceFor(commitSha),
         m6: "pass",
         s7plus: "pass",
         m8: "pass",
@@ -63,12 +187,14 @@ describe("GENESIS V4 CEO Validation Relay", () => {
   });
 
   test("returns DELIVERED_URL only when the complete evidence contract is satisfied", () => {
+    const commitSha = "abc123";
     const output = compileValidationRelay({
       ...baseInput,
       evidence: {
-        commitSha: "abc123",
+        commitSha,
         ciRun: "run-2",
         testsPassed: true,
+        ...pigEvidenceFor(commitSha),
         m6: "pass",
         s7plus: "pass",
         m8: "pass",
@@ -85,13 +211,15 @@ describe("GENESIS V4 CEO Validation Relay", () => {
   });
 
   test("maps Android APK delivery to DELIVERED_APK", () => {
+    const commitSha = "def456";
     const output = compileValidationRelay({
       ...baseInput,
       targetDeliverable: "apk",
       evidence: {
-        commitSha: "def456",
+        commitSha,
         ciRun: "run-3",
         testsPassed: true,
+        ...pigEvidenceFor(commitSha),
         m6: "pass",
         s7plus: "pass",
         m8: "pass",
