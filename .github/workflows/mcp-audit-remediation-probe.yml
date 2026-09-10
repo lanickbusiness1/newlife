@@ -1,0 +1,44 @@
+name: MCP Audit Remediation Probe
+
+on:
+  push:
+    branches: [chore/mcp-audit-2026-09-10]
+    paths:
+      - '.github/workflows/mcp-audit-remediation-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp-server
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/mcp-server/package-lock.json
+      - name: Generate minimal patched dependency state
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pkg set devDependencies.vitest=4.1.11
+          npm pkg set overrides.hono=4.13.5
+          npm install --package-lock-only --ignore-scripts
+      - name: Upload generated dependency files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: patched-dependency-files
+          path: |
+            services/mcp-server/package.json
+            services/mcp-server/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Dependency audit
+        run: npm audit --audit-level=moderate
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
