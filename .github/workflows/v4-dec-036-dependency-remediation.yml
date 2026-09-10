@@ -1,0 +1,53 @@
+name: V4-DEC-036 Dependency Remediation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v4-dec-036-dependency-remediation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp-server
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/mcp-server/package-lock.json
+      - name: Regenerate lock at patched Vitest and Hono versions
+        run: |
+          npm install --save-dev --package-lock-only --ignore-scripts vitest@4.1.11
+          npm update hono --package-lock-only --ignore-scripts
+      - name: Verify clean install
+        run: npm ci --ignore-scripts
+      - name: Verify dependency audit
+        run: npm audit --audit-level=moderate
+      - name: Verify typecheck
+        run: npm run typecheck
+      - name: Verify tests
+        run: npm test
+      - name: Verify build
+        run: npm run build
+      - name: Commit verified dependency lock refresh
+        working-directory: .
+        run: |
+          if git diff --quiet -- services/mcp-server/package.json services/mcp-server/package-lock.json; then
+            echo 'No dependency changes to commit.'
+            exit 0
+          fi
+          git config user.name 'afriagenesis-ci'
+          git config user.email 'ci@afriagenesis.com'
+          git add services/mcp-server/package.json services/mcp-server/package-lock.json
+          git commit -m 'fix(mcp): remediate Vitest and Hono moderate advisories'
+          git push origin HEAD:${{ github.head_ref }}
