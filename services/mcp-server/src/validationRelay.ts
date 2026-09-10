@@ -3,6 +3,11 @@ import {
   type ProductionInfrastructureGateInput,
   type ProductionInfrastructureGateResult
 } from "./productionInfrastructureGate.js";
+import {
+  evaluateDeliveryToBankability,
+  type DeliveryToBankabilityInput,
+  type DeliveryToBankabilityResult
+} from "./deliveryToBankabilityGate.js";
 
 export const GENESIS_V4_VALIDATION_RELAY_ANCHOR = {
   genome: "GENESIS_V4",
@@ -50,6 +55,7 @@ export interface ValidationRelayEvidence {
   healthcheckPassed?: boolean;
   rollbackRef?: string;
   remeRef?: string;
+  deliveryToBankabilityInput?: DeliveryToBankabilityInput;
 }
 
 export interface ValidationRelayInput {
@@ -106,6 +112,8 @@ const EVIDENCE_CONTRACT = [
   "final_url_or_artifact",
   "healthcheck",
   "rollback_ref",
+  "Delivery_to_Bankability_Raw_Input",
+  "Delivery_to_Bankability_Decision",
   "R.E.M.E_ref"
 ];
 
@@ -208,6 +216,32 @@ function recomputePig(
     blockers.push(`recomputed PIG evaluation failed: ${message}`);
     return null;
   }
+}
+
+function recomputeDeliveryProof(
+  rawInput: DeliveryToBankabilityInput | undefined,
+  blockers: string[]
+): DeliveryToBankabilityResult | null {
+  if (!rawInput) {
+    blockers.push("Delivery-to-Bankability raw input is missing; Relay cannot verify final delivery");
+    return null;
+  }
+
+  const result = evaluateDeliveryToBankability(rawInput);
+  if (result.decision === "INVALID_INPUT") {
+    blockers.push("Delivery-to-Bankability input is invalid");
+    return result;
+  }
+
+  if (result.decision !== "PROVEN_OPERATOR" || result.canClaimDelivered !== true) {
+    blockers.push(`Delivery-to-Bankability decision is ${result.decision}; PROVEN_OPERATOR is required for final delivery`);
+  }
+
+  for (const blocker of result.blockers) {
+    blockers.push(`Delivery-to-Bankability:${blocker}`);
+  }
+
+  return result;
 }
 
 export function compileValidationRelay(input: unknown): ValidationRelayOutput {
@@ -382,6 +416,30 @@ export function compileValidationRelay(input: unknown): ValidationRelayOutput {
       "DEPLOYED_UNVERIFIED",
       "Verify the deployed artifact in a fresh environment, prove healthcheck and rollback/reversibility, then re-evaluate.",
       deliveryBlockers
+    );
+  }
+
+  const proofBlockers: string[] = [];
+  if (!text(evidence.remeRef)) {
+    proofBlockers.push("R.E.M.E delivery evidence reference is missing");
+  }
+
+  const deliveryProof = recomputeDeliveryProof(evidence.deliveryToBankabilityInput, proofBlockers);
+  if (!deliveryProof || deliveryProof.decision !== "PROVEN_OPERATOR" || deliveryProof.canClaimDelivered !== true) {
+    return output(
+      input,
+      "DEPLOYED_UNVERIFIED",
+      "Execute commissioning/outcome verification, run the Delivery-to-Bankability Gate, persist R.E.M.E evidence, then re-evaluate final delivery.",
+      proofBlockers
+    );
+  }
+
+  if (proofBlockers.length) {
+    return output(
+      input,
+      "DEPLOYED_UNVERIFIED",
+      "Reconcile Delivery-to-Bankability and R.E.M.E evidence before claiming final delivery.",
+      proofBlockers
     );
   }
 
