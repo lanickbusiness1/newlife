@@ -7,6 +7,7 @@ import {
   PRODUCTION_CONTROL_IDS,
   type ProductionInfrastructureGateInput
 } from "../src/productionInfrastructureGate";
+import type { DeliveryToBankabilityInput } from "../src/deliveryToBankabilityGate";
 
 const baseInput: ValidationRelayInput = {
   validationRef: "CEO-VAL-2026-08-18-001",
@@ -44,6 +45,35 @@ function pigEvidenceFor(commitSha: string) {
     productionCriticalFailures: [] as string[],
     productionInfrastructureEvidenceRef: `reme://PIG-001/${commitSha}`,
     productionInfrastructureInput: fullyProvenPigInput(commitSha)
+  };
+}
+
+function fullyProvenDeliveryInput(commitSha: string): DeliveryToBankabilityInput {
+  return {
+    dimensionScores: {
+      deliveryCostSchedule: 100,
+      commissioning: 100,
+      operationalPerformance: 100,
+      continuityAvailability: 100,
+      governanceControl: 100,
+      financialDiscipline: 100,
+      compliance: 100,
+      evidenceQuality: 100
+    },
+    deliveryStage: "OUTCOME_VERIFIED",
+    commissioningStatus: "VERIFIED",
+    operationalStatus: "VERIFIED",
+    performanceEvidenceStatus: "VERIFIED",
+    materialDisputeStatus: "NONE",
+    evidenceRefs: [`reme://delivery/${commitSha}/outcome-proof`],
+    criticalDependencyReadiness: "VERIFIED"
+  };
+}
+
+function deliveryEvidenceFor(commitSha: string) {
+  return {
+    remeRef: `reme://delivery/${commitSha}`,
+    deliveryToBankabilityInput: fullyProvenDeliveryInput(commitSha)
   };
 }
 
@@ -186,7 +216,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     ]));
   });
 
-  test("returns DELIVERED_URL only when the complete evidence contract is satisfied", () => {
+  test("returns DELIVERED_URL only when infrastructure, commissioning, outcome and R.E.M.E evidence are satisfied", () => {
     const commitSha = "abc123";
     const output = compileValidationRelay({
       ...baseInput,
@@ -200,7 +230,8 @@ describe("GENESIS V4 CEO Validation Relay", () => {
         m8: "pass",
         finalUrlOrArtifact: "https://example.africa",
         healthcheckPassed: true,
-        rollbackRef: "rollback:v1"
+        rollbackRef: "rollback:v1",
+        ...deliveryEvidenceFor(commitSha)
       }
     });
 
@@ -210,7 +241,7 @@ describe("GENESIS V4 CEO Validation Relay", () => {
     expect(output.finalDeliverable).toBe("https://example.africa");
   });
 
-  test("maps Android APK delivery to DELIVERED_APK", () => {
+  test("maps Android APK delivery to DELIVERED_APK only with delivery proof", () => {
     const commitSha = "def456";
     const output = compileValidationRelay({
       ...baseInput,
@@ -225,7 +256,8 @@ describe("GENESIS V4 CEO Validation Relay", () => {
         m8: "pass",
         finalUrlOrArtifact: "artifact://afria-app.apk",
         healthcheckPassed: true,
-        rollbackRef: "rollback:apk-v1"
+        rollbackRef: "rollback:apk-v1",
+        ...deliveryEvidenceFor(commitSha)
       }
     });
 
