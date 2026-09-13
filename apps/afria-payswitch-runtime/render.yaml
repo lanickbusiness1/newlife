@@ -7,5 +7,9 @@ services:
     envVars:
       - key: PAYSWITCH_API_KEY
         sync: false
+      - key: PAYSWITCH_CONSOLE_USER
+        sync: false
+      - key: PAYSWITCH_CONSOLE_PASSWORD
+        sync: false
       - key: DATABASE_URL
         sync: false
