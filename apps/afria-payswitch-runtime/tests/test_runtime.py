@@ -114,3 +114,65 @@ def test_partner_decision_is_recorded_but_not_generated_by_afriagenesis():
     event_types = [event['event_type'] for event in evidence.json()['events']]
     assert 'MERCHANT_CREATED' in event_types
     assert 'PARTNER_DECISION_RECORDED' in event_types
+
+
+def test_console_is_protected_and_renders_operator_dashboard(monkeypatch):
+    import base64
+    monkeypatch.setenv('PAYSWITCH_CONSOLE_USER', 'operator')
+    monkeypatch.setenv('PAYSWITCH_CONSOLE_PASSWORD', 'strong-pass')
+
+    unauthorized = client.get('/console')
+    assert unauthorized.status_code == 401
+
+    token = base64.b64encode(b'operator:strong-pass').decode()
+    authorized = client.get('/console', headers={'Authorization': f'Basic {token}'})
+    assert authorized.status_code == 200
+    assert 'AfrIA PaySwitch' in authorized.text
+    assert 'Merchant-to-Credit Pilot Console' in authorized.text
+    assert 'Create merchant' in authorized.text
+
+
+def test_console_can_create_merchant_and_import_csv(monkeypatch):
+    import base64
+    monkeypatch.setenv('PAYSWITCH_CONSOLE_USER', 'operator')
+    monkeypatch.setenv('PAYSWITCH_CONSOLE_PASSWORD', 'strong-pass')
+    token = base64.b64encode(b'operator:strong-pass').decode()
+    headers = {'Authorization': f'Basic {token}'}
+
+    create = client.post('/console/merchants', headers=headers, data={
+        'legal_name': 'Console Market SARL',
+        'country': 'ML',
+        'currency': 'XOF',
+        'kyb_status': 'VERIFIED',
+    }, follow_redirects=False)
+    assert create.status_code == 303
+
+    page = client.get('/console', headers=headers)
+    assert page.status_code == 200
+    assert 'Console Market SARL' in page.text
+
+    marker = 'Console Market SARL'
+    html = page.text
+    merchant_id = html.split(f'data-merchant-name="{marker}" data-merchant-id="', 1)[1].split('"', 1)[0]
+
+    csv_body = (
+        'external_id,occurred_on,amount,direction,channel,counterparty_hash\n'
+        'console-in-1,2026-09-01,250000,INFLOW,MOBILE_MONEY,buyer-a\n'
+        'console-out-1,2026-09-02,100000,OUTFLOW,BANK,supplier-a\n'
+    )
+    upload = client.post(
+        f'/console/merchants/{merchant_id}/transactions:import-csv',
+        headers=headers,
+        files={'file': ('transactions.csv', csv_body, 'text/csv')},
+        follow_redirects=False,
+    )
+    assert upload.status_code == 303
+
+    evaluate = client.post(
+        f'/console/merchants/{merchant_id}/evaluate', headers=headers, follow_redirects=False
+    )
+    assert evaluate.status_code == 303
+
+    passport = client.get(f'/v1/merchants/{merchant_id}/financial-passport', headers=AUTH)
+    assert passport.status_code == 200
+    assert passport.json()['credit_readiness']['metrics']['transaction_count'] == 2
