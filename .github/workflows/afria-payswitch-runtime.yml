@@ -1,0 +1,30 @@
+name: AfrIA PaySwitch Runtime
+
+on:
+  pull_request:
+    paths:
+      - 'apps/afria-payswitch-runtime/**'
+      - '.github/workflows/afria-payswitch-runtime.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/afria-payswitch-runtime/**'
+      - '.github/workflows/afria-payswitch-runtime.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/afria-payswitch-runtime
+    env:
+      PAYSWITCH_API_KEY: ci-key
+      DATABASE_URL: sqlite:///./ci.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements.txt pytest httpx
+      - run: python -m pytest
+      - run: python -m compileall -q app
