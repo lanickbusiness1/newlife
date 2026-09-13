@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: afria-payswitch-runtime
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PAYSWITCH_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
