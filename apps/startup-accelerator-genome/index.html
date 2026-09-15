@@ -1,190 +1,38 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" dir="ltr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Outil AfrIAgenesis® de qualification des candidatures aux accélérateurs et programmes de croissance.">
-  <meta name="robots" content="index,follow">
-  <meta name="theme-color" content="#130d0a">
-  <meta property="og:title" content="AfrIAgenesis® Startup Accelerator">
-  <meta property="og:description" content="Évaluez la préparation de votre entreprise avant une candidature à un programme d’accélération.">
-  <meta property="og:type" content="website">
-  <title>AfrIAgenesis® — Startup Accelerator</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect rx='16' width='64' height='64' fill='%23130d0a'/><path d='M13 48 29 13h7l15 35h-9l-3-8H25l-3 8zm15-16h8l-4-10z' fill='%23f4b942'/><circle cx='48' cy='16' r='5' fill='%2348b788'/></svg>">
-  <style>
-    :root{--bg:#130d0a;--panel:#21150f;--panel2:#2d1c12;--gold:#f4b942;--orange:#e8752d;--green:#48b788;--text:#fff7e8;--muted:#cbbba7;--red:#e35d6a;--border:#5b3a22}
-    *{box-sizing:border-box}
-    html{scroll-behavior:smooth}
-    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top right,#42210f 0,#130d0a 45%);color:var(--text);min-height:100vh}
-    a{color:var(--gold)}
-    .skip{position:absolute;left:-999px}.skip:focus{left:1rem;top:1rem;background:var(--gold);color:#1b1008;padding:.7rem;border-radius:.5rem;z-index:20}
-    header{padding:22px 6vw 18px;border-bottom:1px solid var(--border);background:rgba(19,13,10,.9);position:sticky;top:0;backdrop-filter:blur(12px);z-index:5}
-    .brand{display:flex;align-items:center;gap:14px}.logo{width:52px;height:52px;flex:none}.brand-copy{min-width:0}
-    h1{margin:0;font-size:clamp(1.45rem,4vw,2.7rem);line-height:1.05}.accent{color:var(--gold)}
-    header p{margin:.55rem 0 0;color:var(--muted);max-width:900px}
-    main{padding:28px 6vw 44px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,.8fr);gap:24px}
-    .card{background:linear-gradient(160deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:20px;padding:22px;box-shadow:0 18px 40px rgba(0,0,0,.22)}
-    h2{margin-top:0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:7px}
-    label{font-size:.88rem;color:var(--muted)} input,select,textarea{width:100%;background:#130d0a;color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px;font:inherit}
-    input:focus,select:focus,textarea:focus,button:focus,a:focus{outline:3px solid rgba(244,185,66,.38);outline-offset:2px}
-    textarea{min-height:90px;resize:vertical}.full{grid-column:1/-1}
-    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}button{border:0;border-radius:12px;padding:12px 18px;font-weight:800;cursor:pointer}
-    .primary{background:linear-gradient(135deg,var(--gold),var(--orange));color:#1b1008}.secondary{background:#3b2416;color:var(--text);border:1px solid var(--border)}
-    .score{font-size:4.2rem;font-weight:900;color:var(--gold);line-height:1}.badge{display:inline-block;padding:7px 10px;border-radius:999px;background:#3b2416;color:var(--muted);margin-top:10px}
-    .meter{height:14px;background:#130d0a;border-radius:999px;overflow:hidden;margin:18px 0}.meter span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--red),var(--gold),var(--green));transition:.4s}
-    .status{font-size:1.2rem;font-weight:800}.list{margin:12px 0 0;padding-left:18px}.list li{margin:8px 0;color:var(--muted)}
-    .check{display:flex;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border);padding:10px 0}.check:last-child{border:0}.ok{color:var(--green)}.bad{color:var(--red)}
-    .notice{padding:12px;border-radius:12px;background:#2c1b12;border-left:4px solid var(--gold);color:var(--muted);font-size:.9rem}
-    footer{border-top:1px solid var(--border);padding:24px 6vw 34px;color:var(--muted);font-size:.84rem;background:#100b08}
-    .footer-wrap{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}.legal-links{display:flex;gap:14px;flex-wrap:wrap}
-    .legal-links button{padding:0;background:none;color:var(--gold);font-weight:600;text-decoration:underline}
-    dialog{max-width:720px;width:calc(100% - 32px);border:1px solid var(--border);border-radius:18px;background:var(--panel);color:var(--text);padding:24px}dialog::backdrop{background:rgba(0,0,0,.7)}
-    dialog h2{color:var(--gold)}dialog p,dialog li{color:var(--muted);line-height:1.55}.close{float:right}
-    @media(max-width:900px){main{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.full{grid-column:auto}.brand{align-items:flex-start}.logo{width:44px;height:44px}}
-  </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="AfrIAgenesis® Startup Accelerator Genome™ — Qatar funding readiness and evidence cockpit.">
+<title>AfrIAgenesis® — Startup Accelerator Genome™ | Qatar</title>
+<style>
+:root{--bg:#07111f;--p:#0d1e31;--p2:#10263d;--line:#29445f;--text:#f5f8fc;--muted:#a8b9ca;--gold:#d9b75d;--cyan:#65d2cf;--green:#63d99b;--red:#f08a8a}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 85% 0,#173755 0,transparent 34%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;line-height:1.55}a{color:inherit}.shell{width:min(1160px,92vw);margin:auto}.top{position:sticky;top:0;z-index:5;background:#07111fe8;backdrop-filter:blur(14px);border-bottom:1px solid #ffffff14}.top .shell{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 0}.brand{font-weight:850}.brand b{color:var(--gold)}button,.btn{border:1px solid var(--line);background:#0b1a2b;color:var(--text);border-radius:10px;padding:9px 12px;font:inherit;cursor:pointer;text-decoration:none}.langs button[aria-pressed=true]{border-color:var(--gold);color:var(--gold)}.hero{padding:72px 0 35px}.eyebrow{color:var(--cyan);border:1px solid var(--line);display:inline-block;border-radius:999px;padding:7px 10px;font-size:.82rem}.hero h1{font-size:clamp(2.45rem,7vw,5.5rem);line-height:.96;letter-spacing:-.045em;margin:19px 0}.hero h1 em{font-style:normal;color:var(--gold)}.hero p{max-width:760px;color:var(--muted);font-size:1.08rem}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.primary{background:linear-gradient(135deg,var(--gold),#f0d483);color:#07111f;border:0;font-weight:800}.section{padding:27px 0}.heading{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:15px}.heading h2{margin:0;font-size:clamp(1.5rem,3vw,2.2rem)}.heading p{margin:0;color:var(--muted);max-width:590px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{background:linear-gradient(160deg,var(--p2),var(--p));border:1px solid var(--line);border-radius:18px;padding:21px}.metric{font-size:3.2rem;font-weight:900;color:var(--gold);letter-spacing:-.04em}.small{color:var(--muted);font-size:.9rem}.tag{display:inline-block;border:1px solid #63d99b55;color:#aaf0c9;background:#63d99b12;padding:5px 8px;border-radius:999px;font-size:.76rem;font-weight:800}.fact{display:flex;justify-content:space-between;gap:15px;padding:9px 0;border-bottom:1px solid #ffffff13}.fact:last-child{border:0}.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{border:1px solid var(--line);color:var(--muted);padding:5px 8px;border-radius:999px;font-size:.78rem}.note{border:1px solid #d9b75d44;background:#d9b75d0c;border-radius:11px;padding:11px 13px;color:#e9dfc2}.decision{border-left:4px solid var(--gold)}[dir=rtl] .decision{border-left:1px solid var(--line);border-right:4px solid var(--gold)}.evidence{display:grid;grid-template-columns:1fr 190px;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid #ffffff13}.evidence:last-child{border:0}.evidence select{background:#07111f;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px}.counter{font-size:2.2rem;font-weight:900;color:var(--gold)}.bars{display:grid;gap:10px}.bar{display:grid;grid-template-columns:1.2fr 2fr 44px;gap:10px;align-items:center}.track{height:10px;background:#07111f;border-radius:99px;overflow:hidden}.track i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--gold))}.road{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.step{border:1px solid var(--line);background:#09192a;border-radius:13px;padding:14px}.step b{color:var(--gold)}.arch{border:1px solid var(--line);background:#09192a;border-radius:13px;padding:13px}.arch strong{display:block}.sources a{color:var(--cyan);word-break:break-word}.footer{border-top:1px solid #ffffff14;margin-top:38px;padding:25px 0 38px;color:var(--muted);font-size:.84rem}.footer .shell{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}[dir=rtl] body{text-align:right}@media(max-width:850px){.grid2,.grid3,.road{grid-template-columns:1fr}.evidence,.bar{grid-template-columns:1fr}.hero{padding-top:48px}.heading{align-items:start;flex-direction:column}.top .shell{align-items:flex-start}}
+</style>
 </head>
 <body>
-<a class="skip" href="#diagnostic">Aller au diagnostic</a>
-<header>
-  <div class="brand">
-    <svg class="logo" role="img" aria-label="Logo AfrIAgenesis" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-      <rect rx="16" width="64" height="64" fill="#1d120c" stroke="#f4b942"/>
-      <path d="M13 48 29 13h7l15 35h-9l-3-8H25l-3 8zm15-16h8l-4-10z" fill="#f4b942"/>
-      <circle cx="48" cy="16" r="5" fill="#48b788"/>
-    </svg>
-    <div class="brand-copy">
-      <h1>AfrIAgenesis® <span class="accent">Startup Accelerator</span></h1>
-      <p>Outil de qualification et de préparation des candidatures aux accélérateurs et programmes de croissance africains.</p>
-    </div>
-  </div>
-</header>
-
-<main id="diagnostic">
-  <section class="card">
-    <h2>Diagnostic candidat</h2>
-    <div class="notice">Les résultats sont indicatifs. Aucune information n’est transmise à un serveur ni conservée après la fermeture de cette page.</div>
-    <div class="grid" style="margin-top:18px">
-      <div class="field"><label for="company">Entreprise</label><input id="company" autocomplete="organization" placeholder="Nom de l'entreprise"></div>
-      <div class="field"><label for="program">Programme</label><select id="program"><option>Ivoire Tech Next 15</option><option>Ivoire Tech Scale Up</option><option>Autre programme</option></select></div>
-      <div class="field"><label for="legal">Implantation locale prouvée</label><select id="legal"><option value="0">Non</option><option value="15">Oui</option></select></div>
-      <div class="field"><label for="age">Ancienneté suffisante</label><select id="age"><option value="0">Non</option><option value="10">Oui</option></select></div>
-      <div class="field"><label for="traction">Traction commerciale</label><select id="traction"><option value="0">Faible ou non prouvée</option><option value="8">Moyenne</option><option value="15">Forte et prouvée</option></select></div>
-      <div class="field"><label for="finance">Performance financière</label><select id="finance"><option value="0">Non documentée</option><option value="8">Partielle</option><option value="15">Solide et documentée</option></select></div>
-      <div class="field"><label for="team">Équipe et organisation</label><select id="team"><option value="0">Faible</option><option value="5">Moyenne</option><option value="10">Solide</option></select></div>
-      <div class="field"><label for="innovation">Innovation technologique</label><select id="innovation"><option value="0">Non démontrée</option><option value="5">Moyenne</option><option value="10">Forte</option></select></div>
-      <div class="field"><label for="growth">Potentiel de croissance</label><select id="growth"><option value="0">Faible</option><option value="5">Moyen</option><option value="10">Fort</option></select></div>
-      <div class="field"><label for="impact">Impact</label><select id="impact"><option value="0">Non prouvé</option><option value="3">Partiel</option><option value="5">Fort et mesuré</option></select></div>
-      <div class="field"><label for="governance">Conformité et gouvernance</label><select id="governance"><option value="0">Insuffisante</option><option value="3">Partielle</option><option value="5">Solide</option></select></div>
-      <div class="field"><label for="evidence">Qualité des justificatifs</label><select id="evidence"><option value="0">Absents</option><option value="2">Déclaratifs</option><option value="4">Vérifiables</option><option value="5">Certifiés</option></select></div>
-      <div class="field full"><label for="notes">Justificatifs manquants ou remarques</label><textarea id="notes" placeholder="Ex. états financiers, attestation fiscale, contrats clients…"></textarea></div>
-    </div>
-    <div class="actions">
-      <button class="primary" type="button" onclick="calculate()">Calculer le diagnostic</button>
-      <button class="secondary" type="button" onclick="exportReport()">Exporter le mémo</button>
-      <button class="secondary" type="button" onclick="resetForm()">Réinitialiser</button>
-    </div>
-  </section>
-
-  <aside class="card" aria-live="polite">
-    <h2>Décision indicative</h2>
-    <div class="score" id="score">0</div>
-    <div class="meter" role="progressbar" aria-label="Score de préparation" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="meter"></span></div>
-    <div class="status" id="status">Dossier non évalué</div>
-    <div class="badge" id="proof">Justificatifs : absents</div>
-    <h3>Contrôles</h3>
-    <div id="checks"></div>
-    <h3>Actions prioritaires</h3>
-    <ul class="list" id="actions"><li>Renseigner les données du candidat.</li></ul>
-  </aside>
+<header class="top"><div class="shell"><div class="brand">AfrIAgenesis® · <b>Startup Accelerator Genome™</b></div><div class="langs"><button data-lang="fr" aria-pressed="true">FR</button> <button data-lang="en" aria-pressed="false">EN</button> <button data-lang="ar" aria-pressed="false">AR</button></div></div></header>
+<main>
+<section class="hero shell"><span class="eyebrow" data-k="verifiedBadge">Signal officiel vérifié · 15 sept. 2026</span><h1 data-html="hero">Qatar ↔ Africa <em>Sovereign Agentic AI Bridge</em></h1><p data-k="lede">Extension du Genome existant pour passer du signal Startup Qatar au dossier exécutable, sans inventer de traction ni de preuve.</p><div class="actions"><a class="btn primary" href="#evidence" data-k="assess">Évaluer les preuves</a><a class="btn" href="https://startupqatar.qa/en/investment-program" target="_blank" rel="noopener" data-k="official">Programme officiel</a></div><p class="small"><span data-k="lastVerified">Dernière vérification</span> : <strong>2026-09-15</strong> · <span data-k="sourceBound">Sources primaires, pas le Reel.</span></p></section>
+<section class="section shell"><div class="heading"><h2 data-k="facts">Faits officiels actuels</h2><p data-k="factsSub">Startup Qatar + Qatar Development Bank. Les données modifiables sont centralisées dans PROGRAM_DATA.</p></div><div class="grid2"><article class="card"><div>START</div><div class="metric">$1.1M</div><p data-k="startDesc">PoC/MVP + implantation au Qatar.</p><span class="tag">PRIMARY VERIFIED</span></article><article class="card"><div>GROW</div><div class="metric">$5.5M</div><p data-k="growDesc">Entreprise établie + expansion au Qatar.</p><span class="tag">PRIMARY VERIFIED</span></article></div><div class="grid2" style="margin-top:16px"><article class="card"><h3 data-k="terms">Modalités confirmées</h3><div class="fact"><span data-k="disbursement">Décaissement</span><strong data-k="milestones">Tranches selon jalons convenus</strong></div><div class="fact"><span data-k="housing">Logement</span><strong data-k="housingV">Subsidized housing support</strong></div><div class="fact"><span data-k="licensing">Licences</span><strong data-k="licensingV">Exonérations d’enregistrement/renouvellement</strong></div><div class="fact"><span>R&D</span><strong data-k="rdV">Accès à des grants innovation/R&D</strong></div></article><article class="card"><h3 data-k="sectors">Secteurs prioritaires</h3><div id="sectors" class="chips"></div><p class="note" data-k="housingCorrection">Correction : support de logement subventionné ne signifie pas que tous les coûts de logement sont garantis couverts.</p></article></div></section>
+<section class="section shell"><article class="card decision"><small>GENESIS V4 DECISION</small><h2><span style="color:var(--gold)">START</span> <span data-k="target">= cible actuelle</span></h2><p data-k="decision">GROW reste un gate ultérieur jusqu’à preuve suffisante de l’historique opérationnel, de la traction et des finances.</p><div class="actions"><a class="btn primary" href="https://startupqatar.qa/en/investment-program" target="_blank" rel="noopener" data-k="apply">Candidater via Startup Qatar</a><a class="btn" href="#evidence" data-k="evidenceBtn">Verrouiller les preuves</a></div></article></section>
+<section class="section shell" id="evidence"><div class="heading"><h2 data-k="evidenceTitle">Evidence Gate — 6 preuves</h2><p data-k="evidenceSub">Compteur interne de complétude. Ce n’est pas un score QDB ni une déclaration d’éligibilité.</p></div><article class="card"><div id="evidenceList"></div><div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:15px"><div class="counter" id="count">0 / 6</div><strong id="readiness" data-k="undocumented">NON DOCUMENTÉ</strong></div></article></section>
+<section class="section shell"><div class="heading"><h2 data-k="allocationTitle">Allocation de travail indicative</h2><p data-k="allocationSub">Hypothèse interne, pas un budget approuvé ni un engagement QDB.</p></div><div class="grid2"><article class="card"><div class="bars" id="allocation"></div></article><article class="card"><h3 data-k="roadmap">Doha → GCC → Africa</h3><div class="road"><div class="step"><b>1</b><p>Doha AI R&D Lab</p></div><div class="step"><b>2</b><p>Sovereign Agentic Runtime</p></div><div class="step"><b>3</b><p>Qatar–Africa pilots</p></div><div class="step"><b>4</b><p>GCC/Africa commercialization</p></div></div></article></div></section>
+<section class="section shell"><div class="heading"><h2 data-k="architectureTitle">Architecture entreprise complète</h2></div><div class="grid3" id="architecture"></div></section>
+<section class="section shell sources"><div class="heading"><h2 data-k="sourcesTitle">Sources officielles</h2><p data-k="sourcesSub">Le Reel reste un signal ; seules les sources primaires pilotent les données du produit.</p></div><div class="grid2" id="sources"></div></section>
 </main>
-
-<footer>
-  <div class="footer-wrap">
-    <div>© 2026 AfrIAgenesis®. Tous droits réservés. Version publique 1.1.</div>
-    <nav class="legal-links" aria-label="Informations légales">
-      <button type="button" onclick="openLegal('legal')">Mentions légales</button>
-      <button type="button" onclick="openLegal('privacy')">Confidentialité</button>
-      <button type="button" onclick="openLegal('terms')">Conditions d’utilisation</button>
-      <button type="button" onclick="openLegal('cookies')">Cookies</button>
-      <button type="button" onclick="openLegal('security')">Sécurité</button>
-    </nav>
-  </div>
-</footer>
-
-<dialog id="legalDialog">
-  <button class="secondary close" type="button" onclick="legalDialog.close()">Fermer</button>
-  <div id="legalContent"></div>
-</dialog>
-
+<footer class="footer"><div class="shell"><span>GENOME-STARTUP-ACCELERATOR-001 · v1.2</span><span>Evidence-bound · Human-governed · Africa-first · Data sovereignty first</span></div></footer>
 <script>
 'use strict';
-const ids=['legal','age','traction','finance','team','innovation','growth','impact','governance','evidence'];
-const value=id=>Number(document.getElementById(id).value||0);
-function calculate(){
-  const score=ids.reduce((sum,id)=>sum+value(id),0);
-  document.getElementById('score').textContent=score;
-  const meter=document.getElementById('meter');
-  meter.style.width=score+'%';
-  meter.parentElement.setAttribute('aria-valuenow',String(score));
-  let status='Dossier non démontrable en l’état';
-  if(score>=85)status='Préparation élevée — revue humaine requise';
-  else if(score>=70)status='Dossier solide avec corrections limitées';
-  else if(score>=55)status='Dossier risqué — plan correctif requis';
-  else if(score>=40)status='Préparation insuffisante';
-  document.getElementById('status').textContent=status;
-  const evidence=document.getElementById('evidence');
-  document.getElementById('proof').textContent='Justificatifs : '+evidence.options[evidence.selectedIndex].text.toLowerCase();
-  const checks=[
-    ['Identification complète',document.getElementById('company').value.trim()!==''],
-    ['Éligibilité minimale',value('legal')>0&&value('age')>0],
-    ['Justificatifs vérifiables',value('evidence')>=4],
-    ['Données financières',value('finance')>=8],
-    ['Traction et croissance',value('traction')>=8&&value('growth')>=5],
-    ['Revue finale',score>=70],
-    ['Autorisation humaine',false]
-  ];
-  document.getElementById('checks').innerHTML=checks.map(([name,ok])=>`<div class="check"><span>${name}</span><strong class="${ok?'ok':'bad'}">${ok?'SATISFAIT':'À TRAITER'}</strong></div>`).join('');
-  const actions=[];
-  if(value('legal')===0)actions.push('Prouver l’implantation juridique locale.');
-  if(value('age')===0)actions.push('Vérifier l’ancienneté minimale exigée.');
-  if(value('finance')<8)actions.push('Compléter et réconcilier les données financières.');
-  if(value('evidence')<4)actions.push('Remplacer les déclarations par des justificatifs vérifiables.');
-  if(value('governance')<3)actions.push('Renforcer la conformité et la gouvernance.');
-  if(!actions.length)actions.push('Faire examiner le dossier par une personne habilitée avant soumission.');
-  document.getElementById('actions').innerHTML=actions.map(item=>`<li>${item}</li>`).join('');
-}
-function exportReport(){
-  calculate();
-  const text=`AFRIAGENESIS® — MÉMO DE PRÉPARATION\nEntreprise : ${document.getElementById('company').value||'Non renseignée'}\nProgramme : ${document.getElementById('program').value}\nScore indicatif : ${document.getElementById('score').textContent}/100\nConclusion : ${document.getElementById('status').textContent}\n${document.getElementById('proof').textContent}\nRemarques : ${document.getElementById('notes').value||'Aucune'}\n\nCe résultat est indicatif et doit être validé par une personne habilitée.`;
-  const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
-  const link=document.createElement('a');
-  link.href=URL.createObjectURL(blob);
-  link.download='afriagenesis-memo-preparation.txt';
-  link.click();
-  setTimeout(()=>URL.revokeObjectURL(link.href),0);
-}
-function resetForm(){
-  document.querySelectorAll('input,textarea').forEach(el=>el.value='');
-  document.querySelectorAll('select').forEach(el=>el.selectedIndex=0);
-  document.getElementById('score').textContent='0';
-  document.getElementById('meter').style.width='0';
-  document.querySelector('.meter').setAttribute('aria-valuenow','0');
-  document.getElementById('status').textContent='Dossier non évalué';
-  document.getElementById('proof').textContent='Justificatifs : absents';
-  document.getElementById('checks').innerHTML='';
-  document.getElementById('actions').innerHTML='<li>Renseigner les données du candidat.</li>';
-}
-const legalTexts={
-  legal:`<h2>Mentions légales</h2><p>Éditeur : AfrIAgenesis®. Cet outil est proposé à titre d’aide à la préparation des candidatures. Il ne représente aucun accélérateur, organisme public ou bailleur et ne garantit ni l’éligibilité ni la sélection.</p><p>Pour toute demande officielle, utilisez le canal de contact AfrIAgenesis® communiqué dans votre relation contractuelle.</p>`,
-  privacy:`<h2>Politique de confidentialité</h2><p>Cette version fonctionne entièrement dans le navigateur. Les informations saisies ne sont pas envoyées à AfrIAgenesis® et ne sont pas conservées par l’application. L’utilisateur reste responsable de ne pas saisir de données sensibles ou confidentielles sur un appareil non sécurisé.</p><p>Lorsqu’une future version activera un stockage ou une transmission, un consentement spécifique et une notice adaptée à la juridiction concernée seront présentés avant la collecte.</p>`,
-  terms:`<h2>Conditions d’utilisation</h2><p>Le score est indicatif et repose uniquement sur les réponses saisies. L’utilisateur doit vérifier les critères officiels du programme ciblé et obtenir une validation humaine avant toute soumission. AfrIAgenesis® ne saurait être tenu responsable d’une décision prise exclusivement à partir de ce diagnostic.</p>`,
-  cookies:`<h2>Politique relative aux cookies</h2><p>Cette version n’installe aucun cookie publicitaire, analytique ou de profilage. Des services d’hébergement externes peuvent toutefois appliquer leurs propres journaux techniques conformément à leurs politiques.</p>`,
-  security:`<h2>Sécurité et confidentialité</h2><p>Ne saisissez pas de mots de passe, coordonnées bancaires, secrets commerciaux, données médicales ou pièces d’identité dans les champs libres. Exportez le mémo uniquement sur un appareil de confiance et supprimez-le lorsqu’il n’est plus nécessaire.</p>`
-};
-function openLegal(type){
-  document.getElementById('legalContent').innerHTML=legalTexts[type];
-  document.getElementById('legalDialog').showModal();
-}
+const LANGS=['fr','en','ar'];
+const PROGRAM_DATA={version:'1.2',lastVerified:'2026-09-15',startUsd:1100000,growUsd:5500000,sectors:['AI & ML','B2B SaaS','FinTech','HealthTech','AgriTech','EduTech','Cybersecurity','IoT & Big Data','PropTech','Robotics & Drones'],sources:[{name:'Startup Qatar — Investment Program',url:'https://startupqatar.qa/en/investment-program'},{name:'Qatar Development Bank — Startup Qatar Investment Program',url:'https://www.qdb.qa/financing-and-funding/equity-and-investment/startup-qatar-investment-program'}]};
+const EVIDENCE=[['legalCapTable','Personne morale + cap table','Legal entity + cap table','الكيان القانوني وجدول الملكية'],['runnableMvp','MVP réellement exécutable','Runnable MVP','نموذج MVP قابل للتشغيل'],['ipOwnership','Propriété intellectuelle','IP ownership','ملكية الملكية الفكرية'],['clientPilotEvidence','Preuves clients / pilotes','Client / pilot evidence','أدلة العملاء أو المشاريع التجريبية'],['actualFinancials','Revenus réels / états financiers','Actual revenue / financials','الإيرادات الفعلية والبيانات المالية'],['qatarLocalization','Plan de localisation Qatar','Qatar localization plan','خطة التوطين في قطر']];
+const ALLOCATION=[['Product & AI engineering',35],['Qatar R&D / sovereign AI infrastructure',20],['Commercial pilots Qatar/GCC',15],['Africa deployment & localization',15],['Security / compliance / data governance',10],['GTM / partnerships',5]];
+const ARCH=['Business','Data','Application','AI & Agents','Technology','Integration','Security','DevSecOps & Operations','Governance'];
+const TXT={fr:{verifiedBadge:'Signal officiel vérifié · 15 sept. 2026',hero:'Qatar ↔ Africa <em>Sovereign Agentic AI Bridge</em>',lede:'Extension du Genome existant pour passer du signal Startup Qatar au dossier exécutable, sans inventer de traction ni de preuve.',assess:'Évaluer les preuves',official:'Programme officiel',lastVerified:'Dernière vérification',sourceBound:'Sources primaires, pas le Reel.',facts:'Faits officiels actuels',factsSub:'Startup Qatar + Qatar Development Bank. Les données modifiables sont centralisées dans PROGRAM_DATA.',startDesc:'PoC/MVP + implantation au Qatar.',growDesc:'Entreprise établie + expansion au Qatar.',terms:'Modalités confirmées',disbursement:'Décaissement',milestones:'Tranches selon jalons convenus',housing:'Logement',housingV:'Subsidized housing support',licensing:'Licences',licensingV:'Exonérations d’enregistrement/renouvellement',rdV:'Accès à des grants innovation/R&D',sectors:'Secteurs prioritaires',housingCorrection:'Correction : support de logement subventionné ne signifie pas que tous les coûts de logement sont garantis couverts.',target:'= cible actuelle',decision:'GROW reste un gate ultérieur jusqu’à preuve suffisante de l’historique opérationnel, de la traction et des finances.',apply:'Candidater via Startup Qatar',evidenceBtn:'Verrouiller les preuves',evidenceTitle:'Evidence Gate — 6 preuves',evidenceSub:'Compteur interne de complétude. Ce n’est pas un score QDB ni une déclaration d’éligibilité.',undocumented:'NON DOCUMENTÉ',allocationTitle:'Allocation de travail indicative',allocationSub:'Hypothèse interne, pas un budget approuvé ni un engagement QDB.',roadmap:'Doha → GCC → Africa',architectureTitle:'Architecture entreprise complète',sourcesTitle:'Sources officielles',sourcesSub:'Le Reel reste un signal ; seules les sources primaires pilotent les données du produit.'},en:{verifiedBadge:'Official signal verified · 15 Sep 2026',hero:'Qatar ↔ Africa <em>Sovereign Agentic AI Bridge</em>',lede:'Existing Genome execution layer that converts the Startup Qatar signal into an evidence-bound submission path without inventing traction.',assess:'Assess evidence',official:'Official program',lastVerified:'Last verified',sourceBound:'Primary sources, not Reel claims.',facts:'Current official facts',factsSub:'Startup Qatar + Qatar Development Bank. Mutable program facts are centralized in PROGRAM_DATA.',startDesc:'PoC/MVP + establish operations in Qatar.',growDesc:'Established company + expansion into Qatar.',terms:'Confirmed terms',disbursement:'Disbursement',milestones:'Trenched against agreed milestones',housing:'Housing',housingV:'Subsidized housing support',licensing:'Licensing',licensingV:'Registration/renewal fee waivers',rdV:'Access to innovation/R&D grants',sectors:'Priority sectors',housingCorrection:'Correction: subsidized housing support is not a guarantee that all housing costs are covered.',target:'= current target',decision:'GROW remains a later gate until operating history, traction and financials are sufficiently evidenced.',apply:'Apply via Startup Qatar',evidenceBtn:'Lock evidence',evidenceTitle:'Evidence Gate — 6 proofs',evidenceSub:'Internal completeness counter. It is not a QDB score or eligibility claim.',undocumented:'UNDOCUMENTED',allocationTitle:'Indicative working allocation',allocationSub:'Internal assumption, not an approved budget or QDB commitment.',roadmap:'Doha → GCC → Africa',architectureTitle:'Full enterprise architecture',sourcesTitle:'Official sources',sourcesSub:'The Reel remains a signal; only primary sources drive product facts.'},ar:{verifiedBadge:'إشارة رسمية موثقة · 15 سبتمبر 2026',hero:'قطر ↔ أفريقيا <em>جسر الذكاء الاصطناعي السيادي الوكيلي</em>',lede:'طبقة تنفيذ للـ Genome القائم لتحويل إشارة Startup Qatar إلى مسار تقديم قائم على الأدلة دون اختلاق الجذب أو الإثبات.',assess:'تقييم الأدلة',official:'البرنامج الرسمي',lastVerified:'آخر تحقق',sourceBound:'المصادر الأولية فقط.',facts:'الحقائق الرسمية الحالية',factsSub:'Startup Qatar وبنك قطر للتنمية. البيانات المتغيرة مركزية في PROGRAM_DATA.',startDesc:'نموذج PoC/MVP + تأسيس العمليات في قطر.',growDesc:'شركة قائمة + التوسع في قطر.',terms:'الشروط المؤكدة',disbursement:'الصرف',milestones:'دفعات مرتبطة بمراحل متفق عليها',housing:'السكن',housingV:'دعم سكن مدعوم',licensing:'التراخيص',licensingV:'إعفاءات التسجيل والتجديد',rdV:'الوصول إلى منح الابتكار والبحث والتطوير',sectors:'القطاعات ذات الأولوية',housingCorrection:'تصحيح: دعم السكن المدعوم لا يعني ضمان تغطية جميع تكاليف السكن.',target:'= المسار الحالي',decision:'يبقى GROW مرحلة لاحقة حتى توثيق السجل التشغيلي والجذب والبيانات المالية.',apply:'التقديم عبر Startup Qatar',evidenceBtn:'تثبيت الأدلة',evidenceTitle:'بوابة الأدلة — 6 إثباتات',evidenceSub:'عداد داخلي لاكتمال الأدلة؛ ليس تقييماً رسمياً من QDB.',undocumented:'غير موثق',allocationTitle:'توزيع عمل إرشادي',allocationSub:'افتراض داخلي وليس ميزانية معتمدة أو التزاماً من QDB.',roadmap:'الدوحة ← الخليج ← أفريقيا',architectureTitle:'معمارية مؤسسية كاملة',sourcesTitle:'المصادر الرسمية',sourcesSub:'الفيديو إشارة فقط؛ المصادر الأولية هي التي تقود بيانات المنتج.'}};
+let lang='fr';const tr=k=>(TXT[lang]||TXT.fr)[k]||k;
+function render(){document.querySelectorAll('[data-k]').forEach(e=>e.textContent=tr(e.dataset.k));document.querySelectorAll('[data-html]').forEach(e=>e.innerHTML=tr(e.dataset.html));document.getElementById('sectors').innerHTML=PROGRAM_DATA.sectors.map(x=>`<span class="chip">${x}</span>`).join('');document.getElementById('allocation').innerHTML=ALLOCATION.map(([n,p])=>`<div class="bar"><span>${n}</span><div class="track"><i style="width:${p}%"></i></div><b>${p}%</b></div>`).join('');document.getElementById('architecture').innerHTML=ARCH.map(x=>`<div class="arch"><strong>${x}</strong><span class="small">GENESIS V4 governed domain</span></div>`).join('');document.getElementById('sources').innerHTML=PROGRAM_DATA.sources.map(s=>`<article class="card"><span class="tag">PRIMARY VERIFIED</span><h3>${s.name}</h3><a href="${s.url}" target="_blank" rel="noopener">${s.url}</a><p class="small">Last verified: ${PROGRAM_DATA.lastVerified}</p></article>`).join('');renderEvidence()}
+function renderEvidence(){document.getElementById('evidenceList').innerHTML=EVIDENCE.map(([id,fr,en,ar])=>`<div class="evidence"><div><strong>${lang==='ar'?ar:lang==='en'?en:fr}</strong><div class="small">Evidence ID: ${id}</div></div><select id="${id}"><option value="0">${lang==='ar'?'غير موثق':lang==='en'?'Undocumented':'Non documenté'}</option><option value="1">${lang==='ar'?'جزئي':lang==='en'?'Partial':'Partiel'}</option><option value="2">${lang==='ar'?'موثق':lang==='en'?'Verified':'Vérifié'}</option></select></div>`).join('');EVIDENCE.forEach(([id])=>document.getElementById(id).addEventListener('change',readiness));readiness()}
+function readiness(){const v=EVIDENCE.map(([id])=>Number(document.getElementById(id)?.value||0));const n=v.filter(x=>x===2).length;document.getElementById('count').textContent=`${n} / 6`;document.getElementById('readiness').textContent=n===6?(lang==='ar'?'مكتمل داخلياً — مراجعة بشرية مطلوبة':lang==='en'?'INTERNALLY COMPLETE — HUMAN REVIEW REQUIRED':'COMPLET EN INTERNE — REVUE HUMAINE REQUISE'):tr('undocumented')}
+function setLang(x){if(!LANGS.includes(x))return;lang=x;document.documentElement.lang=x;document.documentElement.dir=x==='ar'?'rtl':'ltr';document.querySelectorAll('[data-lang]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.lang===x)));render()}
+document.querySelectorAll('[data-lang]').forEach(b=>b.addEventListener('click',()=>setLang(b.dataset.lang)));render();
 </script>
-</body>
-</html>
+</body></html>

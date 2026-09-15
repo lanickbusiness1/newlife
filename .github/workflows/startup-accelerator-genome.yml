@@ -1,0 +1,32 @@
+name: Startup Accelerator Genome
+
+on:
+  push:
+    paths:
+      - 'apps/startup-accelerator-genome/**'
+      - '.github/workflows/startup-accelerator-genome.yml'
+  pull_request:
+    paths:
+      - 'apps/startup-accelerator-genome/**'
+      - '.github/workflows/startup-accelerator-genome.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-bound-static-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run Qatar regression tests
+        run: python -m unittest discover -s apps/startup-accelerator-genome/tests -p 'test_*.py' -v
+      - name: Static smoke check
+        run: |
+          python -m http.server 8765 --directory apps/startup-accelerator-genome >/tmp/startup-genome-http.log 2>&1 &
+          pid=$!
+          sleep 2
+          curl --fail --silent http://127.0.0.1:8765/index.html | grep -q 'Startup Accelerator Genome'
+          kill "$pid"
