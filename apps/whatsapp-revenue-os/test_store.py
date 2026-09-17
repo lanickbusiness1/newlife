@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from domain import HandoffSummary
 from qualification import qualify_text, score_qualification
 from store import InMemoryRevenueStore, redact_phone
@@ -44,3 +46,10 @@ def test_message_store_keeps_hash_not_body():
 
 def test_redact_phone_only_exposes_last_four_digits():
     assert redact_phone("+224611406262") == "+***6262"
+
+
+def test_migration_avoids_reserved_window_identifier():
+    repo_root = Path(__file__).resolve().parents[2]
+    migration = (repo_root / "supabase/migrations/202609170001_whatsapp_revenue_os.sql").read_text()
+    assert "appointment_window text not null" in migration
+    assert "\n  window text not null" not in migration
