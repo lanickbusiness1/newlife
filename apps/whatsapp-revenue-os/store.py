@@ -27,6 +27,7 @@ class RevenueStore(Protocol):
     def upsert_contact(self, organization_id: str, phone_e164: str) -> str: ...
     def get_or_create_conversation(self, organization_id: str, contact_id: str) -> str: ...
     def record_message_meta(self, organization_id: str, conversation_id: str, message_id: str, direction: str, content_sha256: str, status: str) -> None: ...
+    def get_latest_qualification(self, organization_id: str, conversation_id: str) -> QualificationSnapshot | None: ...
     def save_qualification(self, organization_id: str, conversation_id: str, qualification: QualificationSnapshot, score: LeadScore) -> None: ...
     def save_appointment(self, organization_id: str, conversation_id: str, window: str, status: str = "proposed") -> None: ...
     def save_handoff(self, organization_id: str, handoff: HandoffSummary) -> None: ...
@@ -83,6 +84,12 @@ class InMemoryRevenueStore:
             "status": status,
             "created_at": utc_now_iso(),
         })
+
+    def get_latest_qualification(self, organization_id: str, conversation_id: str) -> QualificationSnapshot | None:
+        for item in reversed(self.qualifications):
+            if item["organization_id"] == organization_id and item["conversation_id"] == conversation_id:
+                return QualificationSnapshot.model_validate(item["snapshot"])
+        return None
 
     def save_qualification(self, organization_id: str, conversation_id: str, qualification: QualificationSnapshot, score: LeadScore) -> None:
         self.qualifications.append({
@@ -209,6 +216,23 @@ class SupabaseRevenueStore:
             "content_sha256": content_sha256,
             "status": status,
         }, upsert=True)
+
+    def get_latest_qualification(self, organization_id: str, conversation_id: str) -> QualificationSnapshot | None:
+        response = self.client.get(
+            f"{self.url}/rest/v1/wa_qualification_snapshots",
+            params={
+                "organization_id": f"eq.{organization_id}",
+                "conversation_id": f"eq.{conversation_id}",
+                "select": "snapshot",
+                "order": "created_at.desc",
+                "limit": "1",
+            },
+        )
+        response.raise_for_status()
+        rows = response.json()
+        if not rows:
+            return None
+        return QualificationSnapshot.model_validate(rows[0]["snapshot"])
 
     def save_qualification(self, organization_id: str, conversation_id: str, qualification: QualificationSnapshot, score: LeadScore) -> None:
         self._post("wa_qualification_snapshots", {
