@@ -28,6 +28,7 @@ class RevenueStore(Protocol):
     def get_or_create_conversation(self, organization_id: str, contact_id: str) -> str: ...
     def record_message_meta(self, organization_id: str, conversation_id: str, message_id: str, direction: str, content_sha256: str, status: str) -> None: ...
     def get_latest_qualification(self, organization_id: str, conversation_id: str) -> QualificationSnapshot | None: ...
+    def is_opted_out(self, organization_id: str, contact_id: str) -> bool: ...
     def save_qualification(self, organization_id: str, conversation_id: str, qualification: QualificationSnapshot, score: LeadScore) -> None: ...
     def save_appointment(self, organization_id: str, conversation_id: str, window: str, status: str = "proposed") -> None: ...
     def save_handoff(self, organization_id: str, handoff: HandoffSummary) -> None: ...
@@ -91,6 +92,12 @@ class InMemoryRevenueStore:
                 return QualificationSnapshot.model_validate(item["snapshot"])
         return None
 
+    def is_opted_out(self, organization_id: str, contact_id: str) -> bool:
+        return any(
+            item["organization_id"] == organization_id and item["contact_id"] == contact_id
+            for item in self.opt_outs
+        )
+
     def save_qualification(self, organization_id: str, conversation_id: str, qualification: QualificationSnapshot, score: LeadScore) -> None:
         self.qualifications.append({
             "id": _stable_id("qual", organization_id, conversation_id, utc_now_iso()),
@@ -125,13 +132,14 @@ class InMemoryRevenueStore:
             self.conversations[handoff.conversation_id]["state"] = "HANDOFF"
 
     def save_opt_out(self, organization_id: str, contact_id: str, source_message_id: str) -> None:
-        self.opt_outs.append({
-            "id": _stable_id("optout", organization_id, contact_id),
-            "organization_id": organization_id,
-            "contact_id": contact_id,
-            "source_message_id": source_message_id,
-            "created_at": utc_now_iso(),
-        })
+        if not self.is_opted_out(organization_id, contact_id):
+            self.opt_outs.append({
+                "id": _stable_id("optout", organization_id, contact_id),
+                "organization_id": organization_id,
+                "contact_id": contact_id,
+                "source_message_id": source_message_id,
+                "created_at": utc_now_iso(),
+            })
         for conversation in self.conversations.values():
             if conversation["organization_id"] == organization_id and conversation["contact_id"] == contact_id:
                 conversation["state"] = "OPTED_OUT"
@@ -196,14 +204,19 @@ class SupabaseRevenueStore:
 
     def get_or_create_conversation(self, organization_id: str, contact_id: str) -> str:
         conversation_id = _stable_id("conv", organization_id, contact_id)
-        self._post("wa_conversations", {
-            "id": conversation_id,
-            "organization_id": organization_id,
-            "contact_id": contact_id,
-            "state": "NEW",
-            "automated_followups_sent": 0,
-            "updated_at": utc_now_iso(),
-        }, upsert=True)
+        response = self.client.post(
+            f"{self.url}/rest/v1/wa_conversations",
+            content=json.dumps({
+                "id": conversation_id,
+                "organization_id": organization_id,
+                "contact_id": contact_id,
+                "state": "NEW",
+                "automated_followups_sent": 0,
+                "updated_at": utc_now_iso(),
+            }),
+            headers={"Prefer": "resolution=ignore-duplicates,return=minimal"},
+        )
+        response.raise_for_status()
         return conversation_id
 
     def record_message_meta(self, organization_id: str, conversation_id: str, message_id: str, direction: str, content_sha256: str, status: str) -> None:
@@ -233,6 +246,19 @@ class SupabaseRevenueStore:
         if not rows:
             return None
         return QualificationSnapshot.model_validate(rows[0]["snapshot"])
+
+    def is_opted_out(self, organization_id: str, contact_id: str) -> bool:
+        response = self.client.get(
+            f"{self.url}/rest/v1/wa_opt_outs",
+            params={
+                "organization_id": f"eq.{organization_id}",
+                "contact_id": f"eq.{contact_id}",
+                "select": "id",
+                "limit": "1",
+            },
+        )
+        response.raise_for_status()
+        return bool(response.json())
 
     def save_qualification(self, organization_id: str, conversation_id: str, qualification: QualificationSnapshot, score: LeadScore) -> None:
         self._post("wa_qualification_snapshots", {
