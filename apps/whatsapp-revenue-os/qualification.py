@@ -88,6 +88,28 @@ def qualify_text(text: str) -> QualificationSnapshot:
     )
 
 
+def merge_qualification(
+    previous: QualificationSnapshot | None,
+    current: QualificationSnapshot,
+) -> QualificationSnapshot:
+    """Accumulate only fields that were explicitly learned across turns.
+
+    Current explicit values win over previous values. Missing current fields reuse
+    previously persisted evidence rather than inventing information.
+    """
+    if previous is None:
+        return current
+    return QualificationSnapshot(
+        intent=current.intent or previous.intent,
+        property_type=current.property_type or previous.property_type,
+        zone=current.zone or previous.zone,
+        budget_xof=current.budget_xof if current.budget_xof is not None else previous.budget_xof,
+        timeline=current.timeline or previous.timeline,
+        name=current.name or previous.name,
+        consent_contact=current.consent_contact and previous.consent_contact,
+    )
+
+
 def score_qualification(snapshot: QualificationSnapshot) -> LeadScore:
     points = 0
     reasons: list[str] = []
