@@ -45,7 +45,7 @@ create table if not exists public.wa_appointments (
   id text primary key,
   organization_id text not null,
   conversation_id text not null references public.wa_conversations(id) on delete restrict,
-  window text not null,
+  appointment_window text not null,
   status text not null default 'proposed',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
