@@ -4,7 +4,7 @@ import hashlib
 
 from domain import HandoffSummary, InboundMessage, OrchestrationResult
 from policy import evaluate_inbound_policy
-from qualification import next_missing_question, qualify_text, score_qualification
+from qualification import merge_qualification, next_missing_question, qualify_text, score_qualification
 from store import RevenueStore, redact_phone
 from whatsapp import WhatsAppAdapter
 
@@ -47,7 +47,9 @@ class RevenueOrchestrator:
                 policy_reason=decision.blocked_reason,
             )
 
-        qualification = qualify_text(message.text)
+        current_qualification = qualify_text(message.text)
+        previous_qualification = self.store.get_latest_qualification(org, conversation_id)
+        qualification = merge_qualification(previous_qualification, current_qualification)
         score = score_qualification(qualification)
         self.store.save_qualification(org, conversation_id, qualification, score)
 
@@ -97,10 +99,11 @@ class RevenueOrchestrator:
             handoff_created = True
             state = "HANDOFF"
         else:
-            reply_text = next_missing_question(qualification) or (
+            missing_question = next_missing_question(qualification)
+            reply_text = missing_question or (
                 "Merci. Votre demande est enregistrée et un conseiller humain va la reprendre."
             )
-            state = "QUALIFYING" if next_missing_question(qualification) else "QUALIFIED"
+            state = "QUALIFYING" if missing_question else "QUALIFIED"
 
         if not decision.allow_automated_reply:
             self.store.append_audit(org, "outbound_blocked", conversation_id, {
