@@ -50,6 +50,10 @@ def _build_whatsapp():
     return FakeWhatsAppAdapter()
 
 
+def _live_whatsapp_configured() -> bool:
+    return os.getenv("WHATSAPP_MODE", "fake").strip().lower() == "meta" and whatsapp.is_configured()
+
+
 def _require_operator(x_operator_token: str | None) -> None:
     expected = os.getenv("OPERATOR_TOKEN", "")
     if not expected:
@@ -83,7 +87,7 @@ def health():
         "client_live": False,
         "store_mode": os.getenv("STORE_MODE", "memory"),
         "whatsapp_mode": os.getenv("WHATSAPP_MODE", "fake"),
-        "live_whatsapp_configured": whatsapp.is_configured(),
+        "live_whatsapp_configured": _live_whatsapp_configured(),
         "kill_switch_active": runtime_control["kill_switch_active"],
     }
 
@@ -149,7 +153,7 @@ def dashboard_summary(x_operator_token: str | None = Header(default=None, alias=
         **summary,
         "asset_id": ASSET_ID,
         "kill_switch_active": runtime_control["kill_switch_active"],
-        "live_whatsapp_configured": whatsapp.is_configured(),
+        "live_whatsapp_configured": _live_whatsapp_configured(),
         "demo_ready": False,
         "client_live": False,
     }
