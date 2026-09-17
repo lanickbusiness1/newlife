@@ -32,6 +32,38 @@ def test_demo_flow_qualifies_persists_replies_and_handoffs():
     assert summary["appointments"] == 1
 
 
+def test_multi_turn_qualification_accumulates_explicit_answers():
+    store, adapter, orchestrator = _make()
+    first = orchestrator.process(InboundMessage(
+        organization_id="org-demo",
+        message_id="wamid.turn1",
+        from_number="+224600000020",
+        text="Bonjour, je cherche une parcelle",
+    ))
+    assert first.reply_sent is True
+    assert first.qualification is not None
+    assert first.qualification.intent == "buy"
+    assert first.qualification.property_type == "land"
+    assert first.qualification.zone is None
+
+    second = orchestrator.process(InboundMessage(
+        organization_id="org-demo",
+        message_id="wamid.turn2",
+        from_number="+224600000020",
+        text="À Calavi, budget 12 millions, dans 2 mois",
+    ))
+    assert second.qualification is not None
+    assert second.qualification.intent == "buy"
+    assert second.qualification.property_type == "land"
+    assert second.qualification.zone == "Calavi"
+    assert second.qualification.budget_xof == 12_000_000
+    assert second.qualification.timeline == "dans 2 mois"
+    assert second.score is not None
+    assert second.score.temperature == "hot"
+    assert second.handoff_created is True
+    assert second.appointment_proposed is True
+
+
 def test_stop_persists_optout_and_sends_nothing():
     store, adapter, orchestrator = _make()
     result = orchestrator.process(InboundMessage(
