@@ -79,6 +79,30 @@ def test_stop_persists_optout_and_sends_nothing():
     assert store.summary("org-demo")["opt_outs"] == 1
 
 
+def test_previous_optout_blocks_later_automation_until_manual_reconsent():
+    store, adapter, orchestrator = _make()
+    phone = "+224600000021"
+    orchestrator.process(InboundMessage(
+        organization_id="org-demo",
+        message_id="wamid.stop-first",
+        from_number=phone,
+        text="STOP",
+    ))
+
+    later = orchestrator.process(InboundMessage(
+        organization_id="org-demo",
+        message_id="wamid.after-stop",
+        from_number=phone,
+        text="Bonjour, je cherche une parcelle à Calavi",
+    ))
+
+    assert later.opt_out is True
+    assert later.state == "OPTED_OUT"
+    assert later.reply_sent is False
+    assert later.policy_reason == "previous_opt_out"
+    assert adapter.sent == []
+
+
 def test_sensitive_topic_goes_to_human_without_autonomous_claim():
     store, adapter, orchestrator = _make()
     result = orchestrator.process(InboundMessage(
