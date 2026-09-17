@@ -13,6 +13,8 @@ def test_health_keeps_truthful_release_boundary():
     assert body["demo_ready"] is False
     assert body["client_live"] is False
     assert body["release_stage"] == "CODE_REVIEW"
+    assert body["whatsapp_mode"] == "fake"
+    assert body["live_whatsapp_configured"] is False
 
 
 def test_demo_inbound_runs_safe_simulated_vertical_slice():
