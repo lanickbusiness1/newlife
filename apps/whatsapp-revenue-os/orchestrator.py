@@ -47,6 +47,19 @@ class RevenueOrchestrator:
                 policy_reason=decision.blocked_reason,
             )
 
+        if self.store.is_opted_out(org, contact_id):
+            self.store.append_audit(org, "outbound_blocked", conversation_id, {
+                "reason": "previous_opt_out",
+                "source_message_id": message.message_id,
+            })
+            return OrchestrationResult(
+                conversation_id=conversation_id,
+                state="OPTED_OUT",
+                reply_sent=False,
+                opt_out=True,
+                policy_reason="previous_opt_out",
+            )
+
         current_qualification = qualify_text(message.text)
         previous_qualification = self.store.get_latest_qualification(org, conversation_id)
         qualification = merge_qualification(previous_qualification, current_qualification)
