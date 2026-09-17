@@ -224,7 +224,7 @@ class SupabaseRevenueStore:
             "id": _stable_id("appt", organization_id, conversation_id, window),
             "organization_id": organization_id,
             "conversation_id": conversation_id,
-            "window": window,
+            "appointment_window": window,
             "status": status,
         }, upsert=True)
 
