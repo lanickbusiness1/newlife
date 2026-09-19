@@ -1,0 +1,75 @@
+name: TEST-HEALTH-001 Raw Social Metadata
+
+on:
+  push:
+    branches:
+      - chore/reel-reader-deploy-proof
+    paths:
+      - '.github/workflows/test-health-001-raw-metadata.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chore/reel-reader-deploy-proof
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Capture public resolver payloads
+        shell: python
+        run: |
+          import json, pathlib, urllib.request
+
+          root = pathlib.Path("evidence/test-health-001")
+          root.mkdir(parents=True, exist_ok=True)
+          endpoints = {
+              "fxtwitter": "https://api.fxtwitter.com/Blessinghls/status/2101019521947451594",
+              "vxtwitter": "https://api.vxtwitter.com/Blessinghls/status/2101019521947451594",
+              "syndication": "https://cdn.syndication.twimg.com/tweet-result?id=2101019521947451594&lang=en",
+          }
+          summary = {}
+          for name, url in endpoints.items():
+              req = urllib.request.Request(
+                  url,
+                  headers={"User-Agent": "AfrIAgenesis-Reel-Intelligence-Reader/0.2",
+                           "Accept": "application/json"},
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=25) as resp:
+                      raw = resp.read(5_000_001)
+                      status = resp.status
+                      ctype = resp.headers.get("content-type", "")
+                  if len(raw) > 5_000_000:
+                      raise RuntimeError("payload_over_5mb")
+                  text = raw.decode("utf-8", errors="replace")
+                  (root / f"{name}-raw.json").write_text(text, encoding="utf-8")
+                  summary[name] = {"status": status, "content_type": ctype, "bytes": len(raw)}
+              except Exception as exc:
+                  summary[name] = {"error": type(exc).__name__, "message": str(exc)[:300]}
+
+          (root / "raw-metadata-summary.json").write_text(
+              json.dumps(summary, indent=2), encoding="utf-8"
+          )
+          print("RAW_METADATA_SUMMARY=" + json.dumps(summary, separators=(",", ":")))
+
+      - name: Commit bounded metadata evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "afrIAgenesis EvidenceBot"
+          git config user.email "actions@users.noreply.github.com"
+          git add evidence/test-health-001
+          if git diff --cached --quiet; then
+            echo "NO_NEW_METADATA"
+            exit 0
+          fi
+          git commit -m "evidence(reel-reader): capture TEST-HEALTH-001 raw public metadata"
+          git push origin HEAD:chore/reel-reader-deploy-proof
