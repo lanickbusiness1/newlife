@@ -6,18 +6,21 @@ from urllib.parse import urlparse
 import json
 import re
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, HttpUrl
 
+from resolver import XSourceError, resolve_x_media
+
 APP_ID = "MOD-REEL-INTEL-001"
-APP_VERSION = "0.1.0-test-health-001"
+APP_VERSION = "0.2.0-test-health-001"
 
 app = FastAPI(
     title="AfrIAgenesis Reel Intelligence Reader",
     version=APP_VERSION,
     description=(
         "Evidence-first social media reader boundary. This slice proves source provenance, "
-        "anti-hallucination claim extraction, evidence-state routing, and audit lineage."
+        "anti-hallucination claim extraction, resilient X media resolution, evidence-state "
+        "routing, and audit lineage."
     ),
 )
 
@@ -28,6 +31,10 @@ class SourceResolveRequest(BaseModel):
     source_author: str | None = None
     media_type: Literal["video", "audio", "image", "text", "unknown"] = "unknown"
     fetch_http_status: int | None = Field(default=None, ge=100, le=599)
+
+
+class MediaResolveRequest(BaseModel):
+    source_url: HttpUrl
 
 
 class SourceEvidence(BaseModel):
@@ -159,6 +166,7 @@ def health() -> dict:
         "version": APP_VERSION,
         "readiness": "TEST_PROVEN_SLICE",
         "commercial_boundary": "not_production_health_advice",
+        "network_resolver": "x_whitelist_fallback_chain",
     }
 
 
@@ -184,6 +192,14 @@ def resolve_source(payload: SourceResolveRequest) -> SourceEvidence:
         evidence_state="SOURCE_METADATA_VERIFIED",
         health_gate="CLOSED_UNTIL_CLAIMS_EXTRACTED",
     )
+
+
+@app.post("/reel/media/resolve")
+async def media_resolve(payload: MediaResolveRequest) -> dict:
+    try:
+        return await resolve_x_media(str(payload.source_url))
+    except XSourceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/reel/claims/extract", response_model=ClaimExtractResponse)
