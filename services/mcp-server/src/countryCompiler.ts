@@ -146,6 +146,7 @@ export interface CountryCompileRequest {
   targetTruthState: string;
   countryGenome: CountryGenome;
   requestedCapabilities: string[];
+  requestedCoreMutation?: boolean;
 }
 
 export interface CapabilityMatrixItem {
@@ -344,6 +345,9 @@ export function compileCountryGenome(input: CountryCompileRequest): CountryCompi
   addBlocker(requestBlockers, nonEmptyText(input?.parentCoreRef), "PARENT_CORE_REF_REQUIRED");
   addBlocker(requestBlockers, nonEmptyText(input?.targetTruthState), "TARGET_TRUTH_STATE_REQUIRED");
   addBlocker(requestBlockers, Array.isArray(input?.requestedCapabilities), "REQUESTED_CAPABILITIES_REQUIRED");
+  if (input?.requestedCoreMutation === true) {
+    requestBlockers.push("COUNTRY_CORE_FORK_FORBIDDEN");
+  }
 
   const genomeBlockers = validateCountryGenome(input?.countryGenome);
   const blockers = unique([...requestBlockers, ...genomeBlockers]);
@@ -374,7 +378,11 @@ export function compileCountryGenome(input: CountryCompileRequest): CountryCompi
 
   const status: CompileStatus = blockers.length === 0
     ? "READY_FOR_BLUEPRINT"
-    : blockers.some(code => code.includes("CONTRACT") || code.includes("CODE_REQUIRED"))
+    : blockers.some(code =>
+        code.includes("CONTRACT")
+        || code.includes("CODE_REQUIRED")
+        || code === "COUNTRY_CORE_FORK_FORBIDDEN"
+      )
       ? "BLOCKED"
       : "NEEDS_EVIDENCE";
 
