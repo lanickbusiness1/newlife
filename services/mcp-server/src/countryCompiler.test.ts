@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   assessCountryPortability,
   compileCountryGenome,
-  GENESIS_V4_COUNTRY_COMPILER_ANCHOR
+  GENESIS_V4_COUNTRY_COMPILER_ANCHOR,
+  type CountryGenome
 } from "./countryCompiler.js";
 
-function genome(countryCode: "BJ" | "ML") {
+function genome(countryCode: "BJ" | "ML"): CountryGenome {
   const benin = countryCode === "BJ";
   return {
     contract_id: "GEN-V4-COUNTRY-GENOME-CONTRACT-001",
