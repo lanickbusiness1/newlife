@@ -401,10 +401,31 @@ export function compileCountryGenome(input: CountryCompileRequest): CountryCompi
   };
 }
 
+function assertCompileResult(value: unknown, label: "SOURCE" | "TARGET"): asserts value is CountryCompileResult {
+  if (!isRecord(value)) {
+    throw new Error(`COUNTRY_PORTABILITY_INVALID_${label}`);
+  }
+  const status = value.status;
+  const validStatus = status === "READY_FOR_BLUEPRINT" || status === "NEEDS_EVIDENCE" || status === "BLOCKED";
+  if (
+    !validStatus
+    || !nonEmptyText(value.country)
+    || !nonEmptyText(value.coreRef)
+    || !nonEmptyText(value.compilerRef)
+    || !Array.isArray(value.evidenceRefs)
+    || !Array.isArray(value.blockers)
+  ) {
+    throw new Error(`COUNTRY_PORTABILITY_INVALID_${label}`);
+  }
+}
+
 export function assessCountryPortability(
   source: CountryCompileResult,
   target: CountryCompileResult
 ): CountryPortabilityAssessment {
+  assertCompileResult(source, "SOURCE");
+  assertCompileResult(target, "TARGET");
+
   const regressions: string[] = [];
   const coreUnchanged = source.coreRef === target.coreRef;
 
