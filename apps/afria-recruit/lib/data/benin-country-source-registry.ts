@@ -1,0 +1,163 @@
+export type BeninAuthorityClass = 'A' | 'B';
+export type BeninEvidenceState = 'EVIDENCED';
+export type BeninPiiClass = 'PUBLIC_AGGREGATE_OR_METADATA';
+
+export interface BeninCountrySourceRecord {
+  sourceId: string;
+  country: 'BJ';
+  publisher: string;
+  canonicalUrl: string;
+  domains: string[];
+  authorityClass: BeninAuthorityClass;
+  evidenceState: BeninEvidenceState;
+  freshnessNote: string;
+  piiClass: BeninPiiClass;
+  productMapping: string[];
+  reuseStatus: 'TO_VERIFY' | 'PUBLIC_REFERENCE';
+}
+
+export const BENIN_COUNTRY_SOURCE_REGISTRY: readonly BeninCountrySourceRecord[] = [
+  {
+    sourceId: 'BJ-LAB-001',
+    country: 'BJ',
+    publisher: 'Institut National de la Statistique et de la Démographie (INStaD)',
+    canonicalUrl: 'https://instad.bj/statistiques/enquetes-et-recensements',
+    domains: ['labor-market', 'employment', 'unemployment', 'underemployment', 'informality'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Catalogue active; collection and publication dates must be tracked per dataset.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'TO_VERIFY',
+  },
+  {
+    sourceId: 'BJ-LAB-002',
+    country: 'BJ',
+    publisher: 'Institut National de la Statistique et de la Démographie (INStaD)',
+    canonicalUrl: 'https://instad.bj/statistiques/statistiques-sociales',
+    domains: ['labor-market', 'employment', 'unemployment', 'social-statistics'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Active catalogue with historical series; staleness must be evaluated per publication.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'TO_VERIFY',
+  },
+  {
+    sourceId: 'BJ-MICRO-001',
+    country: 'BJ',
+    publisher: 'INStaD NADA',
+    canonicalUrl: 'https://nada.instad.bj/index.php/catalog/41',
+    domains: ['microdata-metadata', 'employment', 'informal-sector'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'ERI-ESI 2018; historical benchmark only unless superseded by a newer verified survey.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'TO_VERIFY',
+  },
+  {
+    sourceId: 'BJ-EMP-001',
+    country: 'BJ',
+    publisher: 'Agence Nationale Pour l’Emploi (ANPE Bénin)',
+    canonicalUrl: 'https://anpe.bj/',
+    domains: ['jobs', 'jobseekers', 'employers', 'employment-programmes'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Operational 2026 source; page-level timestamps and deadlines remain mandatory.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'PUBLIC_REFERENCE',
+  },
+  {
+    sourceId: 'BJ-EMP-002',
+    country: 'BJ',
+    publisher: 'Agence Nationale Pour l’Emploi (ANPE Bénin)',
+    canonicalUrl: 'https://anpe.bj/statistiques-nationales/',
+    domains: ['jobseekers', 'placement', 'gender', 'labor-market'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Detailed series currently observed through 2023; use as historical evidence, not real-time truth.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'PUBLIC_REFERENCE',
+  },
+  {
+    sourceId: 'BJ-TVET-001',
+    country: 'BJ',
+    publisher: 'Agence de Développement de l’Enseignement Technique (ADET)',
+    canonicalUrl: 'https://adet.bj/',
+    domains: ['tvet', 'training', 'skills', 'programmes', 'occupations'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Active public training-supply source in 2026.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'PUBLIC_REFERENCE',
+  },
+  {
+    sourceId: 'BJ-TVET-002',
+    country: 'BJ',
+    publisher: 'Agence de Développement de l’Enseignement Technique (ADET)',
+    canonicalUrl: 'https://adet.bj/projets',
+    domains: ['tvet', 'projects', 'training-capacity', 'curricula', 'territories'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Projects include active 2025-2027 delivery windows; verify each project status at ingestion.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'PUBLIC_REFERENCE',
+  },
+  {
+    sourceId: 'BJ-EDU-001',
+    country: 'BJ',
+    publisher: 'Ministère de l’Enseignement Supérieur et de la Recherche Scientifique',
+    canonicalUrl: 'https://enseignementsuperieur.gouv.bj/documents/TYPE_DOCUMENT_STATISTIQUES',
+    domains: ['higher-education', 'institutions', 'students', 'graduates'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Official statistical catalog but several available yearbooks are historical; freshness gate mandatory.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'TO_VERIFY',
+  },
+  {
+    sourceId: 'BJ-LEGAL-001',
+    country: 'BJ',
+    publisher: 'Ministère du Travail et de la Fonction Publique',
+    canonicalUrl: 'https://www.travail.gouv.bj/document/lois',
+    domains: ['labor-law', 'employment', 'placement', 'public-workforce'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Official legal reference; instrument effective dates and supersession must be resolved before use.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'PUBLIC_REFERENCE',
+  },
+  {
+    sourceId: 'BJ-LEGAL-002',
+    country: 'BJ',
+    publisher: 'Secrétariat Général du Gouvernement du Bénin',
+    canonicalUrl: 'https://sgg.gouv.bj/doc/decret-2024-1462/download',
+    domains: ['labor-law', 'foreign-labor', 'recruitment', 'training-obligations'],
+    authorityClass: 'A',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Decree dated 2024; legal supersession check remains mandatory.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'PUBLIC_REFERENCE',
+  },
+  {
+    sourceId: 'BJ-EXT-001',
+    country: 'BJ',
+    publisher: 'World Bank Group',
+    canonicalUrl: 'https://documents1.worldbank.org/curated/en/099822104172327932/pdf/IDU093f4b46a02c2a047fb08ee00183640379fbe.pdf',
+    domains: ['private-sector', 'skills-mismatch', 'tvet', 'youth-underemployment'],
+    authorityClass: 'B',
+    evidenceState: 'EVIDENCED',
+    freshnessNote: 'Recent multilateral contextual evidence; never overrides official Benin statistics for canonical national metrics.',
+    piiClass: 'PUBLIC_AGGREGATE_OR_METADATA',
+    productMapping: ['PRD-RECRUIT-001'],
+    reuseStatus: 'PUBLIC_REFERENCE',
+  },
+] as const;
