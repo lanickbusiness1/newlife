@@ -3,7 +3,7 @@ services:
     name: afriagenesis-intelligence-mcp
     runtime: docker
     plan: free
-    autoDeploy: true
+    autoDeploy: false
     rootDir: services/mcp-server
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health

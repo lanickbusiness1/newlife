@@ -1,3 +1,8 @@
+import {
+  verifyReleaseEvidenceBundle,
+  type ReleaseEvidenceBundle
+} from "./releaseCenter.js";
+
 export const GENESIS_V4_VALIDATION_RELAY_ANCHOR = {
   genome: "GENESIS_V4",
   assetId: "INF-DEPLOYBOT-001",
@@ -34,11 +39,13 @@ export interface ValidationRelayEvidence {
   m6?: GateStatus;
   s7plus?: GateStatus;
   m8?: GateStatus;
+  /** @deprecated Legacy non-enforced compatibility only. New assurance is carried by releaseEvidenceBundle. */
   big4?: GateStatus;
   finalUrlOrArtifact?: string;
   healthcheckPassed?: boolean;
   rollbackRef?: string;
   remeRef?: string;
+  releaseEvidenceBundle?: ReleaseEvidenceBundle;
 }
 
 export interface ValidationRelayInput {
@@ -57,6 +64,7 @@ export interface ValidationRelayInput {
     stagingAllowed: boolean;
     productionDelegated: boolean;
   };
+  releaseEvidenceEnforced?: boolean;
   a4Vetoes?: string[];
   evidence?: ValidationRelayEvidence;
 }
@@ -86,11 +94,13 @@ const EVIDENCE_CONTRACT = [
   "M6",
   "S7+",
   "M8",
-  "Big4_if_required",
+  "Independent_Assurance_Council_if_required",
+  "External_Assurance_only_if_explicitly_mandated",
   "final_url_or_artifact",
   "healthcheck",
   "rollback_ref",
-  "R.E.M.E_ref"
+  "R.E.M.E_ref",
+  "release_evidence_bundle_when_enforced"
 ];
 
 function text(value: unknown): value is string {
@@ -112,6 +122,17 @@ function autonomyFor(input: ValidationRelayInput): AutonomyLevel {
   if (input.deploymentPolicy?.productionDelegated && input.budgetEnvelope?.authorized) return "A3";
   if (input.deploymentPolicy?.stagingAllowed) return "A2";
   return "A1";
+}
+
+function bundleRequiredTarget(target: TargetDeliverable): boolean {
+  return target === "url" || target === "service" || target === "infrastructure";
+}
+
+function enforcedBundleRequired(input: ValidationRelayInput): boolean {
+  if (!input.releaseEvidenceEnforced) return false;
+  return bundleRequiredTarget(input.targetDeliverable)
+    || input.riskClass === "high"
+    || input.riskClass === "regulated";
 }
 
 function output(
@@ -161,8 +182,19 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
   }
 
   const evidence = input.evidence ?? {};
+  const bundle = evidence.releaseEvidenceBundle;
+  const commitSha = evidence.commitSha ?? bundle?.commitSha;
+  const ciRun = evidence.ciRun ?? bundle?.ciRun;
+  const testsPassed = evidence.testsPassed ?? (bundle ? true : undefined);
+  const m6 = evidence.m6 ?? bundle?.gates.m6;
+  const s7plus = evidence.s7plus ?? bundle?.gates.s7plus;
+  const m8 = evidence.m8 ?? bundle?.gates.m8;
+  const big4 = evidence.big4 ?? bundle?.gates.big4;
+  const finalUrlOrArtifact = evidence.finalUrlOrArtifact ?? bundle?.finalUrlOrArtifact;
+  const healthcheckPassed = evidence.healthcheckPassed ?? bundle?.healthcheck.passed;
+  const rollbackRef = evidence.rollbackRef ?? bundle?.rollback.reference;
 
-  if (!text(evidence.commitSha)) {
+  if (!text(commitSha)) {
     return output(
       input,
       "SOURCE_PROVEN",
@@ -170,12 +202,12 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
     );
   }
 
-  if (!text(evidence.ciRun) || evidence.testsPassed !== true) {
-    const blockers = evidence.testsPassed === false ? ["Tests are failing"] : [];
+  if (!text(ciRun) || testsPassed !== true) {
+    const blockers = testsPassed === false ? ["Tests are failing"] : [];
     return output(
       input,
-      evidence.testsPassed === false ? "CORRECTING" : "BUILDING",
-      evidence.testsPassed === false
+      testsPassed === false ? "CORRECTING" : "BUILDING",
+      testsPassed === false
         ? "Diagnose, patch, rerun tests and CI automatically; do not return the task to the CEO."
         : "Run the full CI contract and persist the test evidence.",
       blockers
@@ -184,17 +216,22 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
 
   const gateBlockers: string[] = [];
   const requiredGates: Array<[string, GateStatus | undefined]> = [
-    ["M6", evidence.m6],
-    ["S7+", evidence.s7plus],
-    ["M8", evidence.m8]
+    ["M6", m6],
+    ["S7+", s7plus],
+    ["M8", m8]
   ];
 
   for (const [name, status] of requiredGates) {
     if (status !== "pass") gateBlockers.push(`${name} gate is ${status ?? "missing"}`);
   }
 
-  if ((input.riskClass === "high" || input.riskClass === "regulated") && evidence.big4 !== "pass") {
-    gateBlockers.push(`Big4 gate is ${evidence.big4 ?? "missing"}`);
+  // Legacy compatibility only: when Release Evidence enforcement is disabled,
+  // old high/regulated flows may still require the historic Big4 field.
+  // Enforced flows delegate assurance to Release Center + Independent Assurance Council.
+  if (!input.releaseEvidenceEnforced
+    && (input.riskClass === "high" || input.riskClass === "regulated")
+    && big4 !== "pass") {
+    gateBlockers.push(`Legacy Big4 gate is ${big4 ?? "missing"}`);
   }
 
   if (gateBlockers.length) {
@@ -206,7 +243,7 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
     );
   }
 
-  if (!text(evidence.finalUrlOrArtifact)) {
+  if (!text(finalUrlOrArtifact)) {
     return output(
       input,
       "READY_TO_DEPLOY",
@@ -214,9 +251,43 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
     );
   }
 
+  if (enforcedBundleRequired(input)) {
+    if (!bundle) {
+      return output(
+        input,
+        "DEPLOYED_UNVERIFIED",
+        "Compile and verify the immutable Release Evidence Bundle before terminal delivery.",
+        ["Release Evidence Bundle required"]
+      );
+    }
+
+    try {
+      verifyReleaseEvidenceBundle(bundle, {
+        riskClass: input.riskClass,
+        targetDeliverable: input.targetDeliverable
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return output(
+        input,
+        "DEPLOYED_UNVERIFIED",
+        "Correct release evidence and re-run Release Center verification.",
+        [`Release Evidence Bundle invalid: ${reason}`]
+      );
+    }
+
+    return output(
+      input,
+      terminalState(input.targetDeliverable),
+      "Archive release evidence in R.E.M.E/Genome and hand off to Revenue & Growth Engine when applicable.",
+      [],
+      bundle.finalUrlOrArtifact
+    );
+  }
+
   const deliveryBlockers: string[] = [];
-  if (evidence.healthcheckPassed !== true) deliveryBlockers.push("Healthcheck proof missing");
-  if (!text(evidence.rollbackRef)) deliveryBlockers.push("Rollback proof missing");
+  if (healthcheckPassed !== true) deliveryBlockers.push("Healthcheck proof missing");
+  if (!text(rollbackRef)) deliveryBlockers.push("Rollback proof missing");
 
   if (deliveryBlockers.length) {
     return output(
@@ -232,6 +303,6 @@ export function compileValidationRelay(input: ValidationRelayInput): ValidationR
     terminalState(input.targetDeliverable),
     "Archive release evidence in R.E.M.E/Genome and hand off to Revenue & Growth Engine when applicable.",
     [],
-    evidence.finalUrlOrArtifact
+    finalUrlOrArtifact
   );
 }
