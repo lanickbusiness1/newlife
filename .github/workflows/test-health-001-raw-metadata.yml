@@ -34,6 +34,8 @@ jobs:
               "fxtwitter": "https://api.fxtwitter.com/Blessinghls/status/2101019521947451594",
               "vxtwitter": "https://api.vxtwitter.com/Blessinghls/status/2101019521947451594",
               "syndication": "https://cdn.syndication.twimg.com/tweet-result?id=2101019521947451594&lang=en",
+              "source_status_fxtwitter": "https://api.fxtwitter.com/Blessinghls/status/2089240517414379589",
+              "source_status_vxtwitter": "https://api.vxtwitter.com/Blessinghls/status/2089240517414379589",
           }
           summary = {}
           for name, url in endpoints.items():
@@ -72,4 +74,5 @@ jobs:
             exit 0
           fi
           git commit -m "evidence(reel-reader): capture TEST-HEALTH-001 raw public metadata"
+          git pull --rebase origin chore/reel-reader-deploy-proof
           git push origin HEAD:chore/reel-reader-deploy-proof
