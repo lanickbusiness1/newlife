@@ -1,0 +1,47 @@
+name: MCP Audit Remediation
+
+on:
+  push:
+    branches:
+      - feat/reel-reader-live-resolver-deploy
+    paths:
+      - '.github/workflows/mcp-audit-remediation.yml'
+      - 'services/mcp-server/package.json'
+      - 'services/mcp-server/package-lock.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mcp-audit-remediation
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp-server
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: feat/reel-reader-live-resolver-deploy
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/mcp-server/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm audit fix --package-lock-only
+      - run: npm audit --audit-level=high
+      - name: Commit remediated lockfile if changed
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "No lockfile changes required"
+            exit 0
+          fi
+          git config user.name "afrIAgenesis DeployBot"
+          git config user.email "actions@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "fix(mcp): remediate high-risk npm audit findings"
+          git push origin HEAD:feat/reel-reader-live-resolver-deploy
