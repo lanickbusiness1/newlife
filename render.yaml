@@ -12,3 +12,15 @@ services:
         value: http
       - key: NODE_ENV
         value: production
+
+  - type: web
+    name: afria-reel-intelligence-reader
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    rootDir: apps/afria-reel-intelligence-reader/backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
