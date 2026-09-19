@@ -216,6 +216,18 @@ describe("GEN-V4-COUNTRY-COMPILER-001", () => {
     expect(result.blockers).toContain("COUNTRY_CORE_FORK_FORBIDDEN");
   });
 
+  it("fails closed with a deterministic error for malformed portability input", () => {
+    const bj = compileCountryGenome({
+      executionId: "exec-bj",
+      parentCoreRef: "core:genesis-v4:sha-001",
+      targetTruthState: "BLUEPRINT_READY",
+      countryGenome: genome("BJ"),
+      requestedCapabilities: ["identity"]
+    });
+
+    expect(() => assessCountryPortability(bj, {} as any)).toThrow("COUNTRY_PORTABILITY_INVALID_TARGET");
+  });
+
   it("rejects portability if the child requires a different core", () => {
     const bj = compileCountryGenome({
       executionId: "exec-bj",
