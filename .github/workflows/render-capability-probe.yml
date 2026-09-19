@@ -1,0 +1,90 @@
+name: Render Capability Probe
+
+on:
+  push:
+    branches:
+      - chore/reel-reader-deploy-proof
+    paths:
+      - '.github/workflows/render-capability-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      RENDER_KEY_A: ${{ secrets.RENDER_API_KEY }}
+      RENDER_KEY_B: ${{ secrets.RENDER_API_TOKEN }}
+      RENDER_KEY_C: ${{ secrets.RENDER_TOKEN }}
+    steps:
+      - name: Detect Render credential without disclosure
+        shell: bash
+        run: |
+          set -euo pipefail
+          key=""
+          source=""
+          if [ -n "${RENDER_KEY_A:-}" ]; then key="$RENDER_KEY_A"; source="RENDER_API_KEY"; fi
+          if [ -z "$key" ] && [ -n "${RENDER_KEY_B:-}" ]; then key="$RENDER_KEY_B"; source="RENDER_API_TOKEN"; fi
+          if [ -z "$key" ] && [ -n "${RENDER_KEY_C:-}" ]; then key="$RENDER_KEY_C"; source="RENDER_TOKEN"; fi
+          if [ -z "$key" ]; then
+            echo "RENDER_CREDENTIAL=MISSING"
+            exit 2
+          fi
+          echo "RENDER_CREDENTIAL=PRESENT source=$source"
+          echo "::add-mask::$key"
+          printf '%s' "$key" > /tmp/render-key
+
+      - name: Query Render workspaces services and blueprints
+        shell: python
+        run: |
+          import json, urllib.request
+          from pathlib import Path
+
+          key = Path("/tmp/render-key").read_text()
+          headers = {"Authorization": f"Bearer {key}", "Accept": "application/json"}
+
+          def get(path):
+              req = urllib.request.Request("https://api.render.com" + path, headers=headers)
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  return json.load(r)
+
+          owners = get("/v1/owners?limit=100")
+          services = get("/v1/services?limit=100")
+          blueprints = get("/v1/blueprints?limit=100")
+
+          def compact_owner(x):
+              o = x.get("owner", x)
+              return {"id": o.get("id"), "name": o.get("name"), "type": o.get("type")}
+
+          def compact_service(x):
+              s = x.get("service", x)
+              return {
+                  "id": s.get("id"),
+                  "name": s.get("name"),
+                  "type": s.get("type"),
+                  "repo": s.get("repo"),
+                  "branch": s.get("branch"),
+                  "rootDir": s.get("rootDir"),
+                  "serviceDetails": {
+                      "url": (s.get("serviceDetails") or {}).get("url"),
+                      "runtime": (s.get("serviceDetails") or {}).get("runtime"),
+                      "healthCheckPath": (s.get("serviceDetails") or {}).get("healthCheckPath"),
+                  },
+              }
+
+          def compact_blueprint(x):
+              b = x.get("blueprint", x)
+              return {
+                  "id": b.get("id"),
+                  "name": b.get("name"),
+                  "repo": b.get("repo"),
+                  "branch": b.get("branch"),
+                  "path": b.get("path"),
+                  "autoSync": b.get("autoSync"),
+                  "lastSync": b.get("lastSync"),
+              }
+
+          print("RENDER_OWNERS=" + json.dumps([compact_owner(x) for x in owners], separators=(",", ":")))
+          print("RENDER_SERVICES=" + json.dumps([compact_service(x) for x in services], separators=(",", ":")))
+          print("RENDER_BLUEPRINTS=" + json.dumps([compact_blueprint(x) for x in blueprints], separators=(",", ":")))
