@@ -23,9 +23,14 @@ import {
   evaluateKnowledgePromotion,
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
+import {
+  assessCountryPortability,
+  compileCountryGenome,
+  GENESIS_V4_COUNTRY_COMPILER_ANCHOR
+} from "./countryCompiler.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.6.0";
+const CONTROL_PLANE_REVISION = "0.7.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -70,7 +75,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.7.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane and Country Compiler are deterministic control-plane components; external CRM, payment providers, national connectors and canonical SQL persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
@@ -217,6 +222,23 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
+  register("genome.country_compiler.compile", "Compile un Country Genome™ en manifests de déploiement gouvernés sans forker le CORE.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "genome:compile", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    compilation: compileCountryGenome(payload as any)
+  }));
+
+  register("genome.country_compiler.assess_portability", "Évalue la preuve de portabilité entre deux compilations pays en exigeant le même CORE immuable.", {
+    context: RequestContext,
+    source: z.unknown(),
+    target: z.unknown()
+  }, "genome:compile", async ({ context, source, target }) => ({
+    tenantId: context.tenantId,
+    portability: assessCountryPortability(source as any, target as any)
+  }));
+
   return server;
 }
 
@@ -243,7 +265,9 @@ if (mode === "stdio") {
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
-      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
+      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
+      countryCompiler: GENESIS_V4_COUNTRY_COMPILER_ANCHOR.assetId,
+      countryCompilerVersion: GENESIS_V4_COUNTRY_COMPILER_ANCHOR.version
     });
   });
 
