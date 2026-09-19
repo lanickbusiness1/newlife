@@ -23,6 +23,10 @@ import {
   evaluateKnowledgePromotion,
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
+import {
+  assessCorridorValueCapture,
+  GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR
+} from "./corridorValueCapture.js";
 
 const PACKAGE_VERSION = "0.3.0";
 const CONTROL_PLANE_REVISION = "0.6.0";
@@ -70,7 +74,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane and Corridor Value Capture Engine are deterministic; external source ingestion, CRM/payment providers and canonical persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
@@ -151,6 +155,14 @@ function buildServer() {
   }, "revenue:plan", async ({ context, payload }) => ({
     tenantId: context.tenantId,
     ...compileRevenueEngine(payload)
+  }));
+
+  register("corridor.value_capture.assess", "Évalue un corridor stratégique et sa capture de valeur souveraine à partir d'inputs explicitement sourcés.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "corridor:assess", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    assessment: assessCorridorValueCapture(payload as any)
   }));
 
   register("deploybot.validation_relay.compile", "Compile une validation CEO en state machine DeployBot A1-A3 jusqu’au livrable final ou veto A4.", {
@@ -243,7 +255,9 @@ if (mode === "stdio") {
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
-      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
+      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
+      corridorValueCapture: GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR.assetId,
+      corridorValueCaptureVersion: GENESIS_V4_CORRIDOR_VALUE_CAPTURE_ANCHOR.version
     });
   });
 
