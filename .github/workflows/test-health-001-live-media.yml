@@ -26,6 +26,11 @@ jobs:
       - name: Install resolver runtime
         run: pip install 'httpx>=0.28,<1'
 
+      - name: Install bounded media tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
       - name: Execute canonical resolver against real tweet
         shell: bash
         run: |
