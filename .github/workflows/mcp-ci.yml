@@ -33,7 +33,14 @@ jobs:
           cache: npm
           cache-dependency-path: services/mcp-server/package-lock.json
       - run: npm ci --ignore-scripts
-      - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm audit --audit-level=high
+      - name: Generate auditable dependency-fix patch
+        if: failure()
+        run: |
+          npm audit fix --package-lock-only --ignore-scripts || true
+          echo '---BEGIN_PACKAGE_LOCK_PATCH---'
+          git diff -- package-lock.json
+          echo '---END_PACKAGE_LOCK_PATCH---'

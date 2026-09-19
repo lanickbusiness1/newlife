@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://afriagenesis.org/schemas/gen-v4-country-genome-contract-001.schema.json",
+  "title": "GEN-V4-COUNTRY-GENOME-CONTRACT-001",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "contract_id",
+    "contract_version",
+    "genome_id",
+    "genome_version",
+    "country",
+    "authority",
+    "truth",
+    "sovereignty",
+    "capabilities",
+    "security",
+    "deployment",
+    "governance",
+    "reme"
+  ],
+  "properties": {
+    "contract_id": {
+      "const": "GEN-V4-COUNTRY-GENOME-CONTRACT-001"
+    },
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "genome_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "genome_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "country": {
+      "type": "object",
+      "required": [
+        "code_iso2",
+        "name",
+        "region",
+        "jurisdiction",
+        "timezone",
+        "currencies",
+        "languages"
+      ],
+      "properties": {
+        "code_iso2": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jurisdiction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1
+        },
+        "currencies": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "languages": {
+          "type": "object",
+          "required": ["official", "local", "working"],
+          "properties": {
+            "official": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "local": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "working": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "required": ["sovereign_owner", "competent_authorities", "mandates"]
+    },
+    "truth": {
+      "type": "object",
+      "required": ["max_truth_state", "evidence_refs", "unresolved_claims"]
+    },
+    "sovereignty": {
+      "type": "object",
+      "required": ["sovereignty_policy_refs"]
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["existing", "gaps"],
+      "properties": {
+        "existing": {
+          "type": "array"
+        },
+        "gaps": {
+          "type": "array"
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "required": [
+        "permissions_model",
+        "secrets_policy",
+        "logging_policy",
+        "rollback_required",
+        "kill_switch_required"
+      ],
+      "properties": {
+        "rollback_required": {
+          "const": true
+        },
+        "kill_switch_required": {
+          "const": true
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "required": ["rollback_target"]
+    },
+    "governance": {
+      "type": "object",
+      "required": ["required_gates"]
+    },
+    "reme": {
+      "type": "object",
+      "required": ["evidence_root", "learning_return_path"]
+    }
+  }
+}
