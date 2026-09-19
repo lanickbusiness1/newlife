@@ -2,6 +2,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from typing import Literal
+from urllib.parse import quote
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from visibility import VisibilityAssessment, assess_visibility
@@ -30,9 +31,28 @@ EVIDENCE_TO_STATUS = {
     "payment_proof": "Payé",
 }
 
+CHANNEL_ACTION_TO_EVENT = {
+    "send_message": "message_sent",
+    "capture_reply": "reply_received",
+    "reserve_diagnostic": "diagnostic_reserved",
+    "send_proposal": "proposal_sent",
+    "request_payment": "payment_requested",
+    "confirm_payment": "payment_received",
+}
+
+CHANNEL_EVENT_TO_EVIDENCE = {
+    "message_sent": "send_proof",
+    "reply_received": "reply_proof",
+    "diagnostic_reserved": "diagnostic_proof",
+    "proposal_sent": "proposal_proof",
+    "payment_requested": "payment_request_proof",
+    "payment_received": "payment_proof",
+}
+
+CHANNEL_PROOF_CONNECTOR = "Channel Proof Connector Layer™"
 OUTBOUND_EVIDENCE_LEDGER: dict[str, dict] = {}
 
-app = FastAPI(title="AfrIA Marketing Team Production Product", version="1.1.0")
+app = FastAPI(title="AfrIA Marketing Team Production Product", version="1.2.0")
 
 class ProductIntake(BaseModel):
     product_name: str = Field(min_length=1)
@@ -79,6 +99,40 @@ class ChannelActivationRequest(BaseModel):
     connected: bool
     requested_action: str = Field(min_length=1)
 
+class ChannelProofDraftRequest(BaseModel):
+    lead_id: str = Field(min_length=1)
+    lead_name: str | None = None
+    channel: Literal["WhatsApp", "Email", "LinkedIn", "Payment"]
+    action: Literal[
+        "send_message",
+        "capture_reply",
+        "reserve_diagnostic",
+        "send_proposal",
+        "request_payment",
+        "confirm_payment",
+    ]
+    contact_ref: str | None = None
+    message: str | None = None
+    amount: int | None = None
+    currency: str | None = None
+
+class ChannelProofEventRequest(BaseModel):
+    lead_id: str = Field(min_length=1)
+    lead_name: str | None = None
+    channel: Literal["WhatsApp", "Email", "LinkedIn", "Payment"]
+    event_type: Literal[
+        "message_sent",
+        "reply_received",
+        "diagnostic_reserved",
+        "proposal_sent",
+        "payment_requested",
+        "payment_received",
+    ]
+    proof_ref: str = Field(min_length=1)
+    source: str = Field(min_length=1)
+    occurred_at: str | None = None
+    note: str | None = None
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -92,6 +146,53 @@ def _canonical_digest(payload: dict) -> str:
 def _build_evidence_id(payload: dict) -> str:
     return f"OEG-EVID-{_canonical_digest(payload)[:16].upper()}"
 
+
+def _digits_only(value: str | None) -> str:
+    return "".join(character for character in (value or "") if character.isdigit())
+
+
+def _draft_url(payload: ChannelProofDraftRequest) -> str | None:
+    message = quote(payload.message or "")
+    if payload.channel == "WhatsApp":
+        phone = _digits_only(payload.contact_ref)
+        return f"https://wa.me/{phone}?text={message}" if phone else None
+    if payload.channel == "Email":
+        contact = payload.contact_ref or ""
+        return f"mailto:{contact}?subject={quote('AfrIA Marketing Team™')}&body={message}"
+    if payload.channel == "LinkedIn":
+        return payload.contact_ref
+    if payload.channel == "Payment":
+        amount = payload.amount or 0
+        currency = payload.currency or "FCFA"
+        return f"payment://request?lead_id={quote(payload.lead_id)}&amount={amount}&currency={quote(currency)}"
+    return None
+
+
+def _store_outbound_evidence(payload: OutboundEvidenceRequest, connector_layer: str | None = None) -> dict:
+    evidence_payload = {
+        "asset_id": ASSET_ID,
+        "lead_id": payload.lead_id,
+        "lead_name": payload.lead_name,
+        "channel": payload.channel,
+        "evidence_type": payload.evidence_type,
+        "proof_ref": payload.proof_ref,
+        "source": payload.source,
+        "occurred_at": payload.occurred_at or _now_iso(),
+        "note": payload.note,
+    }
+    evidence_id = _build_evidence_id(evidence_payload)
+    record = {
+        **evidence_payload,
+        "evidence_id": evidence_id,
+        "digest": _canonical_digest(evidence_payload),
+        "accepted": True,
+        "crm_transition_enabled": EVIDENCE_TO_STATUS[payload.evidence_type],
+    }
+    if connector_layer:
+        record["connector_layer"] = connector_layer
+    OUTBOUND_EVIDENCE_LEDGER[evidence_id] = record
+    return record
+
 @app.get("/health")
 def health():
     return {
@@ -100,7 +201,7 @@ def health():
         "product_standard": PRODUCT_STANDARD,
         "production_revenue_ready": PRODUCTION_REVENUE_READY,
         "literal": "PRODUCTION_REVENUE_READY=false",
-        "gates": ["S7+", "M6", "CyberAudit", "M8", "Big4", "Outbound Evidence Gate™"],
+        "gates": ["S7+", "M6", "CyberAudit", "M8", "Big4", "Outbound Evidence Gate™", CHANNEL_PROOF_CONNECTOR],
     }
 
 @app.post("/product/intake")
@@ -142,26 +243,7 @@ def export_evidence(payload: EvidenceRequest):
 
 @app.post("/outbound/evidence")
 def ingest_outbound_evidence(payload: OutboundEvidenceRequest):
-    evidence_payload = {
-        "asset_id": ASSET_ID,
-        "lead_id": payload.lead_id,
-        "lead_name": payload.lead_name,
-        "channel": payload.channel,
-        "evidence_type": payload.evidence_type,
-        "proof_ref": payload.proof_ref,
-        "source": payload.source,
-        "occurred_at": payload.occurred_at or _now_iso(),
-        "note": payload.note,
-    }
-    evidence_id = _build_evidence_id(evidence_payload)
-    OUTBOUND_EVIDENCE_LEDGER[evidence_id] = {
-        **evidence_payload,
-        "evidence_id": evidence_id,
-        "digest": _canonical_digest(evidence_payload),
-        "accepted": True,
-        "crm_transition_enabled": EVIDENCE_TO_STATUS[payload.evidence_type],
-    }
-    return OUTBOUND_EVIDENCE_LEDGER[evidence_id]
+    return _store_outbound_evidence(payload)
 
 @app.post("/crm/transition/validate")
 def validate_crm_transition(payload: CrmTransitionRequest):
@@ -223,4 +305,47 @@ def classify_channel_activation(payload: ChannelActivationRequest):
         "requested_action": payload.requested_action,
         "next_action": "prepare_draft_and_capture_external_proof",
         "rule": "canal externe non connecté = activation canal, pas blocage produit",
+    }
+
+@app.post("/channel/proof/draft")
+def draft_channel_proof(payload: ChannelProofDraftRequest):
+    event_type = CHANNEL_ACTION_TO_EVENT[payload.action]
+    evidence_type = CHANNEL_EVENT_TO_EVIDENCE[event_type]
+    return {
+        "connector_layer": CHANNEL_PROOF_CONNECTOR,
+        "prepared": True,
+        "sent": False,
+        "product_blocker": False,
+        "classification": "activation_channel",
+        "channel": payload.channel,
+        "lead_id": payload.lead_id,
+        "lead_name": payload.lead_name,
+        "action": payload.action,
+        "event_type": event_type,
+        "proof_required": evidence_type,
+        "next_status": EVIDENCE_TO_STATUS[evidence_type],
+        "send_url": _draft_url(payload),
+        "message": payload.message,
+        "evidence_submission_target": "/outbound/evidence",
+        "rule": "draft prepared only; CRM status cannot advance until proof is ingested",
+    }
+
+@app.post("/channel/proof/normalize")
+def normalize_channel_proof(payload: ChannelProofEventRequest):
+    evidence_type = CHANNEL_EVENT_TO_EVIDENCE[payload.event_type]
+    evidence_payload = OutboundEvidenceRequest(
+        lead_id=payload.lead_id,
+        lead_name=payload.lead_name,
+        channel=payload.channel,
+        evidence_type=evidence_type,
+        proof_ref=payload.proof_ref,
+        source=payload.source,
+        occurred_at=payload.occurred_at,
+        note=payload.note,
+    )
+    record = _store_outbound_evidence(evidence_payload, connector_layer=CHANNEL_PROOF_CONNECTOR)
+    return {
+        **record,
+        "event_type": payload.event_type,
+        "transition_validation_target": "/crm/transition/validate",
     }

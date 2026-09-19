@@ -108,3 +108,75 @@ def test_channel_unavailable_is_activation_not_product_blocker():
     assert body["classification"] == "activation_channel"
     assert body["product_blocker"] is False
     assert body["next_action"] == "prepare_draft_and_capture_external_proof"
+
+
+def test_channel_proof_draft_builds_whatsapp_link_without_claiming_send():
+    response = client.post("/channel/proof/draft", json={
+        "lead_id": "lead-010",
+        "lead_name": "Prospect école",
+        "channel": "WhatsApp",
+        "action": "send_message",
+        "contact_ref": "+229 61 10 73 73",
+        "message": "Bonjour, diagnostic express AfrIA Marketing Team™ ?"
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["prepared"] is True
+    assert body["sent"] is False
+    assert body["product_blocker"] is False
+    assert body["proof_required"] == "send_proof"
+    assert body["next_status"] == "Message envoyé"
+    assert body["send_url"].startswith("https://wa.me/22961107373?text=")
+    assert body["evidence_submission_target"] == "/outbound/evidence"
+
+
+def test_channel_proof_normalizes_email_sent_event_into_evidence():
+    response = client.post("/channel/proof/normalize", json={
+        "lead_id": "lead-email-001",
+        "lead_name": "Cabinet conseil",
+        "channel": "Email",
+        "event_type": "message_sent",
+        "proof_ref": "email://sent/message-001",
+        "source": "gmail_connector",
+        "occurred_at": "2026-09-19T07:10:00Z"
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["accepted"] is True
+    assert body["evidence_type"] == "send_proof"
+    assert body["crm_transition_enabled"] == "Message envoyé"
+    assert body["connector_layer"] == "Channel Proof Connector Layer™"
+
+
+def test_channel_proof_normalizes_payment_received_event_to_paid_status():
+    evidence = client.post("/channel/proof/normalize", json={
+        "lead_id": "lead-pay-001",
+        "lead_name": "PME payante",
+        "channel": "Payment",
+        "event_type": "payment_received",
+        "proof_ref": "payment://transaction/tx-49900",
+        "source": "payment_manual_proof"
+    }).json()
+
+    assert evidence["evidence_type"] == "payment_proof"
+    assert evidence["crm_transition_enabled"] == "Payé"
+
+    transition = client.post("/crm/transition/validate", json={
+        "lead_id": "lead-pay-001",
+        "from_status": "Paiement demandé",
+        "to_status": "Payé",
+        "evidence_ids": [evidence["evidence_id"]]
+    })
+    assert transition.status_code == 200
+    assert transition.json()["allowed"] is True
+
+
+def test_channel_proof_refuses_unknown_event_mapping():
+    response = client.post("/channel/proof/normalize", json={
+        "lead_id": "lead-unknown",
+        "channel": "LinkedIn",
+        "event_type": "profile_viewed",
+        "proof_ref": "linkedin://event/001",
+        "source": "manual"
+    })
+    assert response.status_code == 422
