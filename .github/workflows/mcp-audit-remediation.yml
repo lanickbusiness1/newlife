@@ -32,8 +32,10 @@ jobs:
           cache: npm
           cache-dependency-path: services/mcp-server/package-lock.json
       - run: npm ci --ignore-scripts
-      - run: npm audit fix --package-lock-only
-      - run: npm audit --audit-level=high
+      - name: Apply non-breaking security fixes to lockfile
+        run: npm audit fix --package-lock-only || true
+      - name: Enforce no high/critical vulnerabilities
+        run: npm audit --audit-level=high
       - name: Commit remediated lockfile if changed
         run: |
           if git diff --quiet -- package-lock.json; then
