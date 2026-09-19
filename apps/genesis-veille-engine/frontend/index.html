@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Genesis Veille — Africa World State</title>
+  <meta name="description" content="Cockpit public Africa 54/54 de Genesis Veille Engine — signaux, provenance, risque et opportunités." />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #100d09;
+      --panel: #1d1812;
+      --panel-2: #272018;
+      --panel-3: #15110d;
+      --line: rgba(245, 189, 86, .22);
+      --line-strong: rgba(245, 189, 86, .42);
+      --gold: #f5bd56;
+      --amber: #e58c32;
+      --ink: #f8f0df;
+      --muted: #b9aa92;
+      --ok: #91cf9d;
+      --danger: #ff8f76;
+      --info: #8fb8d8;
+      --shadow: 0 18px 54px rgba(0,0,0,.34);
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at 14% 0%, rgba(138,82,20,.34), transparent 34rem),
+        radial-gradient(circle at 88% 12%, rgba(84,55,20,.16), transparent 28rem),
+        var(--bg);
+      color: var(--ink);
+      font: 15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, select { font: inherit; }
+    button { color: inherit; }
+    .shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+    header {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.3rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(16,13,9,.92);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand { display: flex; gap: .8rem; align-items: center; }
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--gold), #7e3f12);
+      color: #21160b;
+      font-weight: 900;
+      box-shadow: 0 8px 24px rgba(229,140,50,.2);
+    }
+    .brand strong { display: block; letter-spacing: .04em; }
+    .brand small { color: var(--muted); }
+    .status { display: inline-flex; gap: .5rem; align-items: center; color: var(--muted); font-size: 13px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px rgba(229,140,50,.12); }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 0 4px rgba(145,207,157,.12); }
+    main { padding: 1rem; display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(340px, .75fr); gap: 1rem; }
+    .card {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(38,32,24,.96), rgba(24,20,15,.98));
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .toolbar { padding: .9rem 1rem; display: flex; gap: .7rem; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--line); }
+    .toolbar label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    select { min-width: 225px; background: #16120e; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: .62rem .75rem; }
+    .muted { color: var(--muted); }
+    .sovereign-chip { margin-left: auto; border: 1px solid rgba(145,207,157,.3); color: var(--ok); border-radius: 999px; padding: .25rem .55rem; font-size: 11px; letter-spacing: .04em; }
+    #africa-field {
+      position: relative;
+      height: min(66vh, 720px);
+      min-height: 500px;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(245,189,86,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245,189,86,.035) 1px, transparent 1px),
+        radial-gradient(circle at 50% 42%, rgba(229,140,50,.11), transparent 46%),
+        #13100c;
+      background-size: 40px 40px, 40px 40px, auto, auto;
+    }
+    .continent {
+      position: absolute;
+      inset: 5% 10% 5% 10%;
+      width: 80%;
+      height: 90%;
+      opacity: .38;
+      filter: drop-shadow(0 18px 30px rgba(0,0,0,.3));
+      pointer-events: none;
+    }
+    .continent path { fill: rgba(229,140,50,.16); stroke: rgba(245,189,86,.32); stroke-width: 2.2; vector-effect: non-scaling-stroke; }
+    .country-point {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      padding: 0;
+      margin: -6px 0 0 -6px;
+      border-radius: 50%;
+      border: 1px solid rgba(248,240,223,.65);
+      background: var(--amber);
+      box-shadow: 0 0 0 4px rgba(229,140,50,.09), 0 3px 12px rgba(0,0,0,.5);
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+      z-index: 3;
+    }
+    .country-point:hover, .country-point:focus-visible { transform: scale(1.55); outline: none; box-shadow: 0 0 0 5px rgba(245,189,86,.2), 0 6px 16px rgba(0,0,0,.5); }
+    .country-point.active { width: 18px; height: 18px; margin: -9px 0 0 -9px; background: var(--gold); border-color: #fff3d2; box-shadow: 0 0 0 7px rgba(245,189,86,.18), 0 8px 22px rgba(0,0,0,.6); z-index: 5; }
+    .field-label { position: absolute; top: 1rem; left: 1rem; z-index: 2; max-width: 270px; }
+    .field-label strong { display: block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
+    .field-label span { color: var(--muted); font-size: 11px; }
+    .coordinate-note { position: absolute; right: 1rem; bottom: 1rem; color: #8f816d; font-size: 10px; text-align: right; max-width: 230px; }
+    .legend { padding: .8rem 1rem; display: flex; gap: 1rem; flex-wrap: wrap; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+    .legend b { color: var(--ink); }
+    .side { display: grid; gap: 1rem; align-content: start; }
+    .hero { padding: 1.1rem; }
+    .eyebrow { color: var(--gold); text-transform: uppercase; letter-spacing: .12em; font-weight: 800; font-size: 11px; }
+    h1, h2, p { margin-top: 0; }
+    h1 { font-size: clamp(1.45rem, 2.4vw, 2.1rem); margin-bottom: .4rem; }
+    h2 { font-size: 1rem; margin-bottom: .7rem; }
+    .scores { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; margin-top: 1rem; }
+    .score { border: 1px solid var(--line); border-radius: 14px; padding: .9rem; background: rgba(10,8,6,.28); }
+    .score span { display: block; color: var(--muted); font-size: 12px; }
+    .score strong { font-size: 1.8rem; letter-spacing: -.04em; }
+    .score.risk strong { color: var(--danger); }
+    .score.opp strong { color: var(--ok); }
+    .provenance-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .45rem; margin-top: .8rem; }
+    .prov-metric { padding: .55rem .65rem; border: 1px solid rgba(245,189,86,.12); background: rgba(10,8,6,.22); border-radius: 10px; }
+    .prov-metric span { display: block; color: var(--muted); font-size: 10px; letter-spacing: .05em; }
+    .prov-metric strong { font-size: 14px; }
+    .stream { max-height: 390px; overflow: auto; }
+    .event { padding: .9rem 1rem; border-top: 1px solid rgba(245,189,86,.1); }
+    .event:first-child { border-top: 0; }
+    .event-head { display: flex; justify-content: space-between; gap: .6rem; align-items: flex-start; }
+    .event-title { font-weight: 720; }
+    .event-meta { color: var(--muted); font-size: 12px; margin-top: .32rem; }
+    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: .18rem .5rem; border: 1px solid var(--line); font-size: 10px; letter-spacing: .05em; white-space: nowrap; }
+    .badge.verified, .badge.corroborated { color: var(--ok); border-color: rgba(145,207,157,.35); }
+    .badge.observation { color: var(--gold); }
+    .badge.rejected { color: var(--danger); }
+    .empty { padding: 1rem; color: var(--muted); }
+    .degraded { margin: .8rem 1rem 1rem; border: 1px dashed rgba(255,143,118,.42); padding: .75rem; border-radius: 12px; color: #eec2b5; display: none; }
+    .degraded.visible { display: block; }
+    .footer-note { padding: .9rem 1rem; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      #africa-field { min-height: 440px; height: 57vh; }
+      header { align-items: flex-start; }
+      .status { font-size: 11px; }
+      .sovereign-chip { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="brand">
+      <div class="brand-mark">G4</div>
+      <div><strong>GENESIS VEILLE</strong><small>Africa World State · Public Intelligence</small></div>
+    </div>
+    <div class="status"><span id="health-dot" class="dot"></span><span id="health-text">Connexion au moteur…</span></div>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="toolbar">
+        <label for="country-select">Pays</label>
+        <select id="country-select" aria-label="Sélectionner un pays africain"></select>
+        <span class="muted">Africa-first · 54/54 · Signal ≠ preuve</span>
+        <span class="sovereign-chip">Runtime cartographique local</span>
+      </div>
+      <div id="africa-field" data-sovereign-map="local" role="application" aria-label="Champ opérationnel souverain de l'Afrique">
+        <svg class="continent" viewBox="0 0 620 720" aria-hidden="true">
+          <path d="M206 52 L288 38 L376 56 L452 102 L487 156 L472 213 L508 260 L495 317 L454 344 L424 393 L399 442 L357 477 L336 536 L292 620 L257 681 L228 628 L205 552 L175 503 L139 439 L119 369 L83 319 L79 257 L103 204 L143 177 L158 120 Z M474 414 L503 448 L494 510 L465 565 L445 526 L451 466 Z" />
+        </svg>
+        <div class="field-label"><strong>Africa Sovereign Field</strong><span>Projection locale des 54 pays. Aucun composant cartographique tiers n'est requis pour l'affichage.</span></div>
+        <div class="coordinate-note">Représentation opérationnelle indicative — les points servent à la navigation intelligence, pas à la délimitation juridique des frontières.</div>
+      </div>
+      <div class="legend"><span><b>Risque</b> : événements perturbateurs acceptés</span><span><b>Opportunité</b> : financement, investissement, appel d'offres, croissance</span></div>
+    </section>
+
+    <aside class="side">
+      <section class="card hero">
+        <div class="eyebrow">World State</div>
+        <h1 id="country-name">Mali</h1>
+        <p class="muted">État pays calculé à partir d'événements traçables, avec niveau de provenance explicite.</p>
+        <div class="scores">
+          <div class="score risk"><span>Risk score</span><strong id="risk-score">0</strong></div>
+          <div class="score opp"><span>Opportunity score</span><strong id="opportunity-score">0</strong></div>
+          <div class="score"><span>Événements</span><strong id="event-count">0</strong></div>
+          <div class="score"><span>Confiance moyenne</span><strong id="confidence">0%</strong></div>
+        </div>
+        <div class="provenance-grid">
+          <div class="prov-metric"><span>VERIFIED</span><strong id="verified-count">0</strong></div>
+          <div class="prov-metric"><span>CORROBORATED</span><strong id="corroborated-count">0</strong></div>
+          <div class="prov-metric"><span>OBSERVATION_ONLY</span><strong id="observation-count">0</strong></div>
+          <div class="prov-metric"><span>REJECTED</span><strong>non stocké</strong></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="toolbar"><h2 style="margin:0">Flux événementiel & provenance</h2></div>
+        <div id="degraded" class="degraded">Mode dégradé — le moteur temps réel est momentanément indisponible. Aucune donnée simulée n'est présentée comme donnée live.</div>
+        <div id="event-stream" class="stream"><div class="empty">Aucun événement accepté pour ce pays.</div></div>
+        <div class="footer-note">VERIFIED / CORROBORATED = signal suffisamment étayé selon les règles actives. OBSERVATION_ONLY = observation conservée, jamais présentée comme fait définitivement établi. REJECTED = non admis dans le ledger.</div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+const AFRICA_COUNTRIES = [
+  { iso3: "DZA", name: "Algérie", lat: 28.0, lon: 2.6 },
+  { iso3: "AGO", name: "Angola", lat: -12.3, lon: 17.5 },
+  { iso3: "BEN", name: "Bénin", lat: 9.3, lon: 2.3 },
+  { iso3: "BWA", name: "Botswana", lat: -22.2, lon: 24.0 },
+  { iso3: "BFA", name: "Burkina Faso", lat: 12.3, lon: -1.6 },
+  { iso3: "BDI", name: "Burundi", lat: -3.4, lon: 29.9 },
+  { iso3: "CPV", name: "Cabo Verde", lat: 16.0, lon: -24.0 },
+  { iso3: "CMR", name: "Cameroun", lat: 5.7, lon: 12.7 },
+  { iso3: "CAF", name: "République centrafricaine", lat: 6.6, lon: 20.9 },
+  { iso3: "TCD", name: "Tchad", lat: 15.3, lon: 18.7 },
+  { iso3: "COM", name: "Comores", lat: -11.7, lon: 43.3 },
+  { iso3: "COG", name: "Congo", lat: -0.7, lon: 15.8 },
+  { iso3: "COD", name: "RDC", lat: -2.8, lon: 23.7 },
+  { iso3: "CIV", name: "Côte d’Ivoire", lat: 7.5, lon: -5.5 },
+  { iso3: "DJI", name: "Djibouti", lat: 11.8, lon: 42.6 },
+  { iso3: "EGY", name: "Égypte", lat: 26.8, lon: 30.8 },
+  { iso3: "GNQ", name: "Guinée équatoriale", lat: 1.6, lon: 10.5 },
+  { iso3: "ERI", name: "Érythrée", lat: 15.2, lon: 39.8 },
+  { iso3: "SWZ", name: "Eswatini", lat: -26.5, lon: 31.5 },
+  { iso3: "ETH", name: "Éthiopie", lat: 9.1, lon: 40.5 },
+  { iso3: "GAB", name: "Gabon", lat: -0.8, lon: 11.6 },
+  { iso3: "GMB", name: "Gambie", lat: 13.4, lon: -15.3 },
+  { iso3: "GHA", name: "Ghana", lat: 7.9, lon: -1.0 },
+  { iso3: "GIN", name: "Guinée", lat: 10.4, lon: -10.9 },
+  { iso3: "GNB", name: "Guinée-Bissau", lat: 12.0, lon: -15.2 },
+  { iso3: "KEN", name: "Kenya", lat: 0.2, lon: 37.9 },
+  { iso3: "LSO", name: "Lesotho", lat: -29.6, lon: 28.2 },
+  { iso3: "LBR", name: "Libéria", lat: 6.4, lon: -9.3 },
+  { iso3: "LBY", name: "Libye", lat: 27.0, lon: 17.0 },
+  { iso3: "MDG", name: "Madagascar", lat: -19.0, lon: 46.7 },
+  { iso3: "MWI", name: "Malawi", lat: -13.3, lon: 34.3 },
+  { iso3: "MLI", name: "Mali", lat: 17.6, lon: -3.9 },
+  { iso3: "MRT", name: "Mauritanie", lat: 20.3, lon: -10.3 },
+  { iso3: "MUS", name: "Maurice", lat: -20.3, lon: 57.6 },
+  { iso3: "MAR", name: "Maroc", lat: 31.8, lon: -7.1 },
+  { iso3: "MOZ", name: "Mozambique", lat: -18.7, lon: 35.5 },
+  { iso3: "NAM", name: "Namibie", lat: -22.6, lon: 17.2 },
+  { iso3: "NER", name: "Niger", lat: 17.6, lon: 8.1 },
+  { iso3: "NGA", name: "Nigeria", lat: 9.1, lon: 8.7 },
+  { iso3: "RWA", name: "Rwanda", lat: -1.9, lon: 29.9 },
+  { iso3: "STP", name: "São Tomé-et-Príncipe", lat: 0.2, lon: 6.6 },
+  { iso3: "SEN", name: "Sénégal", lat: 14.5, lon: -14.5 },
+  { iso3: "SYC", name: "Seychelles", lat: -4.7, lon: 55.5 },
+  { iso3: "SLE", name: "Sierra Leone", lat: 8.5, lon: -11.8 },
+  { iso3: "SOM", name: "Somalie", lat: 5.2, lon: 46.2 },
+  { iso3: "ZAF", name: "Afrique du Sud", lat: -30.6, lon: 22.9 },
+  { iso3: "SSD", name: "Soudan du Sud", lat: 7.3, lon: 30.0 },
+  { iso3: "SDN", name: "Soudan", lat: 15.6, lon: 30.2 },
+  { iso3: "TZA", name: "Tanzanie", lat: -6.4, lon: 34.9 },
+  { iso3: "TGO", name: "Togo", lat: 8.6, lon: 1.2 },
+  { iso3: "TUN", name: "Tunisie", lat: 34.0, lon: 9.5 },
+  { iso3: "UGA", name: "Ouganda", lat: 1.4, lon: 32.3 },
+  { iso3: "ZMB", name: "Zambie", lat: -13.1, lon: 27.8 },
+  { iso3: "ZWE", name: "Zimbabwe", lat: -19.0, lon: 29.2 }
+];
+
+const select = document.getElementById("country-select");
+const field = document.getElementById("africa-field");
+const stream = document.getElementById("event-stream");
+const degraded = document.getElementById("degraded");
+const markerByIso = new Map();
+
+function project(country) {
+  const x = Math.max(3, Math.min(97, ((country.lon + 25) / 85) * 100));
+  const y = Math.max(3, Math.min(97, ((37 - country.lat) / 72) * 100));
+  return { x, y };
+}
+
+for (const country of AFRICA_COUNTRIES) {
+  const option = document.createElement("option");
+  option.value = country.iso3;
+  option.textContent = `${country.name} · ${country.iso3}`;
+  option.selected = country.iso3 === "MLI";
+  select.appendChild(option);
+
+  const point = document.createElement("button");
+  point.type = "button";
+  point.className = "country-point";
+  point.dataset.iso3 = country.iso3;
+  point.setAttribute("aria-label", `${country.name} · ${country.iso3}`);
+  point.title = `${country.name} · ${country.iso3}`;
+  const projected = project(country);
+  point.style.left = `${projected.x}%`;
+  point.style.top = `${projected.y}%`;
+  point.addEventListener("click", () => {
+    select.value = country.iso3;
+    loadCountry(country.iso3);
+  });
+  field.appendChild(point);
+  markerByIso.set(country.iso3, point);
+}
+
+function countryMeta(iso3) {
+  return AFRICA_COUNTRIES.find(country => country.iso3 === iso3) || { name: iso3, iso3 };
+}
+
+function setActiveCountry(iso3) {
+  for (const [code, point] of markerByIso.entries()) {
+    point.classList.toggle("active", code === iso3);
+  }
+}
+
+function provenanceClass(status) {
+  if (status === "OBSERVATION_ONLY") return "observation";
+  if (status === "CORROBORATED") return "corroborated";
+  if (status === "REJECTED") return "rejected";
+  return "verified";
+}
+
+function renderEvents(events, iso3) {
+  const filtered = events
+    .filter(item => item.event && item.event.country_iso3 === iso3)
+    .sort((a, b) => new Date(b.event.observed_at) - new Date(a.event.observed_at));
+
+  stream.replaceChildren();
+  if (!filtered.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "Aucun événement accepté pour ce pays.";
+    stream.appendChild(empty);
+    return;
+  }
+
+  for (const item of filtered) {
+    const article = document.createElement("article");
+    article.className = "event";
+
+    const head = document.createElement("div");
+    head.className = "event-head";
+    const title = document.createElement("div");
+    title.className = "event-title";
+    title.textContent = item.event.title;
+    const badge = document.createElement("span");
+    badge.className = `badge ${provenanceClass(item.provenance.status)}`;
+    badge.textContent = item.provenance.status;
+    head.append(title, badge);
+
+    const meta = document.createElement("div");
+    meta.className = "event-meta";
+    meta.textContent = `${item.event.event_type} · confiance ${Math.round(item.event.confidence * 100)}% · ${new Date(item.event.observed_at).toLocaleString()}`;
+
+    article.append(head, meta);
+    stream.appendChild(article);
+  }
+}
+
+function updateMetrics(state) {
+  document.getElementById("risk-score").textContent = Number(state.risk_score || 0).toFixed(0);
+  document.getElementById("opportunity-score").textContent = Number(state.opportunity_score || 0).toFixed(0);
+  document.getElementById("event-count").textContent = state.event_count || 0;
+  document.getElementById("confidence").textContent = `${Math.round((state.average_confidence || 0) * 100)}%`;
+  const counts = state.provenance_counts || {};
+  document.getElementById("verified-count").textContent = counts.VERIFIED || 0;
+  document.getElementById("corroborated-count").textContent = counts.CORROBORATED || 0;
+  document.getElementById("observation-count").textContent = counts.OBSERVATION_ONLY || 0;
+}
+
+async function checkHealth() {
+  try {
+    const response = await fetch("/health");
+    if (!response.ok) throw new Error("health failed");
+    const health = await response.json();
+    document.getElementById("health-dot").classList.add("ok");
+    document.getElementById("health-text").textContent = `${health.service} · ${health.version}`;
+  } catch (error) {
+    document.getElementById("health-dot").classList.remove("ok");
+    document.getElementById("health-text").textContent = "moteur indisponible";
+    degraded.classList.add("visible");
+  }
+}
+
+async function loadCountry(iso3) {
+  const meta = countryMeta(iso3);
+  document.getElementById("country-name").textContent = meta.name;
+  setActiveCountry(iso3);
+
+  try {
+    const [stateResponse, eventsResponse] = await Promise.all([
+      fetch(`/api/v1/world-state/countries/${iso3}`),
+      fetch("/api/v1/events")
+    ]);
+    if (!stateResponse.ok || !eventsResponse.ok) throw new Error("world-state request failed");
+    const state = await stateResponse.json();
+    const events = await eventsResponse.json();
+    updateMetrics(state);
+    renderEvents(events, iso3);
+    degraded.classList.remove("visible");
+  } catch (error) {
+    document.getElementById("risk-score").textContent = "—";
+    document.getElementById("opportunity-score").textContent = "—";
+    document.getElementById("event-count").textContent = "—";
+    document.getElementById("confidence").textContent = "—";
+    document.getElementById("verified-count").textContent = "—";
+    document.getElementById("corroborated-count").textContent = "—";
+    document.getElementById("observation-count").textContent = "—";
+    stream.replaceChildren();
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "Aucune donnée live chargée. Le cockpit n’invente pas de valeurs de remplacement.";
+    stream.appendChild(empty);
+    degraded.classList.add("visible");
+  }
+}
+
+select.addEventListener("change", event => loadCountry(event.target.value));
+checkHealth();
+loadCountry(select.value);
+</script>
+</body>
+</html>
