@@ -1,0 +1,51 @@
+{
+  "source_platform": "X",
+  "source_handle": "Blessinghls",
+  "tweet_id": "2101019521947451594",
+  "source_url": "https://x.com/Blessinghls/status/2101019521947451594",
+  "media_state": "MEDIA_RESOLVED",
+  "resolved_by": "fxtwitter",
+  "media_candidates": [
+    "https://pbs.twimg.com/profile_banners/2072949286359162880/1784214558",
+    "https://pbs.twimg.com/profile_images/2077771801287864320/wRhJ5b_q_200x200.jpg",
+    "https://video.twimg.com/amplify_video/2089240415144648704/vid/avc1/720x900/h_W46utsnu875lcg.mp4?tag=29",
+    "https://pbs.twimg.com/amplify_video_thumb/2089240415144648704/img/45I_swjrLO3mP8r6.jpg",
+    "https://video.twimg.com/amplify_video/2089240415144648704/pl/DMrlod8zu0pCipkJ.m3u8?tag=29",
+    "https://video.twimg.com/amplify_video/2089240415144648704/vid/avc1/320x400/pkSy9fG_FGmLQBkR.mp4?tag=29",
+    "https://video.twimg.com/amplify_video/2089240415144648704/vid/avc1/480x600/rWv-MyDOSreHOSxZ.mp4?tag=29",
+    "https://pbs.twimg.com/profile_images/2077771801287864320/wRhJ5b_q_normal.jpg",
+    "https://video.twimg.com/amplify_video/2089240415144648704/vid/avc1/720x900/h_W46utsnu875lcg.mp4"
+  ],
+  "attempts": [
+    {
+      "strategy": "fxtwitter",
+      "endpoint_host": "api.fxtwitter.com",
+      "http_status": 200,
+      "error": null,
+      "media_candidate_count": 8
+    },
+    {
+      "strategy": "vxtwitter",
+      "endpoint_host": "api.vxtwitter.com",
+      "http_status": 200,
+      "error": null,
+      "media_candidate_count": 3
+    },
+    {
+      "strategy": "x_syndication",
+      "endpoint_host": "cdn.syndication.twimg.com",
+      "http_status": 200,
+      "error": null,
+      "media_candidate_count": 0
+    },
+    {
+      "strategy": "x_oembed",
+      "endpoint_host": "publish.twitter.com",
+      "http_status": 301,
+      "error": null,
+      "media_candidate_count": 0
+    }
+  ],
+  "claim_state": "CLAIMS_NOT_EXTRACTED",
+  "inference_from_caption_allowed": false
+}
