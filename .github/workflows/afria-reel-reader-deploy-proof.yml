@@ -1,0 +1,71 @@
+name: Reel Reader Deploy Proof
+
+on:
+  push:
+    branches:
+      - chore/reel-reader-deploy-proof
+    paths:
+      - '.github/workflows/afria-reel-reader-deploy-proof.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe live health endpoint
+        id: health
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://afria-reel-intelligence-reader.onrender.com/health"
+          echo "Probing $URL"
+          code="000"
+          body=""
+          for i in $(seq 1 8); do
+            body="$(curl -sS --max-time 15 -w "\nHTTP_CODE:%{http_code}" "$URL" || true)"
+            code="$(printf '%s\n' "$body" | sed -n 's/^HTTP_CODE://p' | tail -n1)"
+            payload="$(printf '%s\n' "$body" | sed '/^HTTP_CODE:/d')"
+            echo "attempt=$i http=$code body=$payload"
+            if [ "$code" = "200" ]; then
+              printf '%s' "$payload" > /tmp/health.json
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Health endpoint not observed"
+          exit 1
+
+      - name: Resolve canonical TEST-HEALTH-001 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://afria-reel-intelligence-reader.onrender.com/reel/media/resolve"
+          PAYLOAD='{"source_url":"https://x.com/Blessinghls/status/2101019521947451594"}'
+          response="$(curl -sS --max-time 40             -H 'Content-Type: application/json'             -d "$PAYLOAD"             -w "\nHTTP_CODE:%{http_code}"             "$URL")"
+          code="$(printf '%s\n' "$response" | sed -n 's/^HTTP_CODE://p' | tail -n1)"
+          body="$(printf '%s\n' "$response" | sed '/^HTTP_CODE:/d')"
+          echo "resolver_http=$code"
+          echo "resolver_body=$body"
+          test "$code" = "200"
+          printf '%s' "$body" > /tmp/resolver.json
+
+      - name: Validate evidence boundary
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          health = json.loads(Path("/tmp/health.json").read_text())
+          resolved = json.loads(Path("/tmp/resolver.json").read_text())
+
+          assert health["status"] == "ok"
+          assert health["canonical_asset_id"] == "MOD-REEL-INTEL-001"
+          assert health["version"] == "0.2.0-test-health-001"
+          assert resolved["tweet_id"] == "2101019521947451594"
+          assert resolved["claim_state"] == "CLAIMS_NOT_EXTRACTED"
+          assert resolved["inference_from_caption_allowed"] is False
+          assert len(resolved["attempts"]) == 4
+          print("DEPLOYMENT_EVIDENCE_VALIDATED")
+          print(json.dumps({"health": health, "resolver": resolved}, indent=2))
