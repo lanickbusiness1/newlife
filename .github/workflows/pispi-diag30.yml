@@ -1,0 +1,30 @@
+name: PI-SPI DIAG30 Engine
+
+on:
+  push:
+    paths:
+      - 'products/pispi-diag30/**'
+      - '.github/workflows/pispi-diag30.yml'
+  pull_request:
+    paths:
+      - 'products/pispi-diag30/**'
+      - '.github/workflows/pispi-diag30.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/pispi-diag30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: products/pispi-diag30/package.json
+      - run: npm run check
+      - run: npm test
