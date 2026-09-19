@@ -1,0 +1,17 @@
+{
+  "fxtwitter": {
+    "status": 200,
+    "content_type": "application/json",
+    "bytes": 6044
+  },
+  "vxtwitter": {
+    "status": 200,
+    "content_type": "application/json",
+    "bytes": 1223
+  },
+  "syndication": {
+    "status": 200,
+    "content_type": "application/json; charset=utf-8",
+    "bytes": 2
+  }
+}
