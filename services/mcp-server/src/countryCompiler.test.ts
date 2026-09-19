@@ -202,6 +202,20 @@ describe("GEN-V4-COUNTRY-COMPILER-001", () => {
     expect(portability.criticalRegressions).toEqual([]);
   });
 
+  it("fails closed when a country build requests a direct CORE mutation", () => {
+    const result = compileCountryGenome({
+      executionId: "exec-bj-core-mutation",
+      parentCoreRef: "core:genesis-v4:sha-001",
+      targetTruthState: "BLUEPRINT_READY",
+      countryGenome: genome("BJ"),
+      requestedCapabilities: ["identity"],
+      requestedCoreMutation: true
+    } as any);
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toContain("COUNTRY_CORE_FORK_FORBIDDEN");
+  });
+
   it("rejects portability if the child requires a different core", () => {
     const bj = compileCountryGenome({
       executionId: "exec-bj",
