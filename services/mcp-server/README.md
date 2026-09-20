@@ -1,7 +1,7 @@
 # AFRIAGENESIS® Intelligence MCP Server
 
 Package MCP canonique : `0.3.0`  
-Révision du control plane GENESIS V4 : `0.6.0`
+Révision du control plane GENESIS V4 : `0.14.0`
 
 Passerelle MCP stateless, tenant-aware et deny-by-default du Universal Executive Intelligence OS™. Le service contient le Revenue Engine, le CEO Validation → DeployBot Relay, le World Model Runtime Proof et le ChatGPT Native Control Plane déterministe.
 
@@ -65,6 +65,48 @@ Le Context Compiler assemble un paquet de contexte borné. Le Control Protocol t
 ### Frontière client ChatGPT
 
 Le serveur MCP est indépendant du plan ChatGPT utilisé par le CEO. La disponibilité d’un branchement MCP personnalisé directement dans l’interface ChatGPT dépend des capacités du plan OpenAI au moment de l’usage. Cette documentation ne considère jamais la présence du serveur comme une preuve que le client ChatGPT est connecté.
+
+## GENESIS V4 Always-On Omnichannel Runtime
+
+Extension canonique `GEN-V4-ALWAYS-ON-OMNICHANNEL-RUNTIME-001@0.1.0` : aucun nouveau cerveau, aucune seconde mémoire et aucun orchestrateur parallèle.
+
+Outils gouvernés :
+
+- `genesis.omnichannel.compile` — scope `omnichannel:compile`
+- `genesis.autonomy.evaluate` — scope `control:evaluate`
+- `genesis.heartbeat.compile` — scope `runtime:heartbeat`
+- `genesis.worker.route` — scope `worker:route`
+- `genesis.runtime.compile_readiness` — scope `runtime:readiness`
+
+Invariants :
+
+- ChatGPT, WhatsApp, Telegram, Web, Mobile et Voice sont des adapters ; aucun canal ne devient source de vérité.
+- R.E.M.E™ + Notion + Evidence Ledger restent l'autorité mémoire.
+- Un provider non lié produit `CONNECTOR_UNBOUND` ; aucune connexion externe n'est inventée.
+- Finance, réglementé, destructif et communication externe sensible exigent une autorité humaine A4 lorsqu'elle n'est pas déjà présente.
+- Les actions internes réversibles A1–A3 continuent sans micro-validation.
+- Le heartbeat always-on impose état durable, idempotence, lease/lock, retries, dead-letter handling, healthcheck et rollback.
+- Les données `restricted` restent `REFERENCE_ONLY` à la frontière du canal.
+- Les workers GPT/Codex/Claude/Gemini/local sont substituables et ne deviennent jamais l'autorité GENESIS.
+
+### Runtime Readiness Gate
+
+`genesis.runtime.compile_readiness` compile uniquement un **candidat** de readiness à partir de références de preuve. Il exige :
+- persistance `canonical_postgres` ;
+- preuve de migration de la chaîne SQL canonique `065/070/071/072/074/076` ;
+- présence logique de `object_events`, `object_runtime_bindings`, `object_execution_contexts`, `loop_instances`, `loop_actions`, `loop_results`, `loop_evidence` ;
+- health provider et rollback prouvés ;
+- continuité provider prouvée : billing/account state `verified` avec référence de preuve ;
+- `payment_failed` est un hard blocker `PROVIDER_PAYMENT_FAILED`, même si le healthcheck technique est vert ;
+- registre connecteurs et secrets manager prouvés.
+
+Même avec un paquet complet, la sortie maximale est `READY_FOR_M8_RELEASE_REVIEW`. `operationalClaimAllowed` reste toujours `false` : les références de preuve doivent être vérifiées indépendamment avant release.
+
+### Frontière de preuve
+
+Le runtime omnicanal est un **contrat exécutable provider-agnostic**. Il ne constitue pas encore une preuve de bot Telegram/WhatsApp, de voix ou de worker externe connecté. Le contrôle Supabase du 20 septembre 2026 a confirmé qu'aucun projet Supabase GENESIS canonique n'est actuellement identifié : `afria-recruit` reste isolé à son domaine et l'ancien projet générique inactif n'est pas réutilisé.
+
+Le Provider Continuity Gate est également fail-closed : une preuve de health technique n'autorise pas la release si le compte fournisseur est exposé à suspension ou si la continuité financière n'est pas prouvée. La promotion exige connecteur autorisé, secrets manager, tests E2E du canal, receipt provider, persistance canonique migrée, health + rollback + billing continuity prouvés, observabilité, S7+/M8 applicables et Release Evidence Bundle.
 
 ## Validation Relay
 

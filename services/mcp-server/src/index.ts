@@ -50,9 +50,17 @@ import {
   OPENAI_CAPABILITY_REGISTRY_VERSION,
   recommendCreationCapabilities
 } from "./openAICapabilityRegistry.js";
+import {
+  compileHeartbeatContract,
+  compileOmnichannelCommand,
+  compileRuntimeReadinessCandidate,
+  compileWorkerRoute,
+  evaluateAutonomyBoundary,
+  GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR
+} from "./omnichannelRuntime.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.13.0";
+const CONTROL_PLANE_REVISION = "0.14.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -97,7 +105,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.13.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane, Representation Resolver, Representation Compiler Profile, Evidence Adapter, OpenAI Capability Registry and Cross-Pipeline Auto Representation are deterministic; external CRM, payment providers, provider-specific renderers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.14.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane, Representation Resolver, Representation Compiler Profile, Evidence Adapter, OpenAI Capability Registry, Cross-Pipeline Auto Representation and Always-On Omnichannel Runtime contracts are deterministic; external CRM, payment providers, messaging/voice providers, provider-specific renderers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
@@ -309,6 +317,46 @@ function buildServer() {
     route: compileCommunicationRoute(payload as any)
   }));
 
+  register("genesis.omnichannel.compile", "Compile une commande ChatGPT, WhatsApp, Telegram, Web, Mobile ou Voice en enveloppe GENESIS unique sans transformer le canal en mémoire.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "omnichannel:compile", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    command: compileOmnichannelCommand(payload)
+  }));
+
+  register("genesis.autonomy.evaluate", "Évalue la frontière A1-A4 avant toute action autonome et impose l'autorité humaine sur les actions sensibles.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "control:evaluate", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    boundary: evaluateAutonomyBoundary(payload)
+  }));
+
+  register("genesis.heartbeat.compile", "Compile le contrat heartbeat de l'event loop always-on avec cadence bornée, idempotence, reprise et rollback.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "runtime:heartbeat", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    heartbeat: compileHeartbeatContract(payload)
+  }));
+
+  register("genesis.worker.route", "Sélectionne un worker déclaré et éligible sans céder l'autorité GENESIS au modèle ou au fournisseur.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "worker:route", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    route: compileWorkerRoute(payload)
+  }));
+
+  register("genesis.runtime.compile_readiness", "Compile un candidat de readiness always-on fail-closed à partir des preuves de persistance canonique, provider, rollback, connecteurs et secrets.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "runtime:readiness", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    readiness: compileRuntimeReadinessCandidate(payload)
+  }));
+
   return server;
 }
 
@@ -373,7 +421,11 @@ if (mode === "stdio") {
       representationEvidenceAdapter: GENESIS_EVIDENCE_TO_CONTENT_ADAPTER.adapterId,
       representationEvidenceTruthState: GENESIS_EVIDENCE_TO_CONTENT_ADAPTER.truthState,
       openAICapabilityRegistryVersion: OPENAI_CAPABILITY_REGISTRY_VERSION,
-      crossPipelineAutoRepresentationPolicy: "V4-DEC-042A"
+      crossPipelineAutoRepresentationPolicy: "V4-DEC-042A",
+      omnichannelRuntime: GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR.assetId,
+      omnichannelRuntimeVersion: GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR.version,
+      omnichannelTruthState: GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR.truthState,
+      omnichannelActivationPolicy: "EVIDENCE_GATED_M8_RELEASE_REVIEW"
     });
   });
 
