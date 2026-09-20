@@ -92,6 +92,27 @@ export interface CreationIntentSignals {
   patchFiles?: boolean;
 }
 
+export type GenesisPipelineStage =
+  | "signal"
+  | "goir"
+  | "eces"
+  | "requirements"
+  | "blueprint"
+  | "master_prompt"
+  | "build"
+  | "controls"
+  | "deployment"
+  | "marketing"
+  | "sales"
+  | "revenue"
+  | "measurement_reme";
+
+export interface GenesisPipelineStageProfile {
+  stage: GenesisPipelineStage;
+  recommendedRecipes: string[];
+  rationale: string;
+}
+
 export interface CreationCapabilityRequest {
   intent: string;
   objective: string;
@@ -106,6 +127,7 @@ export interface CreationCapabilityRequest {
     | "enterprise"
     | "general";
   signals: CreationIntentSignals;
+  stage?: GenesisPipelineStage;
 }
 
 export interface CreationCapabilityRecommendation {
@@ -117,6 +139,7 @@ export interface CreationCapabilityRecommendation {
   policy: CapabilityExecutionPolicy;
   triggerReasons: string[];
   guardrails: string[];
+  stageProfile?: GenesisPipelineStageProfile;
   truthState: "CAPABILITY_RECOMMENDATION_ONLY";
 }
 
@@ -980,11 +1003,82 @@ export const GENESIS_CREATION_RECIPE_REGISTRY: GenesisCreationRecipe[] = [
   }
 ];
 
+export const GENESIS_PIPELINE_STAGE_PROFILES: GenesisPipelineStageProfile[] = [
+  {
+    stage: "signal",
+    recommendedRecipes: ["evidence_panel", "timeline", "chart_pack", "map_explorer"],
+    rationale: "Signals should expose evidence, chronology, quantitative shape and spatial context before narrative."
+  },
+  {
+    stage: "goir",
+    recommendedRecipes: ["comparison_matrix", "decision_tree", "executive_brief"],
+    rationale: "GOIR should compare opportunities, make decision logic explicit and preserve an executive summary."
+  },
+  {
+    stage: "eces",
+    recommendedRecipes: ["dashboard", "calculator", "chart_pack", "comparison_matrix"],
+    rationale: "Economic viability needs quantified scenarios, sensitivities, comparisons and decision metrics."
+  },
+  {
+    stage: "requirements",
+    recommendedRecipes: ["editable_document", "process_map", "structured_json"],
+    rationale: "Requirements should be readable by humans, traceable as process and machine-addressable where useful."
+  },
+  {
+    stage: "blueprint",
+    recommendedRecipes: ["flowchart", "annotated_diagram", "process_map", "structured_json"],
+    rationale: "Blueprints need architecture, flow, component annotation and structured contracts."
+  },
+  {
+    stage: "master_prompt",
+    recommendedRecipes: ["structured_json", "editable_document", "evidence_panel"],
+    rationale: "Master prompts should preserve an explicit contract, editable narrative and evidence lineage."
+  },
+  {
+    stage: "build",
+    recommendedRecipes: ["prototype_react", "prototype_html", "coding_patch", "shell_automation"],
+    rationale: "Build should favor executable previews and governed code modification/testing."
+  },
+  {
+    stage: "controls",
+    recommendedRecipes: ["action_checklist", "evidence_panel", "dashboard"],
+    rationale: "M6/S7+/M8/Big4 controls require explicit closure items, proof and status visibility."
+  },
+  {
+    stage: "deployment",
+    recommendedRecipes: ["process_map", "dashboard", "evidence_panel", "action_checklist"],
+    rationale: "Deployment needs execution flow, health evidence, rollback/readiness proof and checklist closure."
+  },
+  {
+    stage: "marketing",
+    recommendedRecipes: ["one_pager", "infographic", "poster", "video_explainer"],
+    rationale: "Marketing should translate validated value into concise, visual and media-ready assets."
+  },
+  {
+    stage: "sales",
+    recommendedRecipes: ["executive_brief", "comparison_matrix", "calculator", "one_pager"],
+    rationale: "Sales should make value, alternatives, ROI and buying logic easy to understand."
+  },
+  {
+    stage: "revenue",
+    recommendedRecipes: ["dashboard", "chart_pack", "data_story", "calculator"],
+    rationale: "Revenue operations require metric visibility, trends, explanation and scenario economics."
+  },
+  {
+    stage: "measurement_reme",
+    recommendedRecipes: ["data_story", "dashboard", "chart_pack", "evidence_panel"],
+    rationale: "Measurement and R.E.M.E need outcomes, experiments, evidence and learning loops."
+  }
+];
+
 const capabilityById = new Map(
   OPENAI_CAPABILITY_REGISTRY.map(item => [item.id, item] as const)
 );
 const recipeById = new Map(
   GENESIS_CREATION_RECIPE_REGISTRY.map(item => [item.id, item] as const)
+);
+const stageProfileById = new Map(
+  GENESIS_PIPELINE_STAGE_PROFILES.map(item => [item.stage, item] as const)
 );
 
 function recipe(id: string): GenesisCreationRecipe {
@@ -1066,6 +1160,15 @@ function evaluateRecipes(request: CreationCapabilityRequest) {
   const scores = new Map<string, number>();
   const reasons = new Map<string, string[]>();
   const s = request.signals;
+
+  if (request.stage) {
+    const profile = stageProfileById.get(request.stage);
+    if (!profile) throw new Error(`GENESIS_PIPELINE_STAGE_NOT_FOUND:${request.stage}`);
+    profile.recommendedRecipes.forEach((id, index) => {
+      const score = Math.max(35, 90 - index * 15);
+      addScore(scores, reasons, id, score, `GENESIS stage '${request.stage}' default representation profile.`);
+    });
+  }
 
   if (s.handwrittenRequested) {
     addScore(scores, reasons, "handwritten_note", 140, "Explicit handwritten-style request.");
@@ -1289,6 +1392,10 @@ export function recommendCreationCapabilities(
     guardrails.push("ACTION_CAPABILITY_REQUIRES_APPROVAL_WHEN_APPLICABLE");
   }
 
+  const stageProfile = request.stage
+    ? stageProfileById.get(request.stage)
+    : undefined;
+
   return {
     registryVersion: OPENAI_CAPABILITY_REGISTRY_VERSION,
     primaryRecipe,
@@ -1298,6 +1405,7 @@ export function recommendCreationCapabilities(
     policy,
     triggerReasons: unique(reasons.get(primaryRecipe.id) ?? []),
     guardrails,
+    ...(stageProfile ? { stageProfile } : {}),
     truthState: "CAPABILITY_RECOMMENDATION_ONLY"
   };
 }
