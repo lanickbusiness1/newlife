@@ -33,6 +33,7 @@ describe("EDUA interactive photosynthesis artifact", () => {
     expect(html).toContain('id="pre-score"');
     expect(html).toContain('id="post-score"');
     expect(html).toContain("repr-demo-001");
+    expect(html).toContain('fetch("/api/edua/outcome"');
     expect(html).not.toMatch(/https?:\/\//);
     expect(html.length).toBeLessThan(60000);
   });
