@@ -53,6 +53,7 @@ import {
 import {
   compileHeartbeatContract,
   compileOmnichannelCommand,
+  compileRuntimeReadinessCandidate,
   compileWorkerRoute,
   evaluateAutonomyBoundary,
   GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR
@@ -348,6 +349,14 @@ function buildServer() {
     route: compileWorkerRoute(payload)
   }));
 
+  register("genesis.runtime.compile_readiness", "Compile un candidat de readiness always-on fail-closed à partir des preuves de persistance canonique, provider, rollback, connecteurs et secrets.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "runtime:readiness", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    readiness: compileRuntimeReadinessCandidate(payload)
+  }));
+
   return server;
 }
 
@@ -415,7 +424,8 @@ if (mode === "stdio") {
       crossPipelineAutoRepresentationPolicy: "V4-DEC-042A",
       omnichannelRuntime: GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR.assetId,
       omnichannelRuntimeVersion: GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR.version,
-      omnichannelTruthState: GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR.truthState
+      omnichannelTruthState: GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR.truthState,
+      omnichannelActivationPolicy: "EVIDENCE_GATED_M8_RELEASE_REVIEW"
     });
   });
 
