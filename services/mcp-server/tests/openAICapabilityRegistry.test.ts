@@ -9,7 +9,7 @@ import {
 describe("V4-DEC-042 OpenAI Capability & Representation Registry", () => {
   test("contains a broad, versioned primitive capability library with no duplicate IDs", () => {
     const ids = OPENAI_CAPABILITY_REGISTRY.map(item => item.id);
-    expect(ids.length).toBeGreaterThanOrEqual(35);
+    expect(ids.length).toBeGreaterThanOrEqual(44);
     expect(new Set(ids).size).toBe(ids.length);
 
     const required = [
@@ -43,7 +43,16 @@ describe("V4-DEC-042 OpenAI Capability & Representation Registry", () => {
       "connected_apps",
       "moderation_text_image",
       "evals_graders",
-      "embeddings_vector_search"
+      "embeddings_vector_search",
+      "response_streaming",
+      "background_mode",
+      "shell_tool",
+      "apply_patch_tool",
+      "custom_tool",
+      "batch_processing",
+      "fine_tuning",
+      "prompt_caching",
+      "agent_builder"
     ];
 
     for (const id of required) expect(ids).toContain(id);
@@ -63,7 +72,7 @@ describe("V4-DEC-042 OpenAI Capability & Representation Registry", () => {
 
   test("contains a broad GENESIS recipe library beyond the five seed examples", () => {
     const ids = GENESIS_CREATION_RECIPE_REGISTRY.map(item => item.id);
-    expect(ids.length).toBeGreaterThanOrEqual(30);
+    expect(ids.length).toBeGreaterThanOrEqual(40);
     expect(new Set(ids).size).toBe(ids.length);
 
     for (const id of [
@@ -91,7 +100,13 @@ describe("V4-DEC-042 OpenAI Capability & Representation Registry", () => {
       "video_explainer",
       "research_report",
       "meeting_digest",
-      "structured_json"
+      "structured_json",
+      "agent_workflow",
+      "batch_generation",
+      "model_specialization",
+      "background_task",
+      "coding_patch",
+      "shell_automation"
     ]) {
       expect(ids).toContain(id);
     }
@@ -302,6 +317,62 @@ describe("V4-DEC-042 OpenAI Capability & Representation Registry", () => {
     expect(result.primitiveCapabilities.map(item => item.id)).toEqual(
       expect.arrayContaining(["function_calling", "remote_mcp", "connected_apps"])
     );
+  });
+
+  test("routes agentic workflows to Agent Builder and tool integrations with action gating", () => {
+    const result = recommendCreationCapabilities({
+      intent: "Construis un workflow agentique multi-étapes avec outils",
+      objective: "agent_workflow",
+      domain: "enterprise",
+      signals: {
+        agentWorkflow: true,
+        externalSystemAction: true
+      }
+    });
+
+    expect(result.primaryRecipe.id).toBe("agent_workflow");
+    expect(result.policy).toBe("ACTION_GATED");
+    expect(result.primitiveCapabilities.map(item => item.id)).toEqual(
+      expect.arrayContaining(["agent_builder", "function_calling", "remote_mcp"])
+    );
+  });
+
+  test("routes high-volume repeated workloads to batch and caching capabilities", () => {
+    const result = recommendCreationCapabilities({
+      intent: "Génère et évalue des milliers d'artefacts répétitifs",
+      objective: "scale_generation",
+      domain: "enterprise",
+      signals: {
+        highVolume: true,
+        repeatedPattern: true
+      }
+    });
+
+    expect(result.primaryRecipe.id).toBe("batch_generation");
+    expect(result.primitiveCapabilities.map(item => item.id)).toEqual(
+      expect.arrayContaining(["batch_processing", "prompt_caching"])
+    );
+  });
+
+  test("routes patching and shell execution to gated coding capabilities", () => {
+    const patch = recommendCreationCapabilities({
+      intent: "Modifie automatiquement les fichiers avec un patch",
+      objective: "patch_files",
+      domain: "enterprise",
+      signals: { patchFiles: true }
+    });
+    expect(patch.primaryRecipe.id).toBe("coding_patch");
+    expect(patch.policy).toBe("ACTION_GATED");
+    expect(patch.primitiveCapabilities.map(item => item.id)).toContain("apply_patch_tool");
+
+    const shell = recommendCreationCapabilities({
+      intent: "Lance les tests et le build en shell",
+      objective: "shell_automation",
+      domain: "enterprise",
+      signals: { shellExecution: true }
+    });
+    expect(shell.primaryRecipe.id).toBe("shell_automation");
+    expect(shell.primitiveCapabilities.map(item => item.id)).toContain("shell_tool");
   });
 
   test("exposes automatic capability recommendation through the governed MCP", () => {
