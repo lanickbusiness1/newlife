@@ -1,10 +1,23 @@
 from __future__ import annotations
+
 import sqlite3
 from pathlib import Path
-def connect_sqlite(path:str)->sqlite3.Connection:
-    db_path=Path(path);db_path.parent.mkdir(parents=True,exist_ok=True);conn=sqlite3.connect(str(db_path),check_same_thread=False);conn.row_factory=sqlite3.Row;conn.execute('PRAGMA journal_mode=WAL');conn.execute('PRAGMA foreign_keys=ON');conn.execute('PRAGMA busy_timeout=100');return conn
-def initialize_schema(conn:sqlite3.Connection)->None:
-    conn.executescript('''
+
+
+def connect_sqlite(path: str) -> sqlite3.Connection:
+    db_path = Path(path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA foreign_keys=ON')
+    conn.execute('PRAGMA busy_timeout=100')
+    return conn
+
+
+def initialize_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        '''
 CREATE TABLE IF NOT EXISTS sites(site_id TEXT PRIMARY KEY,name TEXT NOT NULL,country TEXT NOT NULL,timezone TEXT NOT NULL,industry TEXT NOT NULL,operating_status TEXT NOT NULL,data_residency_policy TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS lines(line_id TEXT PRIMARY KEY,site_id TEXT NOT NULL REFERENCES sites(site_id) ON DELETE RESTRICT,name TEXT NOT NULL,process_type TEXT NOT NULL,rated_capacity REAL NOT NULL,unit TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS assets(asset_id TEXT PRIMARY KEY,site_id TEXT NOT NULL REFERENCES sites(site_id) ON DELETE RESTRICT,line_id TEXT NOT NULL REFERENCES lines(line_id) ON DELETE RESTRICT,asset_type TEXT NOT NULL,manufacturer TEXT NOT NULL,model TEXT NOT NULL,criticality TEXT NOT NULL,commissioning_date TEXT,protocol_profile TEXT NOT NULL,status TEXT NOT NULL);
@@ -16,4 +29,42 @@ CREATE TABLE IF NOT EXISTS evidence(sequence INTEGER PRIMARY KEY AUTOINCREMENT,e
 CREATE TABLE IF NOT EXISTS readiness_assessments(assessment_id TEXT PRIMARY KEY,site_id TEXT NOT NULL,overall_score REAL NOT NULL,dimensions_json TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS ingestion_batches(batch_id TEXT PRIMARY KEY,accepted_count INTEGER NOT NULL,rejected_count INTEGER NOT NULL,created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sync_queue(sequence INTEGER PRIMARY KEY AUTOINCREMENT,envelope_id TEXT NOT NULL UNIQUE,payload_json TEXT NOT NULL,destination TEXT NOT NULL,purpose TEXT NOT NULL,data_class TEXT NOT NULL,retention TEXT NOT NULL,authority TEXT NOT NULL,encryption_state TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'QUEUED',created_at TEXT NOT NULL,replayed_at TEXT);
-''');conn.commit()
+CREATE TABLE IF NOT EXISTS manufacturing_nodes(
+    node_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    country TEXT NOT NULL,
+    jurisdiction TEXT NOT NULL,
+    status TEXT NOT NULL,
+    available_capacity REAL NOT NULL,
+    lead_time_hours REAL NOT NULL,
+    unit_cost REAL NOT NULL,
+    local_content_ratio REAL NOT NULL,
+    energy_state TEXT NOT NULL,
+    connectivity_state TEXT NOT NULL,
+    quality_state TEXT NOT NULL,
+    machine_types_json TEXT NOT NULL,
+    processes_json TEXT NOT NULL,
+    materials_json TEXT NOT NULL,
+    workforce_skills_json TEXT NOT NULL,
+    certifications_json TEXT NOT NULL,
+    permissions_json TEXT NOT NULL,
+    constraints_json TEXT NOT NULL,
+    evidence_refs_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS manufacturing_designs(
+    design_id TEXT PRIMARY KEY,
+    owner TEXT NOT NULL,
+    version TEXT NOT NULL,
+    ip_rights_status TEXT NOT NULL,
+    expired INTEGER NOT NULL,
+    bom_json TEXT NOT NULL,
+    allowed_materials_json TEXT NOT NULL,
+    allowed_machine_types_json TEXT NOT NULL,
+    allowed_jurisdictions_json TEXT NOT NULL,
+    required_certifications_json TEXT NOT NULL,
+    authorized_uses_json TEXT NOT NULL,
+    evidence_refs_json TEXT NOT NULL
+);
+'''
+    )
+    conn.commit()
