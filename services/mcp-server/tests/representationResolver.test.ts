@@ -144,6 +144,15 @@ describe("V4-DEC-042 Generative Interaction & Representation Layer", () => {
     })).toThrow(/REPRESENTATION_INVALID_OBJECTIVE/);
   });
 
+  test("fails closed on malformed signal values", () => {
+    expect(() => resolveRepresentation({
+      ...educationProcess,
+      signals: {
+        dynamicProcess: "yes"
+      } as unknown as RepresentationRequest["signals"]
+    })).toThrow(/REPRESENTATION_INVALID_SIGNALS/);
+  });
+
   test("exposes the resolver through a governed MCP scope", () => {
     const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
 
