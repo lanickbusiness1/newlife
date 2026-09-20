@@ -38,9 +38,13 @@ import {
   evaluateLearningOutcome,
   renderPhotosynthesisArtifact
 } from "./eduaInteractiveRenderer.js";
+import {
+  compileRepresentationArtifact,
+  GENESIS_REPRESENTATION_COMPILER_PROFILE
+} from "./representationArtifactCompiler.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.9.0";
+const CONTROL_PLANE_REVISION = "0.10.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -85,7 +89,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.8.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane and Representation Resolver are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.10.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane, Representation Resolver and Representation Compiler Profile are deterministic; external CRM, payment providers, provider-specific renderers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
@@ -248,6 +252,14 @@ function buildServer() {
     resolution: adaptEduaRepresentation(payload as any)
   }));
 
+  register("representation.artifact.compile", "Compile une décision du Representation Resolver et un contenu structuré sourcé en artifact HTML autonome avec manifest de traçabilité.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "representation:compile", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    compilation: compileRepresentationArtifact(payload as any)
+  }));
+
   register("edua.learning.evaluate_outcome", "Mesure un delta de compréhension de session EDUA et émet un candidat R.E.M.E borné sans revendiquer de causalité.", {
     context: RequestContext,
     payload: z.unknown()
@@ -331,7 +343,9 @@ if (mode === "stdio") {
       representationResolver: GENESIS_V4_REPRESENTATION_RESOLVER_ANCHOR.decisionId,
       representationTruthState: GENESIS_V4_REPRESENTATION_RESOLVER_ANCHOR.truthState,
       eduaInteractiveArtifact: EDUA_PHOTOSYNTHESIS_ARTIFACT.assetId,
-      eduaInteractiveTruthState: EDUA_PHOTOSYNTHESIS_ARTIFACT.truthState
+      eduaInteractiveTruthState: EDUA_PHOTOSYNTHESIS_ARTIFACT.truthState,
+      representationCompilerProfile: GENESIS_REPRESENTATION_COMPILER_PROFILE.profileId,
+      representationCompilerTruthState: GENESIS_REPRESENTATION_COMPILER_PROFILE.truthState
     });
   });
 
