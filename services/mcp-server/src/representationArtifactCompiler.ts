@@ -461,7 +461,7 @@ function renderMetrics(metrics: EvidenceBackedMetric[]): string {
 }
 
 function renderTable(rows: EvidenceBackedComparison[]): string {
-  const columns = unique(rows.flatMap(row => Object.keys(row.values)));
+  const columns = unique(rows.flatMap(row => Object.keys(row.values))).sort();
   return `<div class="table-wrap"><table><thead><tr><th>Élément</th>${columns.map(column =>
     `<th>${escapeHtml(column)}</th>`
   ).join("")}</tr></thead><tbody>${rows.map(row =>
