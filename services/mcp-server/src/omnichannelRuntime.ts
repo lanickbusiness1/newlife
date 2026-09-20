@@ -280,7 +280,9 @@ const RuntimeReadinessSchema = z.object({
   provider: z.object({
     status: z.enum(["verified", "unverified"]),
     healthEvidenceRef: z.string().min(1).optional(),
-    rollbackEvidenceRef: z.string().min(1).optional()
+    rollbackEvidenceRef: z.string().min(1).optional(),
+    continuityStatus: z.enum(["verified", "payment_failed", "unknown"]).default("unknown"),
+    billingEvidenceRef: z.string().min(1).optional()
   }),
   connectors: z.object({
     registryEvidenceRef: z.string().min(1).nullable(),
@@ -318,6 +320,22 @@ export function compileRuntimeReadinessCandidate(input: unknown) {
     blockers.push("ROLLBACK_EVIDENCE_MISSING");
   }
 
+  if (parsed.provider.continuityStatus === "payment_failed") {
+    blockers.push("PROVIDER_PAYMENT_FAILED");
+  } else if (
+    parsed.provider.continuityStatus !== "verified"
+    || !parsed.provider.billingEvidenceRef
+  ) {
+    blockers.push("PROVIDER_CONTINUITY_UNVERIFIED");
+  }
+
+  if (
+    parsed.provider.continuityStatus === "payment_failed"
+    && !parsed.provider.billingEvidenceRef
+  ) {
+    blockers.push("PROVIDER_BILLING_EVIDENCE_MISSING");
+  }
+
   if (!parsed.connectors.registryEvidenceRef) {
     blockers.push("CONNECTOR_REGISTRY_EVIDENCE_MISSING");
   }
@@ -333,6 +351,8 @@ export function compileRuntimeReadinessCandidate(input: unknown) {
       : "BLOCKED_EVIDENCE_INCOMPLETE",
     blockers,
     missingLogicalTables: missingTables,
+    providerContinuityStatus: parsed.provider.continuityStatus,
+    billingEvidencePresent: Boolean(parsed.provider.billingEvidenceRef),
     operationalClaimAllowed: false,
     requiredCanonicalSql: [
       "065_enterprise_object_model.sql",
