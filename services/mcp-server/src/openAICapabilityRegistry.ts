@@ -21,7 +21,8 @@ export type OpenAICapabilityClass =
   | "app_ui"
   | "safety"
   | "evaluation"
-  | "retrieval";
+  | "retrieval"
+  | "platform";
 
 export interface OpenAICapability {
   id: string;
@@ -83,6 +84,12 @@ export interface CreationIntentSignals {
   safetyReview?: boolean;
   qualityEvaluation?: boolean;
   semanticRetrieval?: boolean;
+  longRunning?: boolean;
+  highVolume?: boolean;
+  repeatedPattern?: boolean;
+  agentWorkflow?: boolean;
+  shellExecution?: boolean;
+  patchFiles?: boolean;
 }
 
 export interface CreationCapabilityRequest {
@@ -464,6 +471,87 @@ export const OPENAI_CAPABILITY_REGISTRY: OpenAICapability[] = [
     providerBacked: true,
     actionGated: false,
     sourceRef: "openai-api-model-catalog-embeddings"
+  },
+  {
+    id: "response_streaming",
+    name: "Response streaming",
+    class: "platform",
+    description: "Stream response events progressively to interactive applications.",
+    providerBacked: true,
+    actionGated: false,
+    sourceRef: "openai-api-responses-streaming"
+  },
+  {
+    id: "background_mode",
+    name: "Background mode",
+    class: "platform",
+    description: "Run supported long responses asynchronously with later polling.",
+    providerBacked: true,
+    actionGated: false,
+    sourceRef: "openai-api-responses-background"
+  },
+  {
+    id: "shell_tool",
+    name: "Shell tool",
+    class: "action",
+    description: "Execute shell commands in a managed or authorized environment.",
+    providerBacked: true,
+    actionGated: true,
+    sourceRef: "openai-api-responses-shell"
+  },
+  {
+    id: "apply_patch_tool",
+    name: "Apply patch tool",
+    class: "action",
+    description: "Create, update or delete files through unified diffs.",
+    providerBacked: true,
+    actionGated: true,
+    sourceRef: "openai-api-responses-apply-patch"
+  },
+  {
+    id: "custom_tool",
+    name: "Custom tool",
+    class: "integration",
+    description: "Define custom text- or grammar-formatted tool interfaces.",
+    providerBacked: true,
+    actionGated: true,
+    sourceRef: "openai-api-responses-custom-tools"
+  },
+  {
+    id: "batch_processing",
+    name: "Batch processing",
+    class: "platform",
+    description: "Process large collections of requests through batch jobs.",
+    providerBacked: true,
+    actionGated: false,
+    sourceRef: "openai-api-batch"
+  },
+  {
+    id: "fine_tuning",
+    name: "Fine-tuning",
+    class: "platform",
+    description: "Specialize eligible models using curated training data and supported tuning methods.",
+    providerBacked: true,
+    actionGated: true,
+    sourceRef: "openai-api-fine-tuning"
+  },
+  {
+    id: "prompt_caching",
+    name: "Prompt caching",
+    class: "platform",
+    description: "Reuse cached prompt prefixes to optimize repeated workloads where supported.",
+    providerBacked: true,
+    actionGated: false,
+    sourceRef: "openai-api-prompt-caching"
+  },
+  {
+    id: "agent_builder",
+    name: "Agent Builder",
+    class: "platform",
+    description: "Build, deploy and optimize agent workflows on the OpenAI platform.",
+    providerBacked: true,
+    actionGated: true,
+    sourceRef: "openai-platform-agent-builder"
   }
 ];
 
@@ -835,6 +923,60 @@ export const GENESIS_CREATION_RECIPE_REGISTRY: GenesisCreationRecipe[] = [
     optionalCapabilities: ["function_calling"],
     defaultPolicy: "AUTO_RENDER",
     tags: ["machine", "schema", "api"]
+  },
+  {
+    id: "agent_workflow",
+    name: "Agent Workflow",
+    description: "Multi-step agentic workflow using tools and governed integrations.",
+    requiredCapabilities: ["agent_builder", "function_calling"],
+    optionalCapabilities: ["remote_mcp", "connected_apps", "custom_tool"],
+    defaultPolicy: "ACTION_GATED",
+    tags: ["agent", "workflow", "automation"]
+  },
+  {
+    id: "batch_generation",
+    name: "Batch Generation",
+    description: "High-volume repeated generation or evaluation workload.",
+    requiredCapabilities: ["batch_processing"],
+    optionalCapabilities: ["structured_output_json_schema", "prompt_caching"],
+    defaultPolicy: "SUGGEST",
+    tags: ["batch", "scale", "volume"]
+  },
+  {
+    id: "model_specialization",
+    name: "Model Specialization",
+    description: "Repeated-pattern workflow that may warrant evaluated fine-tuning.",
+    requiredCapabilities: ["fine_tuning", "evals_graders"],
+    optionalCapabilities: ["batch_processing"],
+    defaultPolicy: "ACTION_GATED",
+    tags: ["fine-tuning", "specialization", "quality"]
+  },
+  {
+    id: "background_task",
+    name: "Background Task",
+    description: "Long-running response workflow with progressive or polled completion.",
+    requiredCapabilities: ["background_mode"],
+    optionalCapabilities: ["response_streaming"],
+    defaultPolicy: "SUGGEST",
+    tags: ["long-running", "async"]
+  },
+  {
+    id: "coding_patch",
+    name: "Coding Patch",
+    description: "Governed code/file modification using patch-oriented tooling.",
+    requiredCapabilities: ["apply_patch_tool"],
+    optionalCapabilities: ["shell_tool", "code_block"],
+    defaultPolicy: "ACTION_GATED",
+    tags: ["code", "patch", "files"]
+  },
+  {
+    id: "shell_automation",
+    name: "Shell Automation",
+    description: "Governed execution of shell commands for build, test or automation workflows.",
+    requiredCapabilities: ["shell_tool"],
+    optionalCapabilities: ["apply_patch_tool", "custom_tool"],
+    defaultPolicy: "ACTION_GATED",
+    tags: ["shell", "automation", "build"]
   }
 ];
 
@@ -908,6 +1050,12 @@ function collectPrimitiveCapabilities(
   if (s.safetyReview) ids.push("moderation_text_image");
   if (s.qualityEvaluation) ids.push("evals_graders");
   if (s.semanticRetrieval) ids.push("embeddings_vector_search");
+  if (s.longRunning) ids.push("background_mode", "response_streaming");
+  if (s.highVolume) ids.push("batch_processing", "prompt_caching");
+  if (s.repeatedPattern) ids.push("prompt_caching");
+  if (s.agentWorkflow) ids.push("agent_builder", "function_calling", "remote_mcp");
+  if (s.shellExecution) ids.push("shell_tool");
+  if (s.patchFiles) ids.push("apply_patch_tool");
 
   return unique(ids)
     .map(id => capabilityById.get(id))
@@ -1033,6 +1181,25 @@ function evaluateRecipes(request: CreationCapabilityRequest) {
   if (s.externalSystemAction) {
     addScore(scores, reasons, "action_checklist", 70, "External system action requires an explicit action plan.");
   }
+  if (s.agentWorkflow) {
+    addScore(scores, reasons, "agent_workflow", 130, "Agentic multi-step workflow detected.");
+  }
+  if (s.highVolume) {
+    addScore(scores, reasons, "batch_generation", 110, "High-volume repeated workload detected.");
+  }
+  if (s.repeatedPattern) {
+    addScore(scores, reasons, "model_specialization", 55, "Repeated stable pattern may justify specialization after evals.");
+    addScore(scores, reasons, "batch_generation", 35, "Repeated workload may benefit from batching.");
+  }
+  if (s.longRunning) {
+    addScore(scores, reasons, "background_task", 100, "Long-running generation or research detected.");
+  }
+  if (s.patchFiles) {
+    addScore(scores, reasons, "coding_patch", 125, "File patching intent detected.");
+  }
+  if (s.shellExecution) {
+    addScore(scores, reasons, "shell_automation", 125, "Shell execution intent detected.");
+  }
 
   if (scores.size === 0) {
     addScore(scores, reasons, "editable_document", 35, "No stronger representation signal detected.");
@@ -1085,7 +1252,13 @@ export function recommendCreationCapabilities(
 
   const confidence = confidenceFromScore(primaryScore);
   let policy: CapabilityExecutionPolicy;
-  if (request.signals.externalSystemAction || request.signals.mutation) {
+  if (
+    request.signals.externalSystemAction ||
+    request.signals.mutation ||
+    request.signals.agentWorkflow ||
+    request.signals.shellExecution ||
+    request.signals.patchFiles
+  ) {
     policy = "ACTION_GATED";
   } else if (confidence >= 0.85) {
     policy = primaryRecipe.defaultPolicy;
@@ -1100,7 +1273,13 @@ export function recommendCreationCapabilities(
   if (request.domain === "health") {
     guardrails.push("HEALTH_CONTEXT_REQUIRES_NON_DIAGNOSTIC_BOUNDARY");
   }
-  if (request.signals.externalSystemAction || request.signals.mutation) {
+  if (
+    request.signals.externalSystemAction ||
+    request.signals.mutation ||
+    request.signals.agentWorkflow ||
+    request.signals.shellExecution ||
+    request.signals.patchFiles
+  ) {
     guardrails.push("EXTERNAL_MUTATION_REQUIRES_AUTHORIZATION");
   }
   if (primitiveCapabilities.some(item => item.providerBacked)) {
