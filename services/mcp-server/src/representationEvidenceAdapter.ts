@@ -376,10 +376,6 @@ export function compileRepresentationFromEvidence(
     !item.contradictionKey || !conflictingKeys.has(item.contradictionKey)
   );
 
-  if (safeItems.length === 0) {
-    throw new Error("EVIDENCE_NO_NON_CONTRADICTORY_CONTENT");
-  }
-
   const inferredSignals = inferSignals(safeItems, input.evidencePacket);
   const content = buildContent(
     input.topic,
