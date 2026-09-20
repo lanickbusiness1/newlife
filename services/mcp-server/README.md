@@ -1,7 +1,7 @@
 # AFRIAGENESIS® Intelligence MCP Server
 
 Package MCP canonique : `0.3.0`  
-Révision du control plane GENESIS V4 : `0.6.0`
+Révision du control plane GENESIS V4 : `0.14.0`
 
 Passerelle MCP stateless, tenant-aware et deny-by-default du Universal Executive Intelligence OS™. Le service contient le Revenue Engine, le CEO Validation → DeployBot Relay, le World Model Runtime Proof et le ChatGPT Native Control Plane déterministe.
 
@@ -65,6 +65,32 @@ Le Context Compiler assemble un paquet de contexte borné. Le Control Protocol t
 ### Frontière client ChatGPT
 
 Le serveur MCP est indépendant du plan ChatGPT utilisé par le CEO. La disponibilité d’un branchement MCP personnalisé directement dans l’interface ChatGPT dépend des capacités du plan OpenAI au moment de l’usage. Cette documentation ne considère jamais la présence du serveur comme une preuve que le client ChatGPT est connecté.
+
+## GENESIS V4 Always-On Omnichannel Runtime
+
+Extension canonique `GEN-V4-ALWAYS-ON-OMNICHANNEL-RUNTIME-001@0.1.0` : aucun nouveau cerveau, aucune seconde mémoire et aucun orchestrateur parallèle.
+
+Outils gouvernés :
+
+- `genesis.omnichannel.compile` — scope `omnichannel:compile`
+- `genesis.autonomy.evaluate` — scope `control:evaluate`
+- `genesis.heartbeat.compile` — scope `runtime:heartbeat`
+- `genesis.worker.route` — scope `worker:route`
+
+Invariants :
+
+- ChatGPT, WhatsApp, Telegram, Web, Mobile et Voice sont des adapters ; aucun canal ne devient source de vérité.
+- R.E.M.E™ + Notion + Evidence Ledger restent l'autorité mémoire.
+- Un provider non lié produit `CONNECTOR_UNBOUND` ; aucune connexion externe n'est inventée.
+- Finance, réglementé, destructif et communication externe sensible exigent une autorité humaine A4 lorsqu'elle n'est pas déjà présente.
+- Les actions internes réversibles A1–A3 continuent sans micro-validation.
+- Le heartbeat always-on impose état durable, idempotence, lease/lock, retries, dead-letter handling, healthcheck et rollback.
+- Les données `restricted` restent `REFERENCE_ONLY` à la frontière du canal.
+- Les workers GPT/Codex/Claude/Gemini/local sont substituables et ne deviennent jamais l'autorité GENESIS.
+
+### Frontière de preuve
+
+Le runtime omnicanal est un **contrat exécutable provider-agnostic**. Il ne constitue pas encore une preuve de bot Telegram/WhatsApp, de voix ou de worker externe connecté. La promotion exige connecteur autorisé, secrets manager, tests E2E du canal, receipt provider, persistance, observabilité, S7+/M8 applicables et Release Evidence Bundle.
 
 ## Validation Relay
 
