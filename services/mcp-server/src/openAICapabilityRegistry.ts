@@ -608,7 +608,7 @@ export const GENESIS_CREATION_RECIPE_REGISTRY: GenesisCreationRecipe[] = [
     name: "Study Guide",
     description: "Structured revision document with concepts and checkpoints.",
     requiredCapabilities: ["writing_block"],
-    optionalCapabilities: ["flashcards", "text_to_speech"],
+    optionalCapabilities: ["text_to_speech"],
     defaultPolicy: "AUTO_RENDER",
     tags: ["education", "memory"]
   },
