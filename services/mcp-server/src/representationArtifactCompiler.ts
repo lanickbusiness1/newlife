@@ -119,6 +119,7 @@ export interface CompiledRepresentationArtifact {
 
 const MAX_ITEMS = 50;
 const MAX_TEXT = 6000;
+const MAX_ARTIFACT_BYTES = 180_000;
 const FORMATS_WITH_PROVIDER_RENDERERS = new Set<RepresentationKind>([
   "map",
   "audio",
@@ -160,6 +161,19 @@ function unique<T>(values: T[]): T[] {
 
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(item => stableStringify(item)).join(",")}]`;
+  }
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map(key =>
+    `${JSON.stringify(key)}:${stableStringify(record[key])}`
+  ).join(",")}}`;
 }
 
 function escapeHtml(value: string): string {
@@ -560,6 +574,7 @@ function renderDocument(
   kind: RepresentationKind,
   content: RepresentationContentModel,
   resolution: RepresentationResolution,
+  language: string,
   degraded: boolean,
   degradation?: string,
   evidence: string[] = []
@@ -569,7 +584,7 @@ function renderDocument(
     : `Format sélectionné par Representation Resolver : ${kind}.`;
 
   return `<!doctype html>
-<html lang="${escapeHtml(String((resolution as any).telemetry ? "fr" : "fr"))}">
+<html lang="${escapeHtml(language.slice(0, 24))}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -610,7 +625,7 @@ ${renderBody(kind, content)}
 }
 
 function canonicalContent(content: RepresentationContentModel): string {
-  return JSON.stringify(content);
+  return stableStringify(content);
 }
 
 export function compileRepresentationArtifact(
@@ -638,10 +653,14 @@ export function compileRepresentationArtifact(
     selection.selectedKind,
     input.content,
     resolution,
+    input.representationRequest.constraints.language,
     selection.degraded,
     selection.degradationReason,
     evidence
   );
+  if (Buffer.byteLength(html, "utf8") > MAX_ARTIFACT_BYTES) {
+    throw new Error("REPRESENTATION_ARTIFACT_TOO_LARGE");
+  }
   const artifactDigest = digest(html);
 
   const manifestBase = {
@@ -665,7 +684,7 @@ export function compileRepresentationArtifact(
     effectivenessClaim: "NOT_MEASURED" as const
   };
 
-  const manifestDigest = digest(JSON.stringify(manifestBase));
+  const manifestDigest = digest(stableStringify(manifestBase));
   const manifest: RepresentationArtifactManifest = {
     ...manifestBase,
     manifestDigest
