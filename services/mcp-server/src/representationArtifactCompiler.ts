@@ -68,7 +68,7 @@ export interface NumericVariable {
 }
 
 export interface BoundedInteractiveModel {
-  operation: "min" | "max" | "sum" | "average";
+  operation: "min" | "max" | "sum" | "average" | "multiply";
   outputLabel: string;
   outputUnit?: string;
   variables: NumericVariable[];
@@ -130,7 +130,8 @@ const OPERATIONS = new Set<BoundedInteractiveModel["operation"]>([
   "min",
   "max",
   "sum",
-  "average"
+  "average",
+  "multiply"
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -508,6 +509,7 @@ function renderInteractive(model: BoundedInteractiveModel): string {
       if(operation==="max")return Math.max(...values);
       if(operation==="sum")return values.reduce((a,b)=>a+b,0);
       if(operation==="average")return values.reduce((a,b)=>a+b,0)/values.length;
+      if(operation==="multiply")return values.reduce((a,b)=>a*b,1);
       return 0;
     }
     function update(){
