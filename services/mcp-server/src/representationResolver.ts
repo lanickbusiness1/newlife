@@ -139,6 +139,17 @@ const DOMAINS = new Set<RepresentationDomain>([
 
 const BANDWIDTHS = new Set<RepresentationConstraints["bandwidth"]>(["offline", "low", "normal"]);
 const DEVICES = new Set<RepresentationConstraints["device"]>(["mobile", "desktop", "kiosk"]);
+const SIGNAL_KEYS = new Set<keyof RepresentationSignals>([
+  "dynamicProcess",
+  "quantitative",
+  "comparisonNeeded",
+  "manipulationNeeded",
+  "procedural",
+  "spatial",
+  "sequential",
+  "assessmentNeeded",
+  "richMediaHelpful"
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -197,8 +208,15 @@ function validateRequest(input: unknown): asserts input is RepresentationRequest
   requiredText(input.constraints.language, "REPRESENTATION_INVALID_LANGUAGE");
   assertEvidenceRefs(input.evidenceRefs);
 
-  if (input.signals !== undefined && !isRecord(input.signals)) {
-    throw new Error("REPRESENTATION_INVALID_SIGNALS");
+  if (input.signals !== undefined) {
+    if (!isRecord(input.signals)) {
+      throw new Error("REPRESENTATION_INVALID_SIGNALS");
+    }
+    for (const [key, value] of Object.entries(input.signals)) {
+      if (!SIGNAL_KEYS.has(key as keyof RepresentationSignals) || typeof value !== "boolean") {
+        throw new Error("REPRESENTATION_INVALID_SIGNALS");
+      }
+    }
   }
 }
 
