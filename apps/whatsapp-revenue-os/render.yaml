@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: afriagenesis-whatsapp-revenue-os
+    runtime: docker
+    plan: free
+    autoDeploy: false
+    rootDir: apps/whatsapp-revenue-os
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ORGANIZATION_ID
+        value: afriagenesis-demo
+      - key: STORE_MODE
+        value: supabase
+      - key: WHATSAPP_MODE
+        value: meta
+      - key: OUTBOUND_KILL_SWITCH
+        value: "true"
+      - key: META_GRAPH_VERSION
+        value: v23.0
+      - key: OPERATOR_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: META_VERIFY_TOKEN
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_ACCESS_TOKEN
+        sync: false
+      - key: META_PHONE_NUMBER_ID
+        sync: false
