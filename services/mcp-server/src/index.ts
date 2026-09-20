@@ -28,9 +28,14 @@ import {
   evaluateCommunicationProvider,
   GENESIS_V4_SOVEREIGN_COMMS_ANCHOR
 } from "./communicationControlPlane.js";
+import {
+  adaptEduaRepresentation,
+  GENESIS_V4_REPRESENTATION_RESOLVER_ANCHOR,
+  resolveRepresentation
+} from "./representationResolver.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.7.0";
+const CONTROL_PLANE_REVISION = "0.8.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -75,7 +80,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.6.0: Revenue Engine, World Model Runtime and ChatGPT Native Control Plane are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.8.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane and Representation Resolver are deterministic; external CRM, payment providers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
@@ -222,6 +227,22 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
+  register("representation.resolve", "Sélectionne et compose la représentation la plus adaptée à l’intention, au domaine et aux contraintes explicites, sans revendiquer l’efficacité avant mesure.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "representation:resolve", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    resolution: resolveRepresentation(payload as any)
+  }));
+
+  register("edua.representation.resolve", "Adapte V4-DEC-042 à EDUA V2 avec compréhension mesurée comme North Star.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "education:represent", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    resolution: adaptEduaRepresentation(payload as any)
+  }));
+
   register("comms.provider.evaluate", "Évalue un fournisseur de communication selon les exigences de souveraineté et le niveau de preuve disponible.", {
     context: RequestContext,
     provider: z.unknown(),
@@ -266,7 +287,9 @@ if (mode === "stdio") {
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
-      sovereignCommsControlPlane: GENESIS_V4_SOVEREIGN_COMMS_ANCHOR.capabilityId
+      sovereignCommsControlPlane: GENESIS_V4_SOVEREIGN_COMMS_ANCHOR.capabilityId,
+      representationResolver: GENESIS_V4_REPRESENTATION_RESOLVER_ANCHOR.decisionId,
+      representationTruthState: GENESIS_V4_REPRESENTATION_RESOLVER_ANCHOR.truthState
     });
   });
 
