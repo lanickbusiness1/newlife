@@ -13,27 +13,53 @@ permissions:
   contents: read
 
 jobs:
+  provider-contract:
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.contract.outputs.configured }}
+    steps:
+      - name: Resolve canonical production endpoint contract
+        id: contract
+        env:
+          BASE_URL: ${{ vars.MCP_PRODUCTION_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BASE_URL:-}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Production endpoint unset::MCP_PRODUCTION_BASE_URL is not canonically configured. Production smoke is intentionally skipped; PRODUCTION_PROVEN remains closed."
+          else
+            case "$BASE_URL" in
+              https://*) ;;
+              *) echo "::error title=Invalid production endpoint::MCP_PRODUCTION_BASE_URL must use HTTPS."; exit 1 ;;
+            esac
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Canonical production endpoint contract is configured."
+          fi
+
   smoke:
+    needs: provider-contract
+    if: needs.provider-contract.outputs.configured == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Verify Render production health, EDUA artifact and outcome loop
+      - name: Verify canonical production health, EDUA artifact and outcome loop
         shell: bash
         env:
-          BASE_URL: https://afriagenesis-intelligence-mcp.onrender.com
+          BASE_URL: ${{ vars.MCP_PRODUCTION_BASE_URL }}
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 40); do
-            health="$(curl -fsS --connect-timeout 5 --max-time 20 "$BASE_URL/health" || true)"
-            demo="$(curl -fsS --connect-timeout 5 --max-time 20 "$BASE_URL/demo/edua/photosynthesis" || true)"
-            outcome="$(curl -fsS --connect-timeout 5 --max-time 20               -H 'content-type: application/json'               -d '{"learnerSessionId":"smoke-anonymous","representationEventId":"repr-smoke","preScore":40,"postScore":80,"interactions":3,"evidenceRefs":["smoke:ci"]}'               "$BASE_URL/api/edua/outcome" || true)"
+          base="${BASE_URL%/}"
+          for attempt in $(seq 1 24); do
+            health="$(curl -fsS --connect-timeout 5 --max-time 20 "$base/health" || true)"
+            demo="$(curl -fsS --connect-timeout 5 --max-time 20 "$base/demo/edua/photosynthesis" || true)"
+            outcome="$(curl -fsS --connect-timeout 5 --max-time 20               -H 'content-type: application/json'               -d '{"learnerSessionId":"smoke-anonymous","representationEventId":"repr-smoke","preScore":40,"postScore":80,"interactions":3,"evidenceRefs":["smoke:ci"]}'               "$base/api/edua/outcome" || true)"
 
             if printf '%s' "$health" | grep -q '"status":"ok"'               && printf '%s' "$health" | grep -q '"sovereignCommsControlPlane":"CAP-SAW-COMMS-001"'               && printf '%s' "$health" | grep -q '"eduaInteractiveArtifact":"EDUA-ART-PHOTOSYNTHESIS-001"'               && printf '%s' "$demo" | grep -q 'id="photosynthesis-rate"'               && printf '%s' "$demo" | grep -q 'INTERACTIVE_DEMO_ARTIFACT'               && printf '%s' "$outcome" | grep -q '"status":"measured"'               && printf '%s' "$outcome" | grep -q '"status":"candidate_only"'; then
-              echo "PRODUCTION_PROVEN: health + EDUA interactive artifact + bounded outcome loop observed."
+              echo "PRODUCTION_PROVEN: canonical endpoint + health + EDUA interactive artifact + bounded outcome loop observed."
               exit 0
             fi
 
-            echo "Attempt $attempt/40: deployment not yet proven; retrying in 15s"
+            echo "Attempt $attempt/24: canonical provider not yet proven; retrying in 15s"
             sleep 15
           done
 

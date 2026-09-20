@@ -69,6 +69,20 @@ describe("EDUA interactive photosynthesis artifact", () => {
     expect(outcome.claim).toBe("MEASURED_SESSION_OUTCOME_ONLY");
   });
 
+  test("keeps an immutable static fallback aligned with the governed artifact", () => {
+    const staticHtml = readFileSync(
+      new URL("../../../apps/edua-os/demos/photosynthesis.html", import.meta.url),
+      "utf8"
+    );
+
+    expect(staticHtml).toContain("EDUA-ART-PHOTOSYNTHESIS-001");
+    expect(staticHtml).toContain('id="photosynthesis-rate"');
+    expect(staticHtml).toContain("candidate_only");
+    expect(staticHtml).toContain("MEASURED_SESSION_OUTCOME_ONLY");
+    expect(staticHtml).toContain('data-truth-state="STATIC_DEMO"');
+    expect(staticHtml).not.toMatch(/https?:\/\//);
+  });
+
   test("exposes a public demo route and governed outcome tool", () => {
     const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
 

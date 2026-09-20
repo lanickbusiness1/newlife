@@ -1,0 +1,57 @@
+name: EDUA Static Demo Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/edua-os/demos/**'
+      - 'services/mcp-server/tests/eduaInteractiveRenderer.test.ts'
+      - '.github/workflows/edua-static-demo-smoke.yml'
+  pull_request:
+    paths:
+      - 'apps/edua-os/demos/**'
+      - 'services/mcp-server/tests/eduaInteractiveRenderer.test.ts'
+      - '.github/workflows/edua-static-demo-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-static-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify repository artifact contract
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Validate static artifact markers
+        run: |
+          set -euo pipefail
+          file="apps/edua-os/demos/photosynthesis.html"
+          test -s "$file"
+          grep -q 'EDUA-ART-PHOTOSYNTHESIS-001' "$file"
+          grep -q 'data-truth-state="STATIC_DEMO"' "$file"
+          grep -q 'id="photosynthesis-rate"' "$file"
+          grep -q 'candidate_only' "$file"
+          grep -q 'MEASURED_SESSION_OUTCOME_ONLY' "$file"
+          if grep -Eq 'https?://' "$file"; then
+            echo "External URL found in static artifact; low-bandwidth self-contained contract violated."
+            exit 1
+          fi
+
+      - name: Prove immutable public CDN artifact
+        if: github.event_name != 'pull_request'
+        env:
+          DEMO_URL: https://raw.githack.com/${{ github.repository }}/${{ github.sha }}/apps/edua-os/demos/photosynthesis.html
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error --location               --connect-timeout 5 --max-time 20               "$DEMO_URL" --output /tmp/edua-demo.html               && grep -q 'EDUA-ART-PHOTOSYNTHESIS-001' /tmp/edua-demo.html               && grep -q 'data-truth-state="STATIC_DEMO"' /tmp/edua-demo.html               && grep -q 'id="photosynthesis-rate"' /tmp/edua-demo.html; then
+              echo "PUBLIC_DEMO_PROVEN: $DEMO_URL"
+              exit 0
+            fi
+            echo "Attempt $attempt/12: immutable demo not yet available; retrying in 10s"
+            sleep 10
+          done
+          echo "Immutable public demo proof not obtained."
+          exit 1

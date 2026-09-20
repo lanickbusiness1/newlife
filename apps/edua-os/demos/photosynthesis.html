@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>EDUA — Photosynthèse interactive</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#2f241a;background:#fff7e8}
+*{box-sizing:border-box}body{margin:0;padding:12px}main{max-width:900px;margin:auto}
+.hero{padding:20px;border-radius:22px;background:linear-gradient(135deg,#ffd166,#ef8354)}
+h1{margin:0 0 8px;font-size:clamp(1.6rem,5vw,2.5rem)}p{line-height:1.45}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0}
+.card{background:#fff;border:1px solid #ead4b7;border-radius:18px;padding:15px}
+label{display:flex;justify-content:space-between;gap:8px;font-weight:700}
+input[type=range]{width:100%;accent-color:#9b4f1f}.rate{font-size:2.4rem;font-weight:800}
+.meter{height:15px;border-radius:999px;background:#eee0ca;overflow:hidden}.meter>div{height:100%;width:70%;background:#527a3a}
+.flow{display:flex;gap:7px;align-items:center;justify-content:center;flex-wrap:wrap;margin:12px 0;font-weight:700}
+.node{border:1px solid #d9c09b;border-radius:999px;padding:8px 11px}
+button{border:0;border-radius:12px;padding:10px 13px;background:#7f4f24;color:#fff;font-weight:750;cursor:pointer}
+.quiz label{display:block;font-weight:500;margin:8px 0}.outcome{min-height:44px;margin-top:10px;padding:10px;border-radius:12px;background:#fff2c7}
+.scores{display:grid;grid-template-columns:1fr 1fr;gap:10px}.scores label{display:block}
+input[type=number]{width:100%;padding:10px;border:1px solid #ccb493;border-radius:10px}
+small,footer{color:#705b46}.truth{font-size:.84rem}.badge{display:inline-block;padding:5px 8px;border-radius:999px;background:#f6dfae;font-weight:700}
+@media(max-width:520px){.scores{grid-template-columns:1fr}.hero{padding:15px}}
+</style>
+</head>
+<body>
+<main data-asset-id="EDUA-ART-PHOTOSYNTHESIS-001" data-truth-state="STATIC_DEMO">
+<section class="hero">
+<span class="badge">EDUA V2 · V4-DEC-042</span>
+<h1>Comprendre la photosynthèse</h1>
+<p>Modifie la lumière, le CO₂ et l’eau. Dans ce modèle pédagogique simplifié, le facteur le plus faible limite le taux affiché.</p>
+<p class="truth"><strong>Limite scientifique :</strong> cette simulation n’est pas un modèle physiologique, agronomique ou de rendement agricole.</p>
+</section>
+<section class="grid">
+<div class="card"><label for="light">Lumière <output id="light-value">70%</output></label><input id="light" type="range" min="0" max="100" value="70"></div>
+<div class="card"><label for="co2">CO₂ <output id="co2-value">70%</output></label><input id="co2" type="range" min="0" max="100" value="70"></div>
+<div class="card"><label for="water">Eau <output id="water-value">70%</output></label><input id="water" type="range" min="0" max="100" value="70"></div>
+</section>
+<section class="card" aria-live="polite">
+<div>Taux simplifié de photosynthèse</div>
+<div class="rate"><span id="photosynthesis-rate">70</span>%</div>
+<div class="meter"><div id="rate-meter"></div></div>
+<p id="limiting-factor">Facteur limitant : lumière, CO₂, eau</p>
+<div class="flow"><span class="node">Lumière</span><span>+</span><span class="node">CO₂</span><span>+</span><span class="node">H₂O</span><span>→</span><span class="node">Glucose + O₂</span></div>
+</section>
+<section class="card quiz">
+<h2>Teste ta compréhension</h2>
+<form id="quiz-form">
+<p>Si la lumière est forte mais que l’eau est très faible, que se passe-t-il ?</p>
+<label><input type="radio" name="answer" value="water"> L’eau devient le facteur limitant.</label>
+<label><input type="radio" name="answer" value="light"> La lumière reste toujours le seul facteur important.</label>
+<button type="submit">Vérifier</button>
+</form>
+<div id="quiz-feedback" class="outcome" aria-live="polite"></div>
+</section>
+<section class="card">
+<h2>Mesure de compréhension</h2>
+<p>Compare un score avant/après cette activité. La mesure reste locale dans ce démonstrateur et ne prouve pas une causalité pédagogique.</p>
+<div class="scores"><label>Avant<input id="pre-score" type="number" min="0" max="100" value="40"></label><label>Après<input id="post-score" type="number" min="0" max="100" value="70"></label></div>
+<button id="measure-btn" type="button">Calculer le progrès</button>
+<div id="measure-feedback" class="outcome" aria-live="polite"></div>
+</section>
+<noscript><section class="card">La photosynthèse transforme l’énergie lumineuse, le CO₂ et l’eau en matière organique et libère de l’oxygène. Dans cette démo simplifiée, le facteur le plus faible limite le taux affiché.</section></noscript>
+<footer>EDUA-ART-PHOTOSYNTHESIS-001 · STATIC_DEMO · aucune donnée personnelle collectée · aucun stockage serveur</footer>
+</main>
+<script>
+(function(){
+const ids=["light","co2","water"];let interactions=0;
+const val=id=>Number(document.getElementById(id).value);
+function update(){const v={light:val("light"),co2:val("co2"),water:val("water")};ids.forEach(id=>document.getElementById(id+"-value").textContent=v[id]+"%");const rate=Math.min(v.light,v.co2,v.water);document.getElementById("photosynthesis-rate").textContent=String(rate);document.getElementById("rate-meter").style.width=rate+"%";const m=Math.min(v.light,v.co2,v.water);const names=ids.filter(id=>v[id]===m).map(id=>id==="light"?"lumière":id==="co2"?"CO₂":"eau");document.getElementById("limiting-factor").textContent="Facteur limitant : "+names.join(", ")}
+ids.forEach(id=>document.getElementById(id).addEventListener("input",()=>{interactions++;update()}));
+document.getElementById("quiz-form").addEventListener("submit",e=>{e.preventDefault();interactions++;const answer=new FormData(e.currentTarget).get("answer");document.getElementById("quiz-feedback").textContent=answer==="water"?"Correct. L’eau limite alors le processus dans ce modèle.":"Observe le facteur le plus faible : il limite le processus dans ce modèle."});
+document.getElementById("measure-btn").addEventListener("click",()=>{interactions++;const pre=Number(document.getElementById("pre-score").value),post=Number(document.getElementById("post-score").value),out=document.getElementById("measure-feedback");if(!Number.isFinite(pre)||!Number.isFinite(post)||pre<0||pre>100||post<0||post>100){out.textContent="Scores invalides : utilise 0 à 100.";return}const delta=Math.round((post-pre)*100)/100,state=delta>=10?"amélioration mesurée":delta<=-10?"baisse mesurée":"variation stable";const reme={status:"candidate_only",requiresGateReview:true,claim:"MEASURED_SESSION_OUTCOME_ONLY"};out.textContent=state+" : "+(delta>=0?"+":"")+delta+" points · "+interactions+" interactions · R.E.M.E "+reme.status+". Aucun lien causal n’est revendiqué."});
+update();
+})();
+</script>
+</body>
+</html>
