@@ -30,11 +30,16 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
     expect(result.execution.state).toBe("CONNECTOR_UNBOUND");
   });
 
-  test("normalizes voice as a channel adapter without making voice the authority", () => {
+  test("normalizes voice natively without requiring a duplicate text message", () => {
     const result = compileOmnichannelCommand({
-      ...base,
+      tenantId: base.tenantId,
+      actorId: base.actorId,
       requestId: "req-voice-001",
       channel: "voice",
+      dataClassification: "internal",
+      providerBinding: {
+        status: "unbound"
+      },
       voice: {
         transcript: "Donne-moi les priorités P0",
         language: "fr"
@@ -103,6 +108,17 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
     }
   });
 
+  test("does not let a self-asserted approval release an A4 action", () => {
+    const result = evaluateAutonomyBoundary({
+      actionClass: "financial",
+      reversible: true,
+      approvalPresent: true
+    });
+
+    expect(result.decision).toBe("HUMAN_APPROVAL_VERIFICATION_REQUIRED");
+    expect(result.autonomyClass).toBe("A4");
+  });
+
   test("continues reversible internal work without micro-validation", () => {
     const result = evaluateAutonomyBoundary({
       actionClass: "internal_reversible",
@@ -161,9 +177,10 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
       ]
     });
 
-    expect(result.decision).toBe("WORKER_SELECTED");
+    expect(result.decision).toBe("WORKER_CANDIDATE_SELECTED");
     expect(result.workerId).toBe("codex-worker");
     expect(result.authority).toBe("GENESIS_V4");
+    expect(result.requiresRegistryVerification).toBe(true);
   });
 
   test("fails closed when no worker is eligible", () => {
@@ -194,6 +211,16 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
     expect(indexSource).toContain('register("genesis.heartbeat.compile"');
     expect(indexSource).toContain('register("genesis.worker.route"');
     expect(indexSource).toContain("GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR");
+  });
+
+  test("confidential data is also reference-only at the channel boundary", () => {
+    const result = compileOmnichannelCommand({
+      ...base,
+      requestId: "req-confidential-001",
+      dataClassification: "confidential"
+    });
+
+    expect(result.dataHandling.channelPersistence).toBe("REFERENCE_ONLY");
   });
 
   test("restricted data is reference-only at the channel boundary", () => {
