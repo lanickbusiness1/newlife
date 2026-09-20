@@ -204,13 +204,14 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
     expect(result.blockers).toContain("NO_ELIGIBLE_WORKER");
   });
 
-  test("exposes all four governed runtime tools through the existing MCP server", () => {
+  test("exposes all five governed runtime tools through the existing MCP server", () => {
     const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
 
     expect(indexSource).toContain('register("genesis.omnichannel.compile"');
     expect(indexSource).toContain('register("genesis.autonomy.evaluate"');
     expect(indexSource).toContain('register("genesis.heartbeat.compile"');
     expect(indexSource).toContain('register("genesis.worker.route"');
+    expect(indexSource).toContain('register("genesis.runtime.compile_readiness"');
     expect(indexSource).toContain("GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR");
   });
 
