@@ -25,6 +25,17 @@ describe("V4-DEC-042A Cross-Pipeline Auto Representation", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  test("all stage profiles reference registered GENESIS recipes", async () => {
+    const registry = await import("../src/openAICapabilityRegistry");
+    const recipeIds = new Set(registry.GENESIS_CREATION_RECIPE_REGISTRY.map(item => item.id));
+
+    for (const profile of GENESIS_PIPELINE_STAGE_PROFILES) {
+      for (const recipeId of profile.recommendedRecipes) {
+        expect(recipeIds.has(recipeId), `${profile.stage} references unknown recipe ${recipeId}`).toBe(true);
+      }
+    }
+  });
+
   test("routes Signal stage to evidence-first representation", () => {
     const result = recommendCreationCapabilities({
       intent: "Qualifier ce signal",
