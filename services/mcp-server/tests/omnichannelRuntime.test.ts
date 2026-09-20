@@ -63,6 +63,35 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
     expect(result.execution.blockers).toContain("PROVIDER_CONNECTOR_NOT_BOUND");
   });
 
+  test("does not trust a self-asserted provider binding as runtime proof", () => {
+    const result = compileOmnichannelCommand({
+      ...base,
+      requestId: "req-bound-unverified-001",
+      providerBinding: {
+        status: "bound",
+        provider: "telegram-bot-api",
+        bindingEvidenceRef: "connector-registry://telegram/prod"
+      }
+    });
+
+    expect(result.execution.state).toBe("CONNECTOR_BINDING_REQUIRES_RUNTIME_VERIFICATION");
+    expect(result.execution.canDispatchExternally).toBe(false);
+    expect(result.execution.blockers).toContain("PROVIDER_BINDING_NOT_RUNTIME_VERIFIED");
+  });
+
+  test("requires provider evidence when a binding is declared", () => {
+    expect(() =>
+      compileOmnichannelCommand({
+        ...base,
+        requestId: "req-bound-no-proof",
+        providerBinding: {
+          status: "bound",
+          provider: "telegram-bot-api"
+        }
+      })
+    ).toThrow();
+  });
+
   test("requires human authority for regulated, financial, destructive or sensitive external actions", () => {
     for (const actionClass of ["financial", "regulated", "destructive", "external_sensitive"] as const) {
       const result = evaluateAutonomyBoundary({
