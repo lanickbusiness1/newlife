@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
   compileHeartbeatContract,
   compileOmnichannelCommand,
+  compileWorkerRoute,
   evaluateAutonomyBoundary,
   GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR
 } from "../src/omnichannelRuntime";
@@ -106,6 +108,63 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
         enabled: true
       })
     ).toThrow("OMNICHANNEL_HEARTBEAT_TOO_FREQUENT");
+  });
+
+  test("keeps worker selection provider-neutral and GENESIS-authoritative", () => {
+    const result = compileWorkerRoute({
+      taskId: "task-code-001",
+      taskClass: "code",
+      dataClassification: "internal",
+      requiredCapabilities: ["typescript", "repo_write"],
+      candidates: [
+        {
+          workerId: "codex-worker",
+          capabilities: ["typescript", "repo_write"],
+          allowedClassifications: ["public", "internal"],
+          enabled: true
+        },
+        {
+          workerId: "local-worker",
+          capabilities: ["typescript"],
+          allowedClassifications: ["public", "internal", "confidential"],
+          enabled: true
+        }
+      ]
+    });
+
+    expect(result.decision).toBe("WORKER_SELECTED");
+    expect(result.workerId).toBe("codex-worker");
+    expect(result.authority).toBe("GENESIS_V4");
+  });
+
+  test("fails closed when no worker is eligible", () => {
+    const result = compileWorkerRoute({
+      taskId: "task-restricted-001",
+      taskClass: "reason",
+      dataClassification: "restricted",
+      requiredCapabilities: ["sovereign_reasoning"],
+      candidates: [
+        {
+          workerId: "external-worker",
+          capabilities: ["sovereign_reasoning"],
+          allowedClassifications: ["public", "internal"],
+          enabled: true
+        }
+      ]
+    });
+
+    expect(result.decision).toBe("WORKER_UNBOUND");
+    expect(result.blockers).toContain("NO_ELIGIBLE_WORKER");
+  });
+
+  test("exposes all four governed runtime tools through the existing MCP server", () => {
+    const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+
+    expect(indexSource).toContain('register("genesis.omnichannel.compile"');
+    expect(indexSource).toContain('register("genesis.autonomy.evaluate"');
+    expect(indexSource).toContain('register("genesis.heartbeat.compile"');
+    expect(indexSource).toContain('register("genesis.worker.route"');
+    expect(indexSource).toContain("GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR");
   });
 
   test("restricted data is reference-only at the channel boundary", () => {
