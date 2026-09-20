@@ -76,6 +76,7 @@ Outils gouvernés :
 - `genesis.autonomy.evaluate` — scope `control:evaluate`
 - `genesis.heartbeat.compile` — scope `runtime:heartbeat`
 - `genesis.worker.route` — scope `worker:route`
+- `genesis.runtime.compile_readiness` — scope `runtime:readiness`
 
 Invariants :
 
@@ -88,9 +89,20 @@ Invariants :
 - Les données `restricted` restent `REFERENCE_ONLY` à la frontière du canal.
 - Les workers GPT/Codex/Claude/Gemini/local sont substituables et ne deviennent jamais l'autorité GENESIS.
 
+### Runtime Readiness Gate
+
+`genesis.runtime.compile_readiness` compile uniquement un **candidat** de readiness à partir de références de preuve. Il exige :
+- persistance `canonical_postgres` ;
+- preuve de migration de la chaîne SQL canonique `065/070/071/072/074/076` ;
+- présence logique de `object_events`, `object_runtime_bindings`, `object_execution_contexts`, `loop_instances`, `loop_actions`, `loop_results`, `loop_evidence` ;
+- health provider et rollback prouvés ;
+- registre connecteurs et secrets manager prouvés.
+
+Même avec un paquet complet, la sortie maximale est `READY_FOR_M8_RELEASE_REVIEW`. `operationalClaimAllowed` reste toujours `false` : les références de preuve doivent être vérifiées indépendamment avant release.
+
 ### Frontière de preuve
 
-Le runtime omnicanal est un **contrat exécutable provider-agnostic**. Il ne constitue pas encore une preuve de bot Telegram/WhatsApp, de voix ou de worker externe connecté. La promotion exige connecteur autorisé, secrets manager, tests E2E du canal, receipt provider, persistance, observabilité, S7+/M8 applicables et Release Evidence Bundle.
+Le runtime omnicanal est un **contrat exécutable provider-agnostic**. Il ne constitue pas encore une preuve de bot Telegram/WhatsApp, de voix ou de worker externe connecté. Le contrôle Supabase du 20 septembre 2026 a confirmé qu'aucun projet Supabase GENESIS canonique n'est actuellement identifié : `afria-recruit` reste isolé à son domaine et l'ancien projet générique inactif n'est pas réutilisé. La promotion exige connecteur autorisé, secrets manager, tests E2E du canal, receipt provider, persistance canonique migrée, observabilité, S7+/M8 applicables et Release Evidence Bundle.
 
 ## Validation Relay
 
