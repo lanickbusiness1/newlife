@@ -20,12 +20,13 @@ const SUPPORTED_CHANNELS = [
 
 const ProviderBindingSchema = z.object({
   status: z.enum(["bound", "unbound", "disabled"]),
-  provider: z.string().min(1).optional()
+  provider: z.string().min(1).optional(),
+  bindingEvidenceRef: z.string().min(1).optional()
 }).superRefine((value, ctx) => {
-  if (value.status === "bound" && !value.provider) {
+  if (value.status === "bound" && (!value.provider || !value.bindingEvidenceRef)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "OMNICHANNEL_BOUND_PROVIDER_REQUIRED"
+      message: "OMNICHANNEL_BOUND_PROVIDER_EVIDENCE_REQUIRED"
     });
   }
 });
@@ -70,13 +71,13 @@ export function compileOmnichannelCommand(input: unknown) {
     : null;
 
   const state = parsed.providerBinding.status === "bound"
-    ? "READY_FOR_AUTHORIZED_DISPATCH"
+    ? "CONNECTOR_BINDING_REQUIRES_RUNTIME_VERIFICATION"
     : parsed.providerBinding.status === "disabled"
       ? "CONNECTOR_DISABLED"
       : "CONNECTOR_UNBOUND";
 
   const blockers = parsed.providerBinding.status === "bound"
-    ? []
+    ? ["PROVIDER_BINDING_NOT_RUNTIME_VERIFIED"]
     : parsed.providerBinding.status === "disabled"
       ? ["PROVIDER_CONNECTOR_DISABLED"]
       : ["PROVIDER_CONNECTOR_NOT_BOUND"];
@@ -103,7 +104,8 @@ export function compileOmnichannelCommand(input: unknown) {
     execution: {
       state,
       provider,
-      canDispatchExternally: parsed.providerBinding.status === "bound",
+      canDispatchExternally: false,
+      bindingEvidenceRef: parsed.providerBinding.bindingEvidenceRef ?? null,
       blockers,
       idempotencyKey: `${parsed.tenantId}:${parsed.requestId}`
     },
