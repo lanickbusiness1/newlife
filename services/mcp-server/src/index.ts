@@ -46,9 +46,13 @@ import {
   compileRepresentationFromEvidence,
   GENESIS_EVIDENCE_TO_CONTENT_ADAPTER
 } from "./representationEvidenceAdapter.js";
+import {
+  OPENAI_CAPABILITY_REGISTRY_VERSION,
+  recommendCreationCapabilities
+} from "./openAICapabilityRegistry.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.11.0";
+const CONTROL_PLANE_REVISION = "0.12.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -272,6 +276,14 @@ function buildServer() {
     result: compileRepresentationFromEvidence(payload as any)
   }));
 
+  register("representation.capabilities.recommend", "Recommande automatiquement les capacités OpenAI documentées et recettes GENESIS adaptées au flux de création, avec confiance et politique d'exécution.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "representation:capabilities:recommend", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    recommendation: recommendCreationCapabilities(payload as any)
+  }));
+
   register("edua.learning.evaluate_outcome", "Mesure un delta de compréhension de session EDUA et émet un candidat R.E.M.E borné sans revendiquer de causalité.", {
     context: RequestContext,
     payload: z.unknown()
@@ -359,7 +371,8 @@ if (mode === "stdio") {
       representationCompilerProfile: GENESIS_REPRESENTATION_COMPILER_PROFILE.profileId,
       representationCompilerTruthState: GENESIS_REPRESENTATION_COMPILER_PROFILE.truthState,
       representationEvidenceAdapter: GENESIS_EVIDENCE_TO_CONTENT_ADAPTER.adapterId,
-      representationEvidenceTruthState: GENESIS_EVIDENCE_TO_CONTENT_ADAPTER.truthState
+      representationEvidenceTruthState: GENESIS_EVIDENCE_TO_CONTENT_ADAPTER.truthState,
+      openAICapabilityRegistryVersion: OPENAI_CAPABILITY_REGISTRY_VERSION
     });
   });
 
