@@ -33,9 +33,14 @@ import {
   GENESIS_V4_REPRESENTATION_RESOLVER_ANCHOR,
   resolveRepresentation
 } from "./representationResolver.js";
+import {
+  EDUA_PHOTOSYNTHESIS_ARTIFACT,
+  evaluateLearningOutcome,
+  renderPhotosynthesisArtifact
+} from "./eduaInteractiveRenderer.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.8.0";
+const CONTROL_PLANE_REVISION = "0.9.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -243,6 +248,14 @@ function buildServer() {
     resolution: adaptEduaRepresentation(payload as any)
   }));
 
+  register("edua.learning.evaluate_outcome", "Mesure un delta de compréhension de session EDUA et émet un candidat R.E.M.E borné sans revendiquer de causalité.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "education:measure", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    evaluation: evaluateLearningOutcome(payload as any)
+  }));
+
   register("comms.provider.evaluate", "Évalue un fournisseur de communication selon les exigences de souveraineté et le niveau de preuve disponible.", {
     context: RequestContext,
     provider: z.unknown(),
@@ -274,6 +287,33 @@ if (mode === "stdio") {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
 
+  app.get("/demo/edua/photosynthesis", (req, res) => {
+    const language = req.query.lang === "en" ? "en" : "fr";
+    const learnerLevel = typeof req.query.level === "string" && req.query.level.trim()
+      ? req.query.level.trim().slice(0, 64)
+      : "secondary";
+
+    res.type("html").send(renderPhotosynthesisArtifact({
+      language,
+      learnerLevel,
+      representationEventId: "repr-demo-photosynthesis-v1"
+    }));
+  });
+
+  app.post("/api/edua/outcome", (req, res) => {
+    try {
+      res.json({
+        status: "measured",
+        persistence: "none",
+        evaluation: evaluateLearningOutcome(req.body)
+      });
+    } catch (error) {
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "EDUA_OUTCOME_INVALID_INPUT"
+      });
+    }
+  });
+
   app.get("/health", (_req, res) => {
     res.json({
       status: "ok",
@@ -289,7 +329,9 @@ if (mode === "stdio") {
       chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
       sovereignCommsControlPlane: GENESIS_V4_SOVEREIGN_COMMS_ANCHOR.capabilityId,
       representationResolver: GENESIS_V4_REPRESENTATION_RESOLVER_ANCHOR.decisionId,
-      representationTruthState: GENESIS_V4_REPRESENTATION_RESOLVER_ANCHOR.truthState
+      representationTruthState: GENESIS_V4_REPRESENTATION_RESOLVER_ANCHOR.truthState,
+      eduaInteractiveArtifact: EDUA_PHOTOSYNTHESIS_ARTIFACT.assetId,
+      eduaInteractiveTruthState: EDUA_PHOTOSYNTHESIS_ARTIFACT.truthState
     });
   });
 
