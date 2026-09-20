@@ -49,6 +49,18 @@ describe("V4-DEC-042 OpenAI Capability & Representation Registry", () => {
     for (const id of required) expect(ids).toContain(id);
   });
 
+  test("all GENESIS recipes reference only registered primitive capabilities", () => {
+    const capabilityIds = new Set(OPENAI_CAPABILITY_REGISTRY.map(item => item.id));
+    for (const recipe of GENESIS_CREATION_RECIPE_REGISTRY) {
+      for (const id of [
+        ...recipe.requiredCapabilities,
+        ...(recipe.optionalCapabilities ?? [])
+      ]) {
+        expect(capabilityIds.has(id), `${recipe.id} references unknown capability ${id}`).toBe(true);
+      }
+    }
+  });
+
   test("contains a broad GENESIS recipe library beyond the five seed examples", () => {
     const ids = GENESIS_CREATION_RECIPE_REGISTRY.map(item => item.id);
     expect(ids.length).toBeGreaterThanOrEqual(30);
