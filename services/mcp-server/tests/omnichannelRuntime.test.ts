@@ -4,6 +4,7 @@ import {
   compileHeartbeatContract,
   compileOmnichannelCommand,
   compileWorkerRoute,
+  compileRuntimeReadinessCandidate,
   evaluateAutonomyBoundary,
   GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR
 } from "../src/omnichannelRuntime";
@@ -221,6 +222,59 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
     });
 
     expect(result.dataHandling.channelPersistence).toBe("REFERENCE_ONLY");
+  });
+
+  test("blocks always-on activation until canonical persistence and provider evidence are complete", () => {
+    const readiness = compileRuntimeReadinessCandidate({
+      persistence: {
+        backend: "unbound",
+        migrationEvidenceRefs: [],
+        requiredLogicalTables: []
+      },
+      provider: {
+        status: "unverified"
+      },
+      connectors: {
+        registryEvidenceRef: null,
+        secretsManagerEvidenceRef: null
+      }
+    });
+
+    expect(readiness.decision).toBe("BLOCKED_EVIDENCE_INCOMPLETE");
+    expect(readiness.operationalClaimAllowed).toBe(false);
+    expect(readiness.blockers).toContain("CANONICAL_PERSISTENCE_UNBOUND");
+    expect(readiness.blockers).toContain("PROVIDER_HEALTH_UNVERIFIED");
+  });
+
+  test("only produces a release-review candidate when the full evidence packet is present", () => {
+    const readiness = compileRuntimeReadinessCandidate({
+      persistence: {
+        backend: "canonical_postgres",
+        migrationEvidenceRefs: ["evidence://migration/065-076"],
+        requiredLogicalTables: [
+          "object_events",
+          "object_runtime_bindings",
+          "object_execution_contexts",
+          "loop_instances",
+          "loop_actions",
+          "loop_results",
+          "loop_evidence"
+        ]
+      },
+      provider: {
+        status: "verified",
+        healthEvidenceRef: "evidence://provider/health",
+        rollbackEvidenceRef: "evidence://provider/rollback"
+      },
+      connectors: {
+        registryEvidenceRef: "evidence://connectors/registry",
+        secretsManagerEvidenceRef: "evidence://secrets/manager"
+      }
+    });
+
+    expect(readiness.decision).toBe("READY_FOR_M8_RELEASE_REVIEW");
+    expect(readiness.operationalClaimAllowed).toBe(false);
+    expect(readiness.requiredCanonicalSql).toContain("071_v4_object_runtime_bridge.sql");
   });
 
   test("restricted data is reference-only at the channel boundary", () => {
