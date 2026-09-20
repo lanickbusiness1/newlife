@@ -96,13 +96,17 @@ Invariants :
 - preuve de migration de la chaîne SQL canonique `065/070/071/072/074/076` ;
 - présence logique de `object_events`, `object_runtime_bindings`, `object_execution_contexts`, `loop_instances`, `loop_actions`, `loop_results`, `loop_evidence` ;
 - health provider et rollback prouvés ;
+- continuité provider prouvée : billing/account state `verified` avec référence de preuve ;
+- `payment_failed` est un hard blocker `PROVIDER_PAYMENT_FAILED`, même si le healthcheck technique est vert ;
 - registre connecteurs et secrets manager prouvés.
 
 Même avec un paquet complet, la sortie maximale est `READY_FOR_M8_RELEASE_REVIEW`. `operationalClaimAllowed` reste toujours `false` : les références de preuve doivent être vérifiées indépendamment avant release.
 
 ### Frontière de preuve
 
-Le runtime omnicanal est un **contrat exécutable provider-agnostic**. Il ne constitue pas encore une preuve de bot Telegram/WhatsApp, de voix ou de worker externe connecté. Le contrôle Supabase du 20 septembre 2026 a confirmé qu'aucun projet Supabase GENESIS canonique n'est actuellement identifié : `afria-recruit` reste isolé à son domaine et l'ancien projet générique inactif n'est pas réutilisé. La promotion exige connecteur autorisé, secrets manager, tests E2E du canal, receipt provider, persistance canonique migrée, observabilité, S7+/M8 applicables et Release Evidence Bundle.
+Le runtime omnicanal est un **contrat exécutable provider-agnostic**. Il ne constitue pas encore une preuve de bot Telegram/WhatsApp, de voix ou de worker externe connecté. Le contrôle Supabase du 20 septembre 2026 a confirmé qu'aucun projet Supabase GENESIS canonique n'est actuellement identifié : `afria-recruit` reste isolé à son domaine et l'ancien projet générique inactif n'est pas réutilisé.
+
+Le Provider Continuity Gate est également fail-closed : une preuve de health technique n'autorise pas la release si le compte fournisseur est exposé à suspension ou si la continuité financière n'est pas prouvée. La promotion exige connecteur autorisé, secrets manager, tests E2E du canal, receipt provider, persistance canonique migrée, health + rollback + billing continuity prouvés, observabilité, S7+/M8 applicables et Release Evidence Bundle.
 
 ## Validation Relay
 
