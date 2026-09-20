@@ -247,6 +247,39 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
     expect(readiness.blockers).toContain("PROVIDER_HEALTH_UNVERIFIED");
   });
 
+  test("blocks release when provider billing continuity is payment-failed even if health is claimed", () => {
+    const readiness = compileRuntimeReadinessCandidate({
+      persistence: {
+        backend: "canonical_postgres",
+        migrationEvidenceRefs: ["evidence://migration/065-076"],
+        requiredLogicalTables: [
+          "object_events",
+          "object_runtime_bindings",
+          "object_execution_contexts",
+          "loop_instances",
+          "loop_actions",
+          "loop_results",
+          "loop_evidence"
+        ]
+      },
+      provider: {
+        status: "verified",
+        healthEvidenceRef: "evidence://provider/health",
+        rollbackEvidenceRef: "evidence://provider/rollback",
+        continuityStatus: "payment_failed",
+        billingEvidenceRef: "gmail://render/payment-failed/2026-09-19"
+      },
+      connectors: {
+        registryEvidenceRef: "evidence://connectors/registry",
+        secretsManagerEvidenceRef: "evidence://secrets/manager"
+      }
+    });
+
+    expect(readiness.decision).toBe("BLOCKED_EVIDENCE_INCOMPLETE");
+    expect(readiness.operationalClaimAllowed).toBe(false);
+    expect(readiness.blockers).toContain("PROVIDER_PAYMENT_FAILED");
+  });
+
   test("only produces a release-review candidate when the full evidence packet is present", () => {
     const readiness = compileRuntimeReadinessCandidate({
       persistence: {
@@ -265,7 +298,9 @@ describe("GENESIS V4 Always-On Omnichannel Runtime", () => {
       provider: {
         status: "verified",
         healthEvidenceRef: "evidence://provider/health",
-        rollbackEvidenceRef: "evidence://provider/rollback"
+        rollbackEvidenceRef: "evidence://provider/rollback",
+        continuityStatus: "verified",
+        billingEvidenceRef: "evidence://provider/billing-current"
       },
       connectors: {
         registryEvidenceRef: "evidence://connectors/registry",
