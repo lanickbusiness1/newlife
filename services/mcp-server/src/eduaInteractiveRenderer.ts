@@ -276,17 +276,39 @@ footer{margin:18px 0;font-size:.84rem;color:#7c6957}
     const selected=new FormData(e.currentTarget).get("answer");
     document.getElementById("quiz-feedback").textContent=selected==="water"?"${isFr ? "Correct. L’eau limite alors le processus dans ce modèle." : "Correct. Water then limits the process in this model."}":"${wrongAnswer}";
   });
-  document.getElementById("measure-btn").addEventListener("click",function(){
+  document.getElementById("measure-btn").addEventListener("click",async function(){
     interactions++;
     const pre=Number(document.getElementById("pre-score").value);
     const post=Number(document.getElementById("post-score").value);
+    const feedback=document.getElementById("measure-feedback");
     if(!Number.isFinite(pre)||!Number.isFinite(post)||pre<0||pre>100||post<0||post>100){
-      document.getElementById("measure-feedback").textContent="${isFr ? "Scores invalides : utilise 0 à 100." : "Invalid scores: use 0 to 100."}";return;
+      feedback.textContent="${isFr ? "Scores invalides : utilise 0 à 100." : "Invalid scores: use 0 to 100."}";return;
     }
     const delta=Math.round((post-pre)*100)/100;
     const state=delta>=10?"improved":delta<=-10?"regressed":"stable";
     const label=state==="improved"?"${isFr ? "amélioration mesurée" : "measured improvement"}":state==="regressed"?"${isFr ? "baisse mesurée" : "measured decrease"}":"${isFr ? "variation stable" : "stable change"}";
-    document.getElementById("measure-feedback").textContent=label+" : "+(delta>=0?"+":"")+delta+" points · "+interactions+" interactions. ${isFr ? "Ce résultat décrit seulement cette session, sans prouver une causalité." : "This result describes only this session and does not prove causality."}";
+    const localMessage=label+" : "+(delta>=0?"+":"")+delta+" points · "+interactions+" interactions. ${isFr ? "Ce résultat décrit seulement cette session, sans prouver une causalité." : "This result describes only this session and does not prove causality."}";
+    feedback.textContent=localMessage;
+    try{
+      const response=await fetch("/api/edua/outcome",{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({
+          learnerSessionId:"anonymous-browser-session",
+          representationEventId:"${eventId}",
+          preScore:pre,
+          postScore:post,
+          interactions,
+          evidenceRefs:["client:photosynthesis-demo"]
+        })
+      });
+      if(!response.ok)return;
+      const payload=await response.json();
+      const candidate=payload&&payload.evaluation&&payload.evaluation.remeCandidate?payload.evaluation.remeCandidate.status:"unknown";
+      feedback.textContent=localMessage+" · API outcome: "+candidate+".";
+    }catch(_error){
+      /* Offline-first fallback: local measurement remains visible. */
+    }
   });
   update();
 })();
