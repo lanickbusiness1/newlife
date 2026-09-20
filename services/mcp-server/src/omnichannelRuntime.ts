@@ -237,7 +237,9 @@ export function compileWorkerRoute(input: unknown) {
     && parsed.requiredCapabilities.every(capability => candidate.capabilities.includes(capability))
   );
 
-  if (eligible.length === 0) {
+  const selected = eligible[0];
+
+  if (!selected) {
     return {
       taskId: parsed.taskId,
       decision: "WORKER_UNBOUND",
@@ -249,10 +251,11 @@ export function compileWorkerRoute(input: unknown) {
 
   return {
     taskId: parsed.taskId,
-    decision: "WORKER_SELECTED",
-    workerId: eligible[0].workerId,
+    decision: "WORKER_CANDIDATE_SELECTED",
+    workerId: selected.workerId,
     blockers: [],
     authority: "GENESIS_V4",
+    requiresRegistryVerification: true,
     selectionPolicy: "FIRST_ELIGIBLE_DECLARED_CANDIDATE"
   } as const;
 }
