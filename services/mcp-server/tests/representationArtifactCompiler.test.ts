@@ -104,6 +104,35 @@ describe("GEN-COMPILER-PROFILE-REPRESENTATION-001", () => {
     expect(result.html).toContain("Engrais");
   });
 
+  test("degrades provider-dependent spatial map output to a safe diagram", () => {
+    const result = compileRepresentationArtifact({
+      representationRequest: {
+        intent: "Comprendre les zones d'un corridor logistique",
+        domain: "industry",
+        topic: "corridor logistique",
+        objective: "understand_spatial_structure",
+        constraints: baseConstraints,
+        signals: { spatial: true },
+        evidenceRefs: ["evidence:corridor-001"]
+      },
+      content: {
+        title: "Corridor logistique",
+        summary: "Structure spatiale fournie sans moteur cartographique.",
+        cards: [
+          { title: "Origine", body: "Point de départ documenté.", evidenceRefs: ["evidence:corridor-001"] },
+          { title: "Transit", body: "Zone de transit documentée.", evidenceRefs: ["evidence:corridor-001"] },
+          { title: "Destination", body: "Point d'arrivée documenté.", evidenceRefs: ["evidence:corridor-001"] }
+        ]
+      }
+    });
+
+    expect(result.resolution.primary.kind).toBe("map");
+    expect(result.manifest.selectedKind).toBe("diagram");
+    expect(result.manifest.degraded).toBe(true);
+    expect(result.manifest.degradationReason).toMatch(/RENDERER_UNAVAILABLE/);
+    expect(result.html).toContain('data-representation-kind="diagram"');
+  });
+
   test("compiles procedural enterprise content to sticky board", () => {
     const result = compileRepresentationArtifact({
       representationRequest: {
