@@ -42,9 +42,13 @@ import {
   compileRepresentationArtifact,
   GENESIS_REPRESENTATION_COMPILER_PROFILE
 } from "./representationArtifactCompiler.js";
+import {
+  compileRepresentationFromEvidence,
+  GENESIS_EVIDENCE_TO_CONTENT_ADAPTER
+} from "./representationEvidenceAdapter.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.10.0";
+const CONTROL_PLANE_REVISION = "0.11.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -260,6 +264,14 @@ function buildServer() {
     compilation: compileRepresentationArtifact(payload as any)
   }));
 
+  register("representation.evidence.compile", "Transforme un Evidence Packet sourcé en contenu structuré, résout la représentation et compile l'artifact sans inventer de faits manquants.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "representation:evidence:compile", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    result: compileRepresentationFromEvidence(payload as any)
+  }));
+
   register("edua.learning.evaluate_outcome", "Mesure un delta de compréhension de session EDUA et émet un candidat R.E.M.E borné sans revendiquer de causalité.", {
     context: RequestContext,
     payload: z.unknown()
@@ -345,7 +357,9 @@ if (mode === "stdio") {
       eduaInteractiveArtifact: EDUA_PHOTOSYNTHESIS_ARTIFACT.assetId,
       eduaInteractiveTruthState: EDUA_PHOTOSYNTHESIS_ARTIFACT.truthState,
       representationCompilerProfile: GENESIS_REPRESENTATION_COMPILER_PROFILE.profileId,
-      representationCompilerTruthState: GENESIS_REPRESENTATION_COMPILER_PROFILE.truthState
+      representationCompilerTruthState: GENESIS_REPRESENTATION_COMPILER_PROFILE.truthState,
+      representationEvidenceAdapter: GENESIS_EVIDENCE_TO_CONTENT_ADAPTER.adapterId,
+      representationEvidenceTruthState: GENESIS_EVIDENCE_TO_CONTENT_ADAPTER.truthState
     });
   });
 
