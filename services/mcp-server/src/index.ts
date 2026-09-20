@@ -52,7 +52,7 @@ import {
 } from "./openAICapabilityRegistry.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.12.0";
+const CONTROL_PLANE_REVISION = "0.13.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -97,7 +97,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.10.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane, Representation Resolver and Representation Compiler Profile are deterministic; external CRM, payment providers, provider-specific renderers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.13.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane, Representation Resolver, Representation Compiler Profile, Evidence Adapter, OpenAI Capability Registry and Cross-Pipeline Auto Representation are deterministic; external CRM, payment providers, provider-specific renderers and canonical SQL persistence execute only when separately connected, migrated and authorized."]
   };
 }
 
@@ -372,7 +372,8 @@ if (mode === "stdio") {
       representationCompilerTruthState: GENESIS_REPRESENTATION_COMPILER_PROFILE.truthState,
       representationEvidenceAdapter: GENESIS_EVIDENCE_TO_CONTENT_ADAPTER.adapterId,
       representationEvidenceTruthState: GENESIS_EVIDENCE_TO_CONTENT_ADAPTER.truthState,
-      openAICapabilityRegistryVersion: OPENAI_CAPABILITY_REGISTRY_VERSION
+      openAICapabilityRegistryVersion: OPENAI_CAPABILITY_REGISTRY_VERSION,
+      crossPipelineAutoRepresentationPolicy: "V4-DEC-042A"
     });
   });
 
