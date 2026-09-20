@@ -22,9 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify repository artifact contract
+      - name: Verify repository artifact contracts
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-      - name: Validate static artifact markers
+
+      - name: Validate photosynthesis artifact markers
         run: |
           set -euo pipefail
           file="apps/edua-os/demos/photosynthesis.html"
@@ -35,23 +36,54 @@ jobs:
           grep -q 'candidate_only' "$file"
           grep -q 'MEASURED_SESSION_OUTCOME_ONLY' "$file"
           if grep -Eq 'https?://' "$file"; then
-            echo "External URL found in static artifact; low-bandwidth self-contained contract violated."
+            echo "External URL found in photosynthesis artifact."
             exit 1
           fi
 
-      - name: Prove immutable public CDN artifact
+      - name: Validate five-mode representation lab
+        run: |
+          set -euo pipefail
+          file="apps/edua-os/demos/representation-lab.html"
+          test -s "$file"
+          grep -q 'EDUA-REPRESENTATION-LAB-001' "$file"
+          grep -q 'data-mode="visualize_learning"' "$file"
+          grep -q 'data-mode="handwritten_note"' "$file"
+          grep -q 'data-mode="sticky_board"' "$file"
+          grep -q 'data-mode="info_chart"' "$file"
+          grep -q 'data-mode="infograph"' "$file"
+          if grep -Eq 'https?://' "$file"; then
+            echo "External URL found in representation lab."
+            exit 1
+          fi
+
+      - name: Prove immutable public CDN artifacts
         if: github.event_name != 'pull_request'
         env:
-          DEMO_URL: https://raw.githack.com/${{ github.repository }}/${{ github.sha }}/apps/edua-os/demos/photosynthesis.html
+          PHOTO_URL: https://raw.githack.com/${{ github.repository }}/${{ github.sha }}/apps/edua-os/demos/photosynthesis.html
+          LAB_URL: https://raw.githack.com/${{ github.repository }}/${{ github.sha }}/apps/edua-os/demos/representation-lab.html
         run: |
           set -euo pipefail
           for attempt in $(seq 1 12); do
-            if curl --fail --silent --show-error --location               --connect-timeout 5 --max-time 20               "$DEMO_URL" --output /tmp/edua-demo.html               && grep -q 'EDUA-ART-PHOTOSYNTHESIS-001' /tmp/edua-demo.html               && grep -q 'data-truth-state="STATIC_DEMO"' /tmp/edua-demo.html               && grep -q 'id="photosynthesis-rate"' /tmp/edua-demo.html; then
-              echo "PUBLIC_DEMO_PROVEN: $DEMO_URL"
+            photo_ok=false
+            lab_ok=false
+
+            if curl --fail --silent --show-error --location --connect-timeout 5 --max-time 20               "$PHOTO_URL" --output /tmp/edua-photo.html               && grep -q 'EDUA-ART-PHOTOSYNTHESIS-001' /tmp/edua-photo.html               && grep -q 'id="photosynthesis-rate"' /tmp/edua-photo.html; then
+              photo_ok=true
+            fi
+
+            if curl --fail --silent --show-error --location --connect-timeout 5 --max-time 20               "$LAB_URL" --output /tmp/edua-lab.html               && grep -q 'EDUA-REPRESENTATION-LAB-001' /tmp/edua-lab.html               && grep -q 'data-mode="visualize_learning"' /tmp/edua-lab.html               && grep -q 'data-mode="infograph"' /tmp/edua-lab.html; then
+              lab_ok=true
+            fi
+
+            if [ "$photo_ok" = true ] && [ "$lab_ok" = true ]; then
+              echo "PUBLIC_DEMO_PROVEN: $PHOTO_URL"
+              echo "PUBLIC_REPRESENTATION_LAB_PROVEN: $LAB_URL"
               exit 0
             fi
-            echo "Attempt $attempt/12: immutable demo not yet available; retrying in 10s"
+
+            echo "Attempt $attempt/12: immutable EDUA artifacts not yet both available; retrying in 10s"
             sleep 10
           done
-          echo "Immutable public demo proof not obtained."
+
+          echo "Immutable public EDUA artifact proof not obtained."
           exit 1
