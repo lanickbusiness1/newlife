@@ -259,3 +259,91 @@ export function compileWorkerRoute(input: unknown) {
     selectionPolicy: "FIRST_ELIGIBLE_DECLARED_CANDIDATE"
   } as const;
 }
+
+
+const REQUIRED_RUNTIME_LOGICAL_TABLES = [
+  "object_events",
+  "object_runtime_bindings",
+  "object_execution_contexts",
+  "loop_instances",
+  "loop_actions",
+  "loop_results",
+  "loop_evidence"
+] as const;
+
+const RuntimeReadinessSchema = z.object({
+  persistence: z.object({
+    backend: z.enum(["canonical_postgres", "unbound"]),
+    migrationEvidenceRefs: z.array(z.string().min(1)),
+    requiredLogicalTables: z.array(z.string().min(1))
+  }),
+  provider: z.object({
+    status: z.enum(["verified", "unverified"]),
+    healthEvidenceRef: z.string().min(1).optional(),
+    rollbackEvidenceRef: z.string().min(1).optional()
+  }),
+  connectors: z.object({
+    registryEvidenceRef: z.string().min(1).nullable(),
+    secretsManagerEvidenceRef: z.string().min(1).nullable()
+  })
+});
+
+export function compileRuntimeReadinessCandidate(input: unknown) {
+  const parsed = RuntimeReadinessSchema.parse(input);
+  const blockers: string[] = [];
+
+  if (parsed.persistence.backend !== "canonical_postgres") {
+    blockers.push("CANONICAL_PERSISTENCE_UNBOUND");
+  }
+
+  if (parsed.persistence.migrationEvidenceRefs.length === 0) {
+    blockers.push("CANONICAL_MIGRATION_EVIDENCE_MISSING");
+  }
+
+  const missingTables = REQUIRED_RUNTIME_LOGICAL_TABLES.filter(
+    table => !parsed.persistence.requiredLogicalTables.includes(table)
+  );
+  if (missingTables.length > 0) {
+    blockers.push("CANONICAL_RUNTIME_TABLE_EVIDENCE_INCOMPLETE");
+  }
+
+  if (
+    parsed.provider.status !== "verified"
+    || !parsed.provider.healthEvidenceRef
+  ) {
+    blockers.push("PROVIDER_HEALTH_UNVERIFIED");
+  }
+
+  if (!parsed.provider.rollbackEvidenceRef) {
+    blockers.push("ROLLBACK_EVIDENCE_MISSING");
+  }
+
+  if (!parsed.connectors.registryEvidenceRef) {
+    blockers.push("CONNECTOR_REGISTRY_EVIDENCE_MISSING");
+  }
+
+  if (!parsed.connectors.secretsManagerEvidenceRef) {
+    blockers.push("SECRETS_MANAGER_EVIDENCE_MISSING");
+  }
+
+  return {
+    assetId: GENESIS_V4_OMNICHANNEL_RUNTIME_ANCHOR.assetId,
+    decision: blockers.length === 0
+      ? "READY_FOR_M8_RELEASE_REVIEW"
+      : "BLOCKED_EVIDENCE_INCOMPLETE",
+    blockers,
+    missingLogicalTables: missingTables,
+    operationalClaimAllowed: false,
+    requiredCanonicalSql: [
+      "065_enterprise_object_model.sql",
+      "070_runtime.sql",
+      "071_v4_object_runtime_bridge.sql",
+      "072_world_model.sql",
+      "074_loop_engineering.sql",
+      "076_self_improvement.sql"
+    ],
+    requiredLogicalTables: [...REQUIRED_RUNTIME_LOGICAL_TABLES],
+    evidenceBoundary: "REFERENCES_REQUIRE_INDEPENDENT_VERIFICATION",
+    nextTruthStateIfApproved: "RELEASE_CANDIDATE"
+  } as const;
+}
