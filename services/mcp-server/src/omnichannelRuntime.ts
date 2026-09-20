@@ -36,7 +36,7 @@ const OmnichannelInputSchema = z.object({
   actorId: z.string().min(1),
   requestId: z.string().min(1),
   channel: z.enum(SUPPORTED_CHANNELS),
-  message: z.string().min(1),
+  message: z.string().min(1).optional(),
   dataClassification: z.enum(["public", "internal", "confidential", "restricted"]),
   approvalContext: z.string().min(1).optional(),
   providerBinding: ProviderBindingSchema,
@@ -60,6 +60,10 @@ export function compileOmnichannelCommand(input: unknown) {
 
   if (parsed.channel === "voice" && !parsed.voice?.transcript) {
     throw new Error("OMNICHANNEL_VOICE_TRANSCRIPT_REQUIRED");
+  }
+
+  if (parsed.channel !== "voice" && !parsed.message) {
+    throw new Error("OMNICHANNEL_MESSAGE_REQUIRED");
   }
 
   if (parsed.dataClassification === "restricted" && !parsed.approvalContext) {
@@ -92,7 +96,7 @@ export function compileOmnichannelCommand(input: unknown) {
       channel: parsed.channel,
       normalizedText: parsed.channel === "voice"
         ? parsed.voice!.transcript
-        : parsed.message,
+        : parsed.message!,
       language: parsed.voice?.language ?? null
     },
     authority: {
@@ -111,7 +115,7 @@ export function compileOmnichannelCommand(input: unknown) {
     },
     dataHandling: {
       classification: parsed.dataClassification,
-      channelPersistence: parsed.dataClassification === "restricted"
+      channelPersistence: ["confidential", "restricted"].includes(parsed.dataClassification)
         ? "REFERENCE_ONLY"
         : "TRANSIENT_METADATA_ONLY",
       secretEcho: false,
@@ -147,18 +151,22 @@ export function evaluateAutonomyBoundary(input: unknown) {
     "external_sensitive"
   ].includes(parsed.actionClass);
 
-  if (hardHumanBoundary && !parsed.approvalPresent) {
+  if (hardHumanBoundary) {
     return {
-      decision: "HUMAN_APPROVAL_REQUIRED",
+      decision: parsed.approvalPresent
+        ? "HUMAN_APPROVAL_VERIFICATION_REQUIRED"
+        : "HUMAN_APPROVAL_REQUIRED",
       autonomyClass: "A4",
       continueIndependentBranches: true,
       reason: `GENESIS_AUTHORITY_EDGE_${parsed.actionClass.toUpperCase()}`
     } as const;
   }
 
-  if (!parsed.reversible && !parsed.approvalPresent) {
+  if (!parsed.reversible) {
     return {
-      decision: "HUMAN_APPROVAL_REQUIRED",
+      decision: parsed.approvalPresent
+        ? "HUMAN_APPROVAL_VERIFICATION_REQUIRED"
+        : "HUMAN_APPROVAL_REQUIRED",
       autonomyClass: "A4",
       continueIndependentBranches: true,
       reason: "GENESIS_IRREVERSIBLE_ACTION_APPROVAL_REQUIRED"
@@ -166,14 +174,10 @@ export function evaluateAutonomyBoundary(input: unknown) {
   }
 
   return {
-    decision: parsed.approvalPresent
-      ? "APPROVED_EXECUTION_ALLOWED"
-      : "AUTO_EXECUTE_ALLOWED",
+    decision: "AUTO_EXECUTE_ALLOWED",
     autonomyClass: "A1_A3",
     continueIndependentBranches: true,
-    reason: parsed.approvalPresent
-      ? "EXPLICIT_AUTHORITY_PRESENT"
-      : "REVERSIBLE_WITHIN_DELEGATED_BOUNDARY"
+    reason: "REVERSIBLE_WITHIN_DELEGATED_BOUNDARY"
   } as const;
 }
 
