@@ -23,9 +23,14 @@ import {
   evaluateKnowledgePromotion,
   GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR
 } from "./chatgptControlPlane.js";
+import {
+  compileCommunicationRoute,
+  evaluateCommunicationProvider,
+  GENESIS_V4_SOVEREIGN_COMMS_ANCHOR
+} from "./communicationControlPlane.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.6.0";
+const CONTROL_PLANE_REVISION = "0.7.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -217,6 +222,23 @@ function buildServer() {
     promotion: evaluateKnowledgePromotion(payload as any)
   }));
 
+  register("comms.provider.evaluate", "Évalue un fournisseur de communication selon les exigences de souveraineté et le niveau de preuve disponible.", {
+    context: RequestContext,
+    provider: z.unknown(),
+    requirements: z.unknown()
+  }, "comms:evaluate", async ({ context, provider, requirements }) => ({
+    tenantId: context.tenantId,
+    evaluation: evaluateCommunicationProvider(provider as any, requirements as any)
+  }));
+
+  register("comms.route.compile", "Compile une route de communication souveraine substituable sans transformer un fournisseur en dépendance structurelle.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "comms:route", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    route: compileCommunicationRoute(payload as any)
+  }));
+
   return server;
 }
 
@@ -243,7 +265,8 @@ if (mode === "stdio") {
       revenueInnovations: GENESIS_V4_TODAY_INNOVATIONS,
       validationRelay: GENESIS_V4_VALIDATION_RELAY_ANCHOR.policyId,
       worldModelRuntime: GENESIS_V4_WORLD_MODEL_RUNTIME_ANCHOR.proofMode,
-      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId
+      chatgptNativeControlPlane: GENESIS_V4_CHATGPT_CONTROL_PLANE_ANCHOR.assetId,
+      sovereignCommsControlPlane: GENESIS_V4_SOVEREIGN_COMMS_ANCHOR.capabilityId
     });
   });
 
