@@ -230,7 +230,7 @@ function rankRepresentations(input: RepresentationRequest) {
   }
 
   if (signals.quantitative) {
-    addCandidate(scores, "calculator", 125, "Quantitative outcome requires direct parameter manipulation.");
+    addCandidate(scores, "calculator", 170, "Quantitative outcome requires direct parameter manipulation and remains primary when scenario comparison is also requested.");
     addCandidate(scores, "chart", 95, "Chart exposes quantitative variation and sensitivity.");
   }
 
