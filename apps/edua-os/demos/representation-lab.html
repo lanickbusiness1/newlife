@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>EDUA Representation Lab — V4-DEC-042</title>
+<style>
+:root{
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:#2d2117;background:#fff8ed;--ink:#2d2117;--paper:#fffef9;--line:#ead7bc;
+  --hot:#e76f51;--sun:#f4a261;--leaf:#588157;--gold:#e9c46a;--blue:#457b9d
+}
+*{box-sizing:border-box}body{margin:0;padding:14px}main{max-width:1050px;margin:auto}
+.hero{padding:22px;border-radius:24px;background:linear-gradient(135deg,#f4a261,#e76f51);box-shadow:0 10px 30px rgba(80,45,15,.14)}
+.hero h1{font-size:clamp(1.65rem,5vw,2.8rem);margin:6px 0}.hero p{max-width:760px;line-height:1.5}
+.badge{display:inline-block;background:#fff8;padding:6px 9px;border-radius:999px;font-weight:800}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}
+nav button{border:1px solid #d7bd99;background:#fff;border-radius:999px;padding:9px 12px;font-weight:750;cursor:pointer}
+nav button[aria-selected="true"]{background:#653b1f;color:#fff}
+.panel{display:none;background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;margin:12px 0;box-shadow:0 6px 20px rgba(60,40,20,.06)}
+.panel.active{display:block}.panel h2{margin-top:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{border:1px solid var(--line);border-radius:17px;padding:14px;background:var(--paper)}
+label{font-weight:750;display:flex;justify-content:space-between;gap:8px}input[type=range]{width:100%;accent-color:var(--leaf)}
+.rate{font-size:2.4rem;font-weight:900}.meter{height:15px;border-radius:99px;background:#eee1ce;overflow:hidden}.meter>div{height:100%;width:70%;background:linear-gradient(90deg,#90be6d,#3a5a40)}
+.flow{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;margin:14px 0;font-weight:750}.node{padding:8px 11px;border:1px solid #d4bea0;border-radius:999px}
+.handwritten{background:
+  repeating-linear-gradient(#fffdf6 0,#fffdf6 27px,#bdd4e7 28px);
+  min-height:360px;padding:28px 30px;border-left:5px solid #ef476f;
+  font-family:"Comic Sans MS","Bradley Hand",cursive;transform:rotate(-.3deg)}
+.handwritten h3{font-size:1.55rem;margin:0 0 20px}.formula{font-size:1.35rem;font-weight:800;background:#fff9;display:inline-block;padding:7px 10px;border-radius:8px}
+.sticky-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;padding:8px}
+.sticky{min-height:170px;padding:16px;box-shadow:4px 6px 10px #0002;transform:rotate(-1deg);border-radius:3px}
+.sticky:nth-child(2n){transform:rotate(1deg)}.sticky:nth-child(3n){transform:rotate(.3deg)}
+.yellow{background:#ffe880}.orange{background:#ffc078}.green{background:#b7e4c7}.pink{background:#ffc8dd}
+.sticky input{margin-right:8px}.sticky label{display:block;font-weight:600;margin:9px 0}
+.chart{display:grid;gap:10px}.bar{display:grid;grid-template-columns:120px 1fr 70px;gap:9px;align-items:center}.track{height:22px;background:#eee2d2;border-radius:99px;overflow:hidden}.fill{height:100%;border-radius:99px}.u{width:38%;background:#8ecae6}.n{width:58%;background:#90be6d}.o{width:78%;background:#f9c74f}.b{width:100%;background:#f9844a}
+.notice{padding:11px 13px;background:#fff1c8;border-left:4px solid #e9c46a;border-radius:10px;line-height:1.45}
+.biosphere{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.bio{padding:16px;border-radius:18px;color:#183225;min-height:150px}.atmo{background:#cdeffc}.hydro{background:#a9def9}.litho{background:#e7c8a0}.living{background:#b7e4c7}
+.bio strong{font-size:1.1rem}.loop{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;font-weight:800;margin-top:16px}.loop span{padding:7px 10px;border-radius:99px;background:#fff;border:1px solid #d8c2a5}
+.truth{font-size:.88rem;color:#6b5848}footer{font-size:.82rem;color:#6b5848;margin:16px 4px}
+@media(max-width:560px){.bar{grid-template-columns:85px 1fr 55px}.hero{padding:17px}}
+</style>
+</head>
+<body>
+<main data-asset-id="EDUA-REPRESENTATION-LAB-001" data-truth-state="PUBLIC_DEMO_CANDIDATE">
+<section class="hero">
+<span class="badge">GENESIS V4 · EDUA V2 · V4-DEC-042</span>
+<h1>EDUA Representation Lab</h1>
+<p>Un même moteur pédagogique peut choisir la représentation la plus utile au lieu de répondre automatiquement en texte. Cette démo réunit les cinq modes qui ont déclenché V4-DEC-042.</p>
+</section>
+
+<nav aria-label="Modes de représentation">
+<button data-target="mode-visualize" aria-selected="true">Visualize Learning</button>
+<button data-target="mode-handwritten" aria-selected="false">Handwritten</button>
+<button data-target="mode-sticky" aria-selected="false">Sticky Note</button>
+<button data-target="mode-info-chart" aria-selected="false">Info Chart</button>
+<button data-target="mode-infograph" aria-selected="false">Infograph</button>
+</nav>
+
+<section id="mode-visualize" class="panel active" data-mode="visualize_learning">
+<h2>1 · Visualize Learning — Photosynthèse</h2>
+<p>Manipule les facteurs et observe immédiatement le facteur limitant dans ce modèle pédagogique simplifié.</p>
+<div class="grid">
+<div class="card"><label for="light">Lumière <output id="light-value">70%</output></label><input id="light" type="range" min="0" max="100" value="70"></div>
+<div class="card"><label for="co2">CO₂ <output id="co2-value">70%</output></label><input id="co2" type="range" min="0" max="100" value="70"></div>
+<div class="card"><label for="water">Eau <output id="water-value">70%</output></label><input id="water" type="range" min="0" max="100" value="70"></div>
+</div>
+<div class="card" aria-live="polite">
+<div>Taux simplifié</div><div class="rate"><span id="photosynthesis-rate">70</span>%</div>
+<div class="meter"><div id="rate-meter"></div></div><p id="limiting-factor"></p>
+<div class="flow"><span class="node">Lumière</span><b>+</b><span class="node">CO₂</span><b>+</b><span class="node">H₂O</span><b>→</b><span class="node">Glucose + O₂</span></div>
+</div>
+<p class="truth">Limite : démonstrateur de compréhension, pas modèle physiologique ou agronomique.</p>
+</section>
+
+<section id="mode-handwritten" class="panel" data-mode="handwritten_note">
+<h2>2 · Handwritten — Poussée d’Archimède</h2>
+<div class="handwritten">
+<h3>📝 Ma fiche — Poussée d’Archimède</h3>
+<p><b>Idée clé :</b> un objet plongé dans un fluide reçoit une force verticale vers le haut.</p>
+<p class="formula">F<sub>A</sub> = ρ × V × g</p>
+<p>ρ = masse volumique du fluide<br>V = volume de fluide déplacé<br>g = intensité de la pesanteur</p>
+<p><b>Je retiens :</b> si la poussée compense le poids → équilibre / flottement.</p>
+<p>Exemple mental : bateau → grand volume d’eau déplacé → poussée importante.</p>
+</div>
+</section>
+
+<section id="mode-sticky" class="panel" data-mode="sticky_board">
+<h2>3 · Sticky Note — Checklist d’apprentissage</h2>
+<p>Découper une tâche complexe en micro-actions visibles et cochables.</p>
+<div class="sticky-board">
+<div class="sticky yellow"><b>🎯 Objectif</b><label><input type="checkbox">Définir le résultat attendu</label><label><input type="checkbox">Identifier les prérequis</label></div>
+<div class="sticky orange"><b>📚 Comprendre</b><label><input type="checkbox">Lire l’explication courte</label><label><input type="checkbox">Voir un exemple</label></div>
+<div class="sticky green"><b>🧪 Pratiquer</b><label><input type="checkbox">Faire un exercice</label><label><input type="checkbox">Comparer avec la solution</label></div>
+<div class="sticky pink"><b>✅ Maîtriser</b><label><input type="checkbox">Expliquer sans aide</label><label><input type="checkbox">Revoir le point faible</label></div>
+</div>
+</section>
+
+<section id="mode-info-chart" class="panel" data-mode="info_chart">
+<h2>4 · Info Chart — IMC, lecture éducative</h2>
+<div class="notice"><b>Important :</b> l’IMC est un indicateur de dépistage populationnel, pas un diagnostic individuel. Cette fiche ne donne aucun conseil alimentaire personnalisé.</div>
+<div class="chart" aria-label="Catégories éducatives d'IMC">
+<div class="bar"><b>&lt; 18,5</b><div class="track"><div class="fill u"></div></div><span>Bas</span></div>
+<div class="bar"><b>18,5–24,9</b><div class="track"><div class="fill n"></div></div><span>Repère</span></div>
+<div class="bar"><b>25–29,9</b><div class="track"><div class="fill o"></div></div><span>Élevé</span></div>
+<div class="bar"><b>≥ 30</b><div class="track"><div class="fill b"></div></div><span>Très élevé</span></div>
+</div>
+<p class="truth">La composition corporelle, l’âge, la grossesse, la musculature et le contexte clinique peuvent modifier l’interprétation.</p>
+</section>
+
+<section id="mode-infograph" class="panel" data-mode="infograph">
+<h2>5 · Infograph — Biosphère</h2>
+<p>Une vue synthétique relie les grands compartiments de la Terre qui rendent la vie possible.</p>
+<div class="biosphere">
+<div class="bio atmo"><strong>☁️ Atmosphère</strong><p>Gaz, climat, échanges de CO₂, oxygène et vapeur d’eau.</p></div>
+<div class="bio hydro"><strong>💧 Hydrosphère</strong><p>Océans, rivières, lacs, nappes et cycle de l’eau.</p></div>
+<div class="bio litho"><strong>🪨 Lithosphère</strong><p>Sols, roches, minéraux et support physique des écosystèmes terrestres.</p></div>
+<div class="bio living"><strong>🌱 Monde vivant</strong><p>Plantes, animaux, champignons, micro-organismes et leurs interactions.</p></div>
+</div>
+<div class="loop"><span>Énergie solaire</span>→<span>Producteurs</span>→<span>Consommateurs</span>→<span>Décomposeurs</span>→<span>Nutriments</span></div>
+</section>
+
+<noscript><section class="panel active"><b>Mode sans JavaScript :</b> les cinq représentations restent présentes dans le document ; seule la navigation par onglets et la simulation dynamique sont limitées.</section></noscript>
+<footer>EDUA-REPRESENTATION-LAB-001 · STATIC / LOW-BANDWIDTH / NO EXTERNAL ASSETS · aucun stockage serveur</footer>
+</main>
+<script>
+(function(){
+const buttons=[...document.querySelectorAll("nav button")],panels=[...document.querySelectorAll(".panel")];
+buttons.forEach(button=>button.addEventListener("click",()=>{
+  buttons.forEach(x=>x.setAttribute("aria-selected","false"));
+  button.setAttribute("aria-selected","true");
+  panels.forEach(p=>p.classList.remove("active"));
+  document.getElementById(button.dataset.target).classList.add("active");
+}));
+const ids=["light","co2","water"];
+function val(id){return Number(document.getElementById(id).value)}
+function update(){
+ const v={light:val("light"),co2:val("co2"),water:val("water")};
+ ids.forEach(id=>document.getElementById(id+"-value").textContent=v[id]+"%");
+ const rate=Math.min(v.light,v.co2,v.water);
+ document.getElementById("photosynthesis-rate").textContent=String(rate);
+ document.getElementById("rate-meter").style.width=rate+"%";
+ const m=Math.min(v.light,v.co2,v.water);
+ const names=ids.filter(id=>v[id]===m).map(id=>id==="light"?"lumière":id==="co2"?"CO₂":"eau");
+ document.getElementById("limiting-factor").textContent="Facteur limitant : "+names.join(", ");
+}
+ids.forEach(id=>document.getElementById(id).addEventListener("input",update));update();
+})();
+</script>
+</body>
+</html>

@@ -83,6 +83,21 @@ describe("EDUA interactive photosynthesis artifact", () => {
     expect(staticHtml).not.toMatch(/https?:\/\//);
   });
 
+  test("ships the five-mode EDUA Representation Lab without external dependencies", () => {
+    const labHtml = readFileSync(
+      new URL("../../../apps/edua-os/demos/representation-lab.html", import.meta.url),
+      "utf8"
+    );
+
+    expect(labHtml).toContain("EDUA-REPRESENTATION-LAB-001");
+    expect(labHtml).toContain('data-mode="visualize_learning"');
+    expect(labHtml).toContain('data-mode="handwritten_note"');
+    expect(labHtml).toContain('data-mode="sticky_board"');
+    expect(labHtml).toContain('data-mode="info_chart"');
+    expect(labHtml).toContain('data-mode="infograph"');
+    expect(labHtml).not.toMatch(/https?:\/\//);
+  });
+
   test("exposes a public demo route and governed outcome tool", () => {
     const indexSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
 
