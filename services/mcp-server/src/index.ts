@@ -54,9 +54,13 @@ import {
   GENESIS_V4_MODEL_ROUTING_ANCHOR,
   routeOpenAIWorkload
 } from "./modelRoutingPolicy.js";
+import {
+  compileNistCsfAiAssessment,
+  NIST_CSF_AI_ASSESSMENT_ANCHOR
+} from "./nistCsfAiAssessment.js";
 
 const PACKAGE_VERSION = "0.3.0";
-const CONTROL_PLANE_REVISION = "0.14.0";
+const CONTROL_PLANE_REVISION = "0.15.0";
 
 const RequestContext = z.object({
   tenantId: z.string().min(1),
@@ -101,7 +105,7 @@ function governed(ctx: Context, tool: string, data: unknown) {
     contradictions: [],
     eces: { status: "allowed", gate: "G8.3", reason: "Scope validated; GENESIS V4 governed control plane active with Revenue Engine v0.3.0." },
     auditId,
-    limitations: ["MCP package 0.3.0 / control-plane revision 0.14.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane, Representation Resolver, Representation Compiler Profile, Evidence Adapter, OpenAI Capability Registry, GPT-6 Model Routing Policy and Cross-Pipeline Auto Representation are deterministic; external CRM, payment providers, provider-specific renderers, model-provider execution and canonical SQL persistence execute only when separately connected, migrated and authorized."]
+    limitations: ["MCP package 0.3.0 / control-plane revision 0.15.0: Revenue Engine, World Model Runtime, ChatGPT Native Control Plane, Representation Resolver, Representation Compiler Profile, Evidence Adapter, OpenAI Capability Registry, GPT-6 Model Routing Policy, NIST CSF AI Assessment Control and Cross-Pipeline Auto Representation are deterministic; external CRM, payment providers, provider-specific renderers, model-provider execution and canonical SQL persistence execute only when separately connected, migrated and authorized. NIST CSF AI outputs are drafts and never constitute cybersecurity assurance without human validation and referenced evidence."]
   };
 }
 
@@ -296,6 +300,14 @@ function buildServer() {
     decision: routeOpenAIWorkload(payload as any)
   }));
 
+  register("cyberaudit.csf_ai.compile", "Compile un plan d'assessment CSF 2.0 assisté par IA selon NIST SP 1353, avec couverture de preuves, hypothèses et lacunes explicites, sans claim d'assurance.", {
+    context: RequestContext,
+    payload: z.unknown()
+  }, "cyber:audit:compile", async ({ context, payload }) => ({
+    tenantId: context.tenantId,
+    plan: compileNistCsfAiAssessment(payload as any)
+  }));
+
   register("edua.learning.evaluate_outcome", "Mesure un delta de compréhension de session EDUA et émet un candidat R.E.M.E borné sans revendiquer de causalité.", {
     context: RequestContext,
     payload: z.unknown()
@@ -387,6 +399,8 @@ if (mode === "stdio") {
       openAICapabilityRegistryVersion: OPENAI_CAPABILITY_REGISTRY_VERSION,
       modelRoutingPolicyVersion: GENESIS_V4_MODEL_ROUTING_ANCHOR.policyVersion,
       modelRoutingTruthState: GENESIS_V4_MODEL_ROUTING_ANCHOR.truthState,
+      nistCsfAiAssessmentPolicy: NIST_CSF_AI_ASSESSMENT_ANCHOR.publication,
+      nistCsfAiAssessmentTruthState: NIST_CSF_AI_ASSESSMENT_ANCHOR.truthState,
       crossPipelineAutoRepresentationPolicy: "V4-DEC-042A"
     });
   });
