@@ -1,0 +1,19 @@
+{
+  "name": "Supporter 2030 — afrIAgenesis Recovery",
+  "short_name": "Supporter 2030",
+  "description": "Independent mobile-first supporter experience for the 2030 World Cup recovery build.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#130d0a",
+  "theme_color": "#130d0a",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
