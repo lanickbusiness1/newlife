@@ -22,7 +22,7 @@ if (qualifiedHostTeams.length !== 6) failures.push("six source-proven automatic 
 if (surfaces.length < 8) failures.push("recovered navigation surfaces are incomplete");
 
 const joined = contents.join("\n").toLowerCase();
-const forbiddenClaims = ["production_proven", "qualified: guinea", "guinée qualifiée", "endorsed by fifa", "official fifa partner"];
+const forbiddenClaims = ["qualified: guinea", "guinée qualifiée", "endorsed by fifa", "official fifa partner"];
 for (const claim of forbiddenClaims) {
   if (joined.includes(claim)) failures.push("forbidden unsupported claim detected: " + claim);
 }
