@@ -16,12 +16,12 @@ test("recovery artifact targets 2030 and remains non-canonical", () => {
   assert.equal(recoveryManifest.officialBranding, false);
 });
 
-test("no tournament facts are invented", () => {
+test("unsourced tournament facts remain fail-closed", () => {
   assert.deepEqual(tournamentState.teams, []);
   assert.deepEqual(tournamentState.fixtures, []);
   assert.deepEqual(tournamentState.qualification, []);
   assert.equal(tournamentState.source, null);
-  assert.match(tournamentNotice(), /aucune qualification/i);
+  assert.match(tournamentNotice(), /aucune rencontre/i);
 });
 
 test("qualification promotion is fail-closed", () => {
@@ -36,7 +36,7 @@ test("qualification promotion is fail-closed", () => {
 
 test("historical functional surfaces are represented", () => {
   const ids = new Set(surfaces.map((surface) => surface.id));
-  for (const id of ["home", "matches", "community", "travel", "vault", "assistant"]) {
+  for (const id of ["home", "matches", "hosts", "community", "travel", "vault", "assistant", "settings"]) {
     assert.equal(ids.has(id), true);
   }
 });
