@@ -1,4 +1,5 @@
 name: World Cup 2030 Recovery Check
+# Gate revision: 0.2.0-recovery
 
 on:
   push:
