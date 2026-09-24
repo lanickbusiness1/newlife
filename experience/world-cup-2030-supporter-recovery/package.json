@@ -1,0 +1,10 @@
+{
+  "name": "world-cup-2030-supporter-recovery",
+  "version": "0.0.1-recovery",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node scripts/check.mjs"
+  }
+}
