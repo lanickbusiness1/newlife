@@ -11,10 +11,12 @@ export const recoveryManifest = Object.freeze({
 export const surfaces = Object.freeze([
   { id: "home", label: "Accueil", purpose: "supporter dashboard" },
   { id: "matches", label: "Match Center", purpose: "verified fixtures and scores only" },
+  { id: "hosts", label: "Hôtes 2030", purpose: "source-proven host hubs" },
   { id: "community", label: "Communautés", purpose: "supporter groups and moderation" },
-  { id: "travel", label: "Voyage & Culture", purpose: "travel, culture and safety guidance" },
+  { id: "travel", label: "Voyage", purpose: "travel, culture and safety guidance" },
   { id: "vault", label: "Ticket Safety", purpose: "anti-scam and ticket evidence vault" },
-  { id: "assistant", label: "Assistant IA", purpose: "grounded supporter assistance" }
+  { id: "assistant", label: "Assistant IA", purpose: "grounded supporter assistance" },
+  { id: "settings", label: "Réglages", purpose: "local preferences and data saver" }
 ]);
 
 export const tournamentState = Object.freeze({
@@ -41,7 +43,7 @@ export function canPromoteQualification(record) {
 
 export function tournamentNotice(state = tournamentState) {
   if (!state.source || !state.verifiedAt) {
-    return "Données compétition non chargées — aucune qualification ou affiche n’est revendiquée.";
+    return "Calendrier et affiches non chargés — aucune rencontre n’est inventée.";
   }
   return "Données compétition sourcées — vérifier la fraîcheur avant affichage.";
 }
