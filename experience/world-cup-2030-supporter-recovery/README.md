@@ -2,7 +2,7 @@
 
 ## Truth state
 
-`RECOVERY_ARTIFACT / SOURCE_NOT_RECOVERED / NON_CANONICAL / TEST_PROVEN_ON_BRANCH / NOT_DEPLOYED`
+`RECOVERY_ARTIFACT / SOURCE_NOT_RECOVERED / NON_CANONICAL / CODED / CI_PENDING / NOT_DEPLOYED`
 
 This directory is a quarantined reconstruction created from historically described requirements after the original source could not be recovered from the currently accessible Notion, GitHub, Google Drive, or ChatGPT Library surfaces.
 
@@ -12,34 +12,30 @@ It is **not** the original FANOS source, **not** a catalogue product, **not** an
 
 - Target event: World Cup 2030, per CEO correction on 24 September 2026.
 - GENESIS V4.1 remains the governing execution model.
-- Canonical identity is unresolved; catalogue mutation is blocked until evidence resolves Existing-Asset Match / Anti-Duplication.
+- Canonical identity is unresolved; catalogue mutation remains blocked.
 - FIFA source-proven facts currently loaded: Morocco, Portugal and Spain as hosts; Argentina, Paraguay and Uruguay as centenary-match hosts; all six are automatically qualified.
 - Fixtures, stadiums, ticket inventory and any other team qualification remain fail-closed until sourced.
-- No FIFA marks, logos, or official tournament branding are used.
 
-## Implemented recovery capabilities
+## v0.3 implemented surfaces
 
-- mobile-first supporter dashboard;
-- source-proven 2030 host hubs;
-- Match Center with six source-proven automatic host qualifications and zero invented fixture;
-- community shell with public-backend gate;
-- travel/culture shell with evidence boundaries;
-- Ticket Evidence Vault stored locally on-device with minimisation and card-like-number redaction;
-- ticket-risk heuristic;
-- local preferences for language, host focus and data-saver mode;
-- PWA manifest + service worker for offline shell;
-- grounded assistant status surface.
+- privacy-first local supporter profile: nickname + country + up to five favorite teams, with no email or phone;
+- favorites are explicitly user preferences, never qualification claims;
+- safe bounded offline outbox for community drafts, watch-party interest and profile sync;
+- unknown or transactional offline actions are rejected;
+- provenance-gated API envelope restricted to eventYear 2030 and HTTPS source metadata;
+- mobile-first dashboard, host hubs, Match Center, travel, Ticket Safety Vault, settings and grounded assistant;
+- PWA manifest + service worker; offline shell;
+- Ticket Safety minimisation and heuristic risk scan.
 
 ## Automated evidence
 
 ```bash
-cd experience/world-cup-2030-supporter-recovery
 npm test
 npm run check
 ```
 
-The CI intentionally records RED → GREEN for critical gates. A passing branch proves only this recovery implementation, not canonical identity or production status.
+v0.2.0 previously reached TEST_PROVEN_ON_BRANCH. v0.3.0 remains CODED / CI_PENDING until its own full green run is attached to the current head.
 
 ## Promotion rule
 
-Do not move this directory into `apps/`, merge it to `main`, declare `PRODUCTION_PROVEN`, publish a commercial claim, or add a catalogue product until the canonical identity and upstream GENESIS V4.1 gates are reconciled.
+Do not merge to `main`, declare production, publish official affiliation, or mutate the product catalogue until the GENESIS V4.1 upstream gates are reconciled.
