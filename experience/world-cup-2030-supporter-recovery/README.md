@@ -2,7 +2,7 @@
 
 ## Truth state
 
-`RECOVERY_ARTIFACT / SOURCE_NOT_RECOVERED / NON_CANONICAL / CODED / CI_PENDING / NOT_DEPLOYED`
+`RECOVERY_ARTIFACT / SOURCE_NOT_RECOVERED / NON_CANONICAL / TEST_PROVEN_ON_BRANCH / NOT_DEPLOYED`
 
 This directory is a quarantined reconstruction created from historically described requirements after the original source could not be recovered from the currently accessible Notion, GitHub, Google Drive, or ChatGPT Library surfaces.
 
@@ -34,7 +34,7 @@ npm test
 npm run check
 ```
 
-v0.2.0 previously reached TEST_PROVEN_ON_BRANCH. v0.3.0 remains CODED / CI_PENDING until its own full green run is attached to the current head.
+v0.3.0 reached TEST_PROVEN_ON_BRANCH on GitHub Actions run 36104361955: unit tests PASS and GENESIS recovery assertions PASS on head f63af88ee6e537ac16561c2f67bebffbf912999a.
 
 ## Promotion rule
 
