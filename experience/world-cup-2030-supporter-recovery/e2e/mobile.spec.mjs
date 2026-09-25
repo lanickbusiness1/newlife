@@ -2,8 +2,10 @@ import { test, expect, devices } from "@playwright/test";
 
 test.use({ ...devices["Pixel 5"] });
 
+const BASE_URL = (process.env.BASE_URL || "http://127.0.0.1:4173").replace(/\/$/, "");
+
 test("mobile pilot: profile, offline community, ticket safety and grounded assistant", async ({ page }) => {
-  await page.goto("http://127.0.0.1:4173/index.html");
+  await page.goto(BASE_URL + "/index.html");
   await expect(page).toHaveTitle(/Supporter 2030/);
   await expect(page.getByRole("heading", { name: /football mondial/i })).toBeVisible();
   await expect(page.getByText("6 qualifications hôtes sourcées")).toBeVisible();
@@ -46,7 +48,7 @@ test("mobile pilot: profile, offline community, ticket safety and grounded assis
 });
 
 test("mobile pilot never presents unsupported official affiliation", async ({ page }) => {
-  await page.goto("http://127.0.0.1:4173/index.html");
+  await page.goto(BASE_URL + "/index.html");
   const body = (await page.locator("body").innerText()).toLowerCase();
   expect(body).not.toContain("official fifa partner");
   expect(body).not.toContain("endorsed by fifa");
