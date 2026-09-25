@@ -1,0 +1,52 @@
+name: World Cup 2030 Browser QA
+
+on:
+  push:
+    branches:
+      - recovery/world-cup-2030-supporter
+    paths:
+      - "experience/world-cup-2030-supporter-recovery/**"
+      - ".github/workflows/world-cup-2030-browser-qa.yml"
+  pull_request:
+    paths:
+      - "experience/world-cup-2030-supporter-recovery/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-browser-qa:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experience/world-cup-2030-supporter-recovery
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install pinned browser QA dependencies
+        run: npm install --no-save --no-package-lock @playwright/test@1.55.0 http-server@14.1.1
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start static preview
+        run: |
+          npx http-server . -p 4173 -a 127.0.0.1 -c-1 > /tmp/supporter2030-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/supporter2030-http.log
+          exit 1
+
+      - name: Mobile Chromium E2E
+        run: npx playwright test e2e/mobile.spec.mjs --reporter=line --workers=1
