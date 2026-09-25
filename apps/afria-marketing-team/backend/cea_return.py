@@ -35,27 +35,27 @@ HeritageEventType = Literal[
 
 
 class CeaReturnLeadInput(BaseModel):
-    content_id: str = Field(min_length=1)
-    narrative_source: str = Field(min_length=1)
+    content_id: str = Field(min_length=1, max_length=128)
+    narrative_source: str = Field(min_length=1, max_length=256)
     primary_intent: CeaPrimaryIntent
     horizon: CeaHorizon
     budget_usd: float = Field(ge=0)
-    investment_project: str | None = None
+    investment_project: str | None = Field(default=None, max_length=2000)
     consent_contact: bool = False
     language: CeaLanguage = "FR"
 
 
 class HeritageAttributionEvent(BaseModel):
-    client_event_id: str = Field(min_length=1)
-    session_id: str = Field(min_length=1)
-    lead_id: str | None = None
+    client_event_id: str = Field(min_length=1, max_length=128)
+    session_id: str = Field(min_length=1, max_length=128)
+    lead_id: str | None = Field(default=None, max_length=128)
     content_id: str = Field(min_length=1)
-    source_campaign: str = Field(min_length=1)
+    source_campaign: str = Field(min_length=1, max_length=256)
     narrative_source: str = Field(min_length=1)
     event_type: HeritageEventType
     heritage_sensitivity: HeritageSensitivity = "PUBLIC_N0"
     consent_contact: bool = False
-    proof_ref: str | None = None
+    proof_ref: str | None = Field(default=None, max_length=2048)
     economic_value_usd: float | None = Field(default=None, ge=0)
     occurred_at: str | None = None
 
