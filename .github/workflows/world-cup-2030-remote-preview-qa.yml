@@ -1,0 +1,45 @@
+name: World Cup 2030 Remote Preview QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: HTTPS preview URL to verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  remote-mobile-qa:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experience/world-cup-2030-supporter-recovery
+    env:
+      BASE_URL: ${{ inputs.preview_url }}
+    steps:
+      - name: Require HTTPS preview
+        run: |
+          case "$BASE_URL" in
+            https://*) ;;
+            *) echo "preview_url must use HTTPS"; exit 1 ;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install pinned browser QA dependency
+        run: npm install --no-save --no-package-lock @playwright/test@1.55.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Pixel 5 remote E2E
+        run: npx playwright test e2e/mobile.spec.mjs --reporter=line --workers=1
