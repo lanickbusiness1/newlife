@@ -35,14 +35,14 @@ CeaPaymentStatus = Literal["Non proposé", "Lien envoyé", "Acompte payé", "Pay
 
 
 class CeaCrmLead(BaseModel):
-    lead_id: str = Field(min_length=1)
-    name: str = Field(min_length=1)
-    email: str | None = None
-    whatsapp: str | None = None
-    country: str | None = None
-    organization: str | None = None
-    content_id: str = Field(min_length=1)
-    narrative_source: str = Field(min_length=1)
+    lead_id: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=200)
+    email: str | None = Field(default=None, max_length=320)
+    whatsapp: str | None = Field(default=None, max_length=64)
+    country: str | None = Field(default=None, max_length=128)
+    organization: str | None = Field(default=None, max_length=200)
+    content_id: str = Field(min_length=1, max_length=128)
+    narrative_source: str = Field(min_length=1, max_length=256)
     primary_intent: CeaPrimaryIntent
     next_best_offer: CeaNextBestOffer
     language: CeaLanguage
@@ -50,7 +50,7 @@ class CeaCrmLead(BaseModel):
     revenue_attributed_usd: float = Field(default=0, ge=0)
     payment_status: CeaPaymentStatus = "Non proposé"
     priority: CeaPriority
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=1000)
 
 
 @dataclass(frozen=True)
