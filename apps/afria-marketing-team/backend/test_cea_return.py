@@ -52,6 +52,7 @@ def test_public_funnel_blocks_initiatic_content():
     response = client.post(
         "/cea/heritage/event/track",
         json={
+            "client_event_id": "evt-sensitive-001",
             "session_id": "sess-sensitive-001",
             "content_id": "VODUN-SECRET-001",
             "source_campaign": "griot-private",
@@ -64,7 +65,7 @@ def test_public_funnel_blocks_initiatic_content():
     body = response.json()
     assert body["accepted"] is False
     assert body["blocked"] is True
-    assert body["reason"] == "sensitive_heritage_not_eligible_for_public_revenue_funnel"
+    assert body["reason"] == "non_public_heritage_not_eligible_for_public_revenue_funnel"
     assert body["revenue_attributable"] is False
 
 
@@ -72,6 +73,7 @@ def test_payment_confirmation_is_rejected_without_transaction_proof():
     response = client.post(
         "/cea/heritage/event/track",
         json={
+            "client_event_id": "evt-pay-no-proof",
             "session_id": "sess-pay-no-proof",
             "lead_id": "lead-pay-no-proof",
             "content_id": "VODUN-KAKPO-001",
@@ -90,10 +92,11 @@ def test_payment_confirmation_is_rejected_without_transaction_proof():
     assert body["revenue_attributable"] is False
 
 
-def test_verified_payment_creates_evidence_and_paid_crm_transition():
+def test_proof_gated_staging_payment_creates_evidence_and_paid_crm_transition():
     response = client.post(
         "/cea/heritage/event/track",
         json={
+            "client_event_id": "evt-pay-proof",
             "session_id": "sess-pay-proof",
             "lead_id": "lead-heritage-paid-001",
             "content_id": "VODUN-KAKPO-001",
@@ -120,6 +123,7 @@ def test_verified_payment_creates_evidence_and_paid_crm_transition():
 
 def test_same_heritage_event_is_idempotent_for_same_explicit_timestamp():
     payload = {
+        "client_event_id": "evt-idempotent-001",
         "session_id": "sess-idempotent-001",
         "content_id": "VODUN-KAKPO-001",
         "source_campaign": "griot-capsule-01",
@@ -134,3 +138,23 @@ def test_same_heritage_event_is_idempotent_for_same_explicit_timestamp():
     assert second.status_code == 200
     assert first.json()["event_id"] == second.json()["event_id"]
     assert first.json()["attribution_level"] == "OBSERVED"
+
+
+def test_public_funnel_blocks_unvalidated_community_content():
+    response = client.post(
+        "/cea/heritage/event/track",
+        json={
+            "client_event_id": "evt-community-001",
+            "session_id": "sess-community-001",
+            "content_id": "VODUN-COMMUNITY-001",
+            "source_campaign": "griot-community",
+            "narrative_source": "community",
+            "event_type": "CONTENT_VIEW",
+            "heritage_sensitivity": "COMMUNITY_N1",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["accepted"] is False
+    assert body["blocked"] is True
+    assert body["reason"] == "non_public_heritage_not_eligible_for_public_revenue_funnel"
