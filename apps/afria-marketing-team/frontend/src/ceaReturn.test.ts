@@ -93,5 +93,22 @@ describe("CEA Retour aux Sources capture contract", () => {
     expect(payload.priority).toBe("P1 - Cette semaine");
     expect(payload.consent_contact).toBe(true);
     expect(payload.revenue_attributed_usd).toBe(0);
+    expect(payload.note).toBe("source_campaign=linkedin");
+  });
+
+  test("minimizes free-text persistence into the CRM", () => {
+    const payload = buildCeaCrmPayload(
+      {
+        ...form,
+        whyNow: "Private family context that must not be persisted by default.",
+        household: "Sensitive household detail",
+      },
+      resolveCeaAttribution("?utm_source=linkedin&utm_campaign=benin-roots"),
+      qualification,
+      "cea-return-privacy-001",
+    );
+    expect(payload.note).toBe("source_campaign=linkedin");
+    expect(payload.note).not.toContain("Private family context");
+    expect(payload.note).not.toContain("Sensitive household detail");
   });
 });
