@@ -1,4 +1,4 @@
-const CACHE = "supporter-2030-recovery-v2";
+const CACHE = "supporter-2030-recovery-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,9 @@ const ASSETS = [
   "./src/provenance.mjs",
   "./src/hosts.mjs",
   "./src/preferences.mjs",
+  "./src/profile.mjs",
+  "./src/outbox.mjs",
+  "./src/api-envelope.mjs",
   "./src/vault.mjs",
   "./src/ui.mjs"
 ];
