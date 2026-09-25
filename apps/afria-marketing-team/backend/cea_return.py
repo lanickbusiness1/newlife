@@ -46,6 +46,7 @@ class CeaReturnLeadInput(BaseModel):
 
 
 class HeritageAttributionEvent(BaseModel):
+    client_event_id: str = Field(min_length=1)
     session_id: str = Field(min_length=1)
     lead_id: str | None = None
     content_id: str = Field(min_length=1)
@@ -128,6 +129,7 @@ def qualify_cea_return_lead(payload: CeaReturnLeadInput) -> dict:
 
 def normalize_heritage_event(payload: HeritageAttributionEvent) -> dict:
     base = {
+        "client_event_id": payload.client_event_id,
         "session_id": payload.session_id,
         "lead_id": payload.lead_id,
         "content_id": payload.content_id,
@@ -141,12 +143,12 @@ def normalize_heritage_event(payload: HeritageAttributionEvent) -> dict:
         "occurred_at": payload.occurred_at or _now_iso(),
     }
 
-    if payload.heritage_sensitivity in {"INITIATIC_N2", "SACRED_N3", "RESTRICTED_N4"}:
+    if payload.heritage_sensitivity != "PUBLIC_N0":
         return {
             **base,
             "accepted": False,
             "blocked": True,
-            "reason": "sensitive_heritage_not_eligible_for_public_revenue_funnel",
+            "reason": "non_public_heritage_not_eligible_for_public_revenue_funnel",
             "attribution_level": "NONE",
             "revenue_attributable": False,
         }
@@ -200,14 +202,10 @@ def normalize_heritage_event(payload: HeritageAttributionEvent) -> dict:
         attribution_level = "ATTRIBUTED"
 
     event_id_seed = {
+        "client_event_id": payload.client_event_id,
         "session_id": payload.session_id,
-        "lead_id": payload.lead_id,
         "content_id": payload.content_id,
         "source_campaign": payload.source_campaign,
-        "event_type": payload.event_type,
-        "proof_ref": payload.proof_ref,
-        "economic_value_usd": payload.economic_value_usd,
-        "occurred_at": payload.occurred_at,
     }
     event_id = f"HER-EVT-{_canonical_digest(event_id_seed)[:16].upper()}"
     record = {
