@@ -619,7 +619,7 @@ def persist_cea_crm_lead(payload: CeaCrmLead):
 
     try:
         return {
-            **NotionCrmAdapter(config).create_lead(payload),
+            **NotionCrmAdapter(config).upsert_lead(payload),
             "classification": "connected_persistent_crm",
             "product_blocker": False,
         }
