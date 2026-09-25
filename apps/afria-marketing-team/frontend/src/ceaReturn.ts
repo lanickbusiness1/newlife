@@ -98,11 +98,7 @@ export function buildCeaCrmPayload(
     revenue_attributed_usd: 0,
     payment_status: "Non proposé",
     priority: qualification.priority,
-    note: [
-      `why_now=${form.whyNow.trim() || "not_provided"}`,
-      `household=${form.household.trim() || "not_provided"}`,
-      `source_campaign=${attribution.sourceCampaign}`,
-    ].join("; "),
+    note: `source_campaign=${attribution.sourceCampaign}`,
   };
 }
 
