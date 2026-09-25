@@ -5,7 +5,8 @@ import { hostDataset, qualifiedHostTeams, validateHostDataset } from "../src/hos
 const root = new URL("../", import.meta.url);
 const files = [
   "README.md", "index.html", "styles.css", "manifest.webmanifest", "service-worker.js",
-  "src/model.mjs", "src/provenance.mjs", "src/hosts.mjs", "src/preferences.mjs", "src/vault.mjs", "src/ui.mjs"
+  "src/model.mjs", "src/provenance.mjs", "src/hosts.mjs", "src/preferences.mjs",
+  "src/profile.mjs", "src/outbox.mjs", "src/api-envelope.mjs", "src/vault.mjs", "src/ui.mjs"
 ];
 const contents = await Promise.all(files.map((file) => readFile(new URL(file, root), "utf8")));
 
@@ -19,7 +20,7 @@ if (tournamentState.teams.length || tournamentState.fixtures.length || tournamen
 }
 if (!validateHostDataset(hostDataset).ok) failures.push("host dataset provenance invalid");
 if (qualifiedHostTeams.length !== 6) failures.push("six source-proven automatic host qualifications required");
-if (surfaces.length < 8) failures.push("recovered navigation surfaces are incomplete");
+if (surfaces.length < 9) failures.push("v0.3 navigation surfaces are incomplete");
 
 const joined = contents.join("\n").toLowerCase();
 const forbiddenClaims = ["qualified: guinea", "guinée qualifiée", "endorsed by fifa", "official fifa partner"];
@@ -29,11 +30,13 @@ for (const claim of forbiddenClaims) {
 if (!joined.includes("not** an official fifa app") && !joined.includes("not an official fifa app")) {
   failures.push("independence disclaimer missing");
 }
-if (!joined.includes("service-worker.js") || !joined.includes("manifest.webmanifest")) failures.push("PWA shell missing");
+for (const required of ["service-worker.js", "manifest.webmanifest", "profile.mjs", "outbox.mjs", "api-envelope.mjs"]) {
+  if (!joined.includes(required)) failures.push("required v0.3 module missing: " + required);
+}
 
 if (failures.length) {
   console.error(failures.join("\n"));
   process.exit(1);
 }
 
-console.log("Recovery checks passed: 2030 source-proven hosts, fail-closed fixtures, PWA shell, non-canonical truth state.");
+console.log("Recovery checks passed: v0.3 local profile, safe offline outbox, provenance API boundary, source-proven hosts, fail-closed fixtures.");
