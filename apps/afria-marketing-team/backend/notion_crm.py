@@ -152,14 +152,34 @@ class NotionCrmAdapter:
             "Notion-Version": self.config.api_version,
         }
 
+    def _consent_denied(self, payload: CeaCrmLead) -> dict:
+        return {
+            "persisted": False,
+            "reason": "contact_consent_required_for_crm_persistence",
+            "lead_id": payload.lead_id,
+            "data_source_id": self.config.data_source_id,
+        }
+
+    def find_lead_page(self, lead_id: str) -> dict | None:
+        marker = f"CEA_LEAD_ID={lead_id}"
+        response = self.client.post(
+            f"https://api.notion.com/v1/data_sources/{self.config.data_source_id}/query",
+            headers=self.headers,
+            json={
+                "filter": {
+                    "property": "Notes",
+                    "rich_text": {"contains": marker},
+                },
+                "page_size": 1,
+            },
+        )
+        response.raise_for_status()
+        results = response.json().get("results", [])
+        return results[0] if results else None
+
     def create_lead(self, payload: CeaCrmLead) -> dict:
         if not payload.consent_contact:
-            return {
-                "persisted": False,
-                "reason": "contact_consent_required_for_crm_persistence",
-                "lead_id": payload.lead_id,
-                "data_source_id": self.config.data_source_id,
-            }
+            return self._consent_denied(payload)
 
         response = self.client.post(
             "https://api.notion.com/v1/pages",
@@ -182,4 +202,35 @@ class NotionCrmAdapter:
             "notion_url": body.get("url"),
             "data_source_id": self.config.data_source_id,
             "persistence_boundary": "NOTION_CRM",
+            "idempotent_upsert": True,
         }
+
+    def update_lead(self, page_id: str, payload: CeaCrmLead) -> dict:
+        if not payload.consent_contact:
+            return self._consent_denied(payload)
+
+        response = self.client.patch(
+            f"https://api.notion.com/v1/pages/{page_id}",
+            headers=self.headers,
+            json={"properties": build_notion_crm_properties(payload)},
+        )
+        response.raise_for_status()
+        body = response.json()
+        return {
+            "persisted": True,
+            "reason": "notion_crm_page_updated",
+            "lead_id": payload.lead_id,
+            "notion_page_id": body.get("id", page_id),
+            "notion_url": body.get("url"),
+            "data_source_id": self.config.data_source_id,
+            "persistence_boundary": "NOTION_CRM",
+            "idempotent_upsert": True,
+        }
+
+    def upsert_lead(self, payload: CeaCrmLead) -> dict:
+        if not payload.consent_contact:
+            return self._consent_denied(payload)
+        existing = self.find_lead_page(payload.lead_id)
+        if existing and existing.get("id"):
+            return self.update_lead(existing["id"], payload)
+        return self.create_lead(payload)
