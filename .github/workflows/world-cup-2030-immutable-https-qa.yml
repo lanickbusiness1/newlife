@@ -1,0 +1,77 @@
+name: World Cup 2030 Immutable HTTPS QA
+
+on:
+  push:
+    branches:
+      - recovery/world-cup-2030-supporter
+    paths:
+      - ".github/workflows/world-cup-2030-immutable-https-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  immutable-https-qa:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experience/world-cup-2030-supporter-recovery
+    env:
+      BASE_URL: https://rawcdn.githack.com/lanickbusiness1/newlife/${{ github.sha }}/experience/world-cup-2030-supporter-recovery
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install pinned browser QA dependency
+        run: npm install --no-save --no-package-lock @playwright/test@1.55.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for immutable HTTPS mirror
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "$BASE_URL/index.html" >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Immutable HTTPS mirror did not become reachable"
+          exit 1
+
+      - name: Configure raw CDN browser confirmation bypass
+        run: |
+          cat > githack-state.json <<'JSON'
+          {
+            "cookies": [
+              {
+                "name": "__Http-phish",
+                "value": "1",
+                "domain": "rawcdn.githack.com",
+                "path": "/",
+                "expires": -1,
+                "httpOnly": false,
+                "secure": true,
+                "sameSite": "Lax"
+              }
+            ],
+            "origins": []
+          }
+          JSON
+          cat > playwright-immutable.config.mjs <<'JS'
+          import { defineConfig } from "@playwright/test";
+          export default defineConfig({
+            use: {
+              storageState: "./githack-state.json"
+            }
+          });
+          JS
+
+      - name: Pixel 5 immutable HTTPS E2E
+        run: npx playwright test e2e/mobile.spec.mjs --config=playwright-immutable.config.mjs --reporter=line --workers=1
