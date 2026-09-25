@@ -127,3 +127,12 @@ export function buildCeaWhatsAppMessage(
     "Merci de confirmer la prochaine étape, le prix applicable et les conditions avant tout paiement.",
   ].join(" ");
 }
+
+
+export function buildCeaReturnPath(): string {
+  return "/retour-sources";
+}
+
+export function isCeaReturnPath(pathname: string): boolean {
+  return pathname.replace(/\/+$/, "") === buildCeaReturnPath();
+}
