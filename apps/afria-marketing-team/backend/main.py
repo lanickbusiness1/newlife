@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from authenticity import AuthenticityAssessment, assess_authenticity
 from visibility import VisibilityAssessment, assess_visibility
 from cea_return import CeaReturnLeadInput, HeritageAttributionEvent, qualify_cea_return_lead, normalize_heritage_event
+from notion_crm import CeaCrmLead, NotionCrmAdapter, NotionCrmConfig
 
 PRODUCT_STANDARD = "Production Product"
 ASSET_ID = "PRD-MKT-TEAM-001"
@@ -596,3 +597,37 @@ def track_cea_heritage_event(payload: HeritageAttributionEvent):
         "production_revenue_ready": PRODUCTION_REVENUE_READY,
         "revenue_rule": "staging attribution requires payment proof reference; production cash remains false until an authorized payment adapter verifies live settlement",
     }
+
+
+
+@app.post("/cea/crm/lead/persist")
+def persist_cea_crm_lead(payload: CeaCrmLead):
+    config = NotionCrmConfig.from_env()
+    if config is None:
+        return {
+            "persisted": False,
+            "classification": "activation_channel",
+            "product_blocker": False,
+            "lead_id": payload.lead_id,
+            "reason": "notion_crm_credentials_not_configured",
+            "next_action": "configure_NOTION_CRM_TOKEN_in_deployment_secret_store",
+            "data_source_id": "bf3a6c6b-4304-4a2c-a96d-0b788dc08600",
+        }
+
+    try:
+        return {
+            **NotionCrmAdapter(config).create_lead(payload),
+            "classification": "connected_persistent_crm",
+            "product_blocker": False,
+        }
+    except Exception as exc:
+        return {
+            "persisted": False,
+            "classification": "external_adapter_error",
+            "product_blocker": False,
+            "lead_id": payload.lead_id,
+            "reason": "notion_crm_write_failed",
+            "error_type": type(exc).__name__,
+            "next_action": "inspect_adapter_evidence_without_exposing_secrets",
+            "data_source_id": config.data_source_id,
+        }
