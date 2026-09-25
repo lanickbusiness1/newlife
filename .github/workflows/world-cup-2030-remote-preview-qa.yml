@@ -27,6 +27,18 @@ jobs:
             *) echo "preview_url must use HTTPS"; exit 1 ;;
           esac
 
+      - name: Require security headers
+        run: |
+          curl -fsSIL "$BASE_URL/index.html" -D /tmp/supporter2030-headers.txt -o /dev/null
+          for header in             "content-security-policy:"             "x-content-type-options:"             "x-frame-options:"             "referrer-policy:"             "permissions-policy:"
+          do
+            if ! grep -iq "^$header" /tmp/supporter2030-headers.txt; then
+              echo "Missing required header: $header"
+              cat /tmp/supporter2030-headers.txt
+              exit 1
+            fi
+          done
+
       - name: Checkout
         uses: actions/checkout@v4
 
