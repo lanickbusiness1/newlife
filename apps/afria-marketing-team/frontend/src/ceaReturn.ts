@@ -132,3 +132,43 @@ export function buildCeaReturnPath(): string {
 export function isCeaReturnPath(pathname: string): boolean {
   return pathname.replace(/\/+$/, "") === buildCeaReturnPath();
 }
+
+
+export type CeaHeritageEventType =
+  | "CONTENT_VIEW"
+  | "KNOWLEDGE_CARD_OPEN"
+  | "CTA_CLICK"
+  | "WHATSAPP_START"
+  | "LEAD_CREATED"
+  | "DIAGNOSTIC_BOOKED"
+  | "OFFER_SENT"
+  | "PAYMENT_CONFIRMED"
+  | "TRIP_STARTED"
+  | "HERITAGE_SITE_VISIT"
+  | "EXPERIENCE_COMPLETED"
+  | "INVESTMENT_LEAD_CREATED"
+  | "REFERRAL_CREATED";
+
+export function buildCeaHeritageEventPayload(
+  sessionId: string,
+  eventType: CeaHeritageEventType,
+  attribution: CeaAttribution,
+  options: { leadId?: string; consentContact?: boolean } = {},
+) {
+  return {
+    client_event_id: [
+      "CEA-HER",
+      attribution.contentId,
+      sessionId,
+      eventType,
+    ].join(":"),
+    session_id: sessionId,
+    lead_id: options.leadId ?? null,
+    content_id: attribution.contentId,
+    source_campaign: attribution.sourceCampaign,
+    narrative_source: attribution.narrativeSource,
+    event_type: eventType,
+    heritage_sensitivity: "PUBLIC_N0",
+    consent_contact: options.consentContact ?? false,
+  };
+}
