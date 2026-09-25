@@ -90,3 +90,75 @@ def test_notion_adapter_posts_to_canonical_data_source_with_expected_headers():
         "data_source_id": CANONICAL_CRM_DATA_SOURCE_ID,
     }
     assert captured["json"]["properties"]["Content ID"]["rich_text"][0]["text"]["content"] == "VODUN-KAKPO-001"
+
+
+
+def test_notion_upsert_creates_only_after_empty_idempotency_lookup():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, request.url.path))
+        if request.url.path.endswith("/query"):
+            body = __import__("json").loads(request.content.decode("utf-8"))
+            assert body["filter"]["property"] == "Notes"
+            assert body["filter"]["rich_text"]["contains"] == "CEA_LEAD_ID=cea-lead-001"
+            return httpx.Response(200, json={"results": []})
+        if request.method == "POST" and request.url.path == "/v1/pages":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "notion-page-created",
+                    "url": "https://www.notion.so/notion-page-created",
+                },
+            )
+        raise AssertionError(f"unexpected request: {request.method} {request.url.path}")
+
+    adapter = NotionCrmAdapter(
+        NotionCrmConfig(token="test-token"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    result = adapter.upsert_lead(sample_lead())
+    assert result["reason"] == "notion_crm_page_created"
+    assert result["idempotent_upsert"] is True
+    assert calls == [
+        ("POST", f"/v1/data_sources/{CANONICAL_CRM_DATA_SOURCE_ID}/query"),
+        ("POST", "/v1/pages"),
+    ]
+
+
+def test_notion_upsert_updates_existing_lead_instead_of_duplicating():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, request.url.path))
+        if request.url.path.endswith("/query"):
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "id": "existing-page-001",
+                            "url": "https://www.notion.so/existing-page-001",
+                        }
+                    ]
+                },
+            )
+        if request.method == "PATCH" and request.url.path == "/v1/pages/existing-page-001":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "existing-page-001",
+                    "url": "https://www.notion.so/existing-page-001",
+                },
+            )
+        raise AssertionError(f"unexpected request: {request.method} {request.url.path}")
+
+    adapter = NotionCrmAdapter(
+        NotionCrmConfig(token="test-token"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    result = adapter.upsert_lead(sample_lead())
+    assert result["reason"] == "notion_crm_page_updated"
+    assert result["notion_page_id"] == "existing-page-001"
+    assert result["idempotent_upsert"] is True
+    assert ("POST", "/v1/pages") not in calls
