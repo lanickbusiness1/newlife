@@ -30,15 +30,15 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install pinned browser QA dependencies
-        run: npm install --no-save --no-package-lock @playwright/test@1.55.0 http-server@14.1.1
+      - name: Install pinned browser QA dependency
+        run: npm install --no-save --no-package-lock @playwright/test@1.55.0
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Start static preview
         run: |
-          npx http-server . -p 4173 -a 127.0.0.1 -c-1 > /tmp/supporter2030-http.log 2>&1 &
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/supporter2030-http.log 2>&1 &
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then
               exit 0
