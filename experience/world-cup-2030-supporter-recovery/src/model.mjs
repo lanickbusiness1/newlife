@@ -12,10 +12,11 @@ export const surfaces = Object.freeze([
   { id: "home", label: "Accueil", purpose: "supporter dashboard" },
   { id: "matches", label: "Match Center", purpose: "verified fixtures and scores only" },
   { id: "hosts", label: "Hôtes 2030", purpose: "source-proven host hubs" },
-  { id: "community", label: "Communautés", purpose: "supporter groups and moderation" },
+  { id: "community", label: "Communautés", purpose: "offline-safe supporter drafts and future moderated groups" },
   { id: "travel", label: "Voyage", purpose: "travel, culture and safety guidance" },
   { id: "vault", label: "Ticket Safety", purpose: "anti-scam and ticket evidence vault" },
   { id: "assistant", label: "Assistant IA", purpose: "grounded supporter assistance" },
+  { id: "profile", label: "Profil", purpose: "privacy-preserving local supporter identity" },
   { id: "settings", label: "Réglages", purpose: "local preferences and data saver" }
 ]);
 
