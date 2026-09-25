@@ -54,3 +54,5 @@ jobs:
           grep -R "R.E.M.E" apps/afria-marketing-team
           grep -R "S7+" apps/afria-marketing-team
           grep -R "CyberAudit" apps/afria-marketing-team
+      - name: Docker packaging proof
+        run: docker build --file apps/afria-marketing-team/Dockerfile --tag afria-marketing-team:ci apps/afria-marketing-team
