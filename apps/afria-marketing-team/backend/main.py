@@ -1,10 +1,13 @@
 import hashlib
 import json
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Literal
 from urllib.parse import quote
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from authenticity import AuthenticityAssessment, assess_authenticity
@@ -631,3 +634,22 @@ def persist_cea_crm_lead(payload: CeaCrmLead):
             "next_action": "inspect_adapter_evidence_without_exposing_secrets",
             "data_source_id": config.data_source_id,
         }
+
+
+
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+FRONTEND_ASSETS = FRONTEND_DIST / "assets"
+
+if FRONTEND_DIST.exists():
+    if FRONTEND_ASSETS.exists():
+        app.mount("/assets", StaticFiles(directory=str(FRONTEND_ASSETS)), name="frontend-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_frontend(full_path: str):
+        root = FRONTEND_DIST.resolve()
+        candidate = (FRONTEND_DIST / full_path).resolve()
+        if candidate != root and root not in candidate.parents:
+            return FileResponse(root / "index.html")
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(root / "index.html")
