@@ -3,6 +3,8 @@ import {
   buildCeaCrmPayload,
   buildCeaQualifyPayload,
   canPersistCeaLead,
+  buildCeaReturnPath,
+  isCeaReturnPath,
   resolveCeaAttribution,
   type CeaQualification,
   type CeaReturnForm,
@@ -39,6 +41,13 @@ const qualification: CeaQualification = {
 };
 
 describe("CEA Retour aux Sources capture contract", () => {
+  test("routes /retour-sources as the canonical controlled landing", () => {
+    expect(buildCeaReturnPath()).toBe("/retour-sources");
+    expect(isCeaReturnPath("/retour-sources")).toBe(true);
+    expect(isCeaReturnPath("/retour-sources/")).toBe(true);
+    expect(isCeaReturnPath("/start")).toBe(false);
+  });
+
   test("preserves UTM content and narrative source", () => {
     expect(resolveCeaAttribution("?utm_source=linkedin&utm_campaign=benin-roots&utm_content=BEN-VODUN-01")).toEqual({
       contentId: "BEN-VODUN-01",
