@@ -592,5 +592,7 @@ def track_cea_heritage_event(payload: HeritageAttributionEvent):
         "payment_evidence": payment_evidence,
         "crm_application": crm_application,
         "revenue_attributed_usd": payload.economic_value_usd,
-        "revenue_rule": "revenue recognized only with verified payment proof",
+        "verification_boundary": "STAGING_PROOF_GATED_ONLY",
+        "production_revenue_ready": PRODUCTION_REVENUE_READY,
+        "revenue_rule": "staging attribution requires payment proof reference; production cash remains false until an authorized payment adapter verifies live settlement",
     }
