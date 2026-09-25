@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   buildCeaCrmPayload,
+  buildCeaHeritageEventPayload,
   buildCeaQualifyPayload,
   canPersistCeaLead,
   buildCeaReturnPath,
@@ -46,6 +47,17 @@ describe("CEA Retour aux Sources capture contract", () => {
     expect(isCeaReturnPath("/retour-sources")).toBe(true);
     expect(isCeaReturnPath("/retour-sources/")).toBe(true);
     expect(isCeaReturnPath("/start")).toBe(false);
+  });
+
+  test("builds deterministic N0 heritage events for attribution", () => {
+    const attribution = resolveCeaAttribution("?utm_source=linkedin&utm_campaign=benin-roots&utm_content=BEN-VODUN-01");
+    const first = buildCeaHeritageEventPayload("session-001", "CONTENT_VIEW", attribution);
+    const second = buildCeaHeritageEventPayload("session-001", "CONTENT_VIEW", attribution);
+    expect(first.client_event_id).toBe(second.client_event_id);
+    expect(first.heritage_sensitivity).toBe("PUBLIC_N0");
+    expect(first.content_id).toBe("BEN-VODUN-01");
+    expect(first.source_campaign).toBe("linkedin");
+    expect(first.lead_id).toBeNull();
   });
 
   test("preserves UTM content and narrative source", () => {
