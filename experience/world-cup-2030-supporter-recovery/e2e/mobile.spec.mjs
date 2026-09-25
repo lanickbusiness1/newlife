@@ -13,7 +13,7 @@ test("mobile pilot: profile, offline community, ticket safety and grounded assis
   await page.getByLabel("Pays").fill("Bénin");
   await page.getByLabel("Équipes favorites").fill("Bénin, Morocco, Brazil");
   await page.getByRole("button", { name: "Enregistrer sur cet appareil" }).click();
-  await expect(page.getByDisplayValue("QA Supporter")).toBeVisible();
+  await expect(page.getByLabel("Pseudo")).toHaveValue("QA Supporter");
 
   await page.getByRole("button", { name: "Accueil" }).click();
   await expect(page.getByRole("heading", { name: "QA Supporter" })).toBeVisible();
