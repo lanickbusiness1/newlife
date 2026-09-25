@@ -158,3 +158,31 @@ def test_public_funnel_blocks_unvalidated_community_content():
     assert body["accepted"] is False
     assert body["blocked"] is True
     assert body["reason"] == "non_public_heritage_not_eligible_for_public_revenue_funnel"
+
+
+
+def test_crm_persistence_endpoint_classifies_missing_secret_as_activation_channel(monkeypatch):
+    monkeypatch.delenv("NOTION_CRM_TOKEN", raising=False)
+    response = client.post(
+        "/cea/crm/lead/persist",
+        json={
+            "lead_id": "cea-lead-missing-config",
+            "name": "Lead Consentant",
+            "email": "lead@example.com",
+            "content_id": "VODUN-KAKPO-001",
+            "narrative_source": "griot/capsule-01",
+            "primary_intent": "Mémoire & Culture",
+            "next_best_offer": "Accueil Cotonou 600 USD",
+            "language": "FR",
+            "consent_contact": True,
+            "revenue_attributed_usd": 0,
+            "payment_status": "Non proposé",
+            "priority": "P1 - Cette semaine",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["persisted"] is False
+    assert body["classification"] == "activation_channel"
+    assert body["product_blocker"] is False
+    assert body["reason"] == "notion_crm_credentials_not_configured"
