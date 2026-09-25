@@ -24,3 +24,30 @@ services:
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
+
+  - type: web
+    name: afriagenesis-supporter-2030-preview
+    runtime: static
+    repo: https://github.com/lanickbusiness1/newlife.git
+    branch: recovery/world-cup-2030-supporter
+    rootDir: experience/world-cup-2030-supporter-recovery
+    buildCommand: npm run build:release
+    staticPublishPath: ./dist
+    autoDeployTrigger: off
+    renderSubdomainPolicy: enabled
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: geolocation=(), camera=(), microphone=()
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
