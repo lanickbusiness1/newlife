@@ -56,7 +56,7 @@ jobs:
                 "domain": "rawcdn.githack.com",
                 "path": "/",
                 "expires": -1,
-                "httpOnly": false,
+                "httpOnly": true,
                 "secure": true,
                 "sameSite": "Lax"
               }
