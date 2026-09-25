@@ -1,14 +1,19 @@
 import hashlib
 import json
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Literal
 from urllib.parse import quote
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from authenticity import AuthenticityAssessment, assess_authenticity
 from visibility import VisibilityAssessment, assess_visibility
+from cea_return import CeaReturnLeadInput, HeritageAttributionEvent, qualify_cea_return_lead, normalize_heritage_event
+from notion_crm import CeaCrmLead, NotionCrmAdapter, NotionCrmConfig
 
 PRODUCT_STANDARD = "Production Product"
 ASSET_ID = "PRD-MKT-TEAM-001"
@@ -58,7 +63,7 @@ OUTBOUND_EVIDENCE_LEDGER: dict[str, dict] = {}
 CRM_STATUS_STORE: dict[str, dict] = {}
 CASH_AUTOPILOT_RUNS: list[dict] = []
 
-app = FastAPI(title="AfrIA Marketing Team Production Product", version="1.3.0")
+app = FastAPI(title="AfrIA Marketing Team Production Product", version="1.4.0")
 
 
 class ProductIntake(BaseModel):
@@ -337,7 +342,7 @@ def health():
         "product_standard": PRODUCT_STANDARD,
         "production_revenue_ready": PRODUCTION_REVENUE_READY,
         "literal": "PRODUCTION_REVENUE_READY=false",
-        "gates": ["S7+", "M6", "CyberAudit", "M8", "Big4", "Outbound Evidence Gate™", CHANNEL_PROOF_CONNECTOR, CASH_AUTOPILOT_LAYER],
+        "gates": ["S7+", "M6", "CyberAudit", "M8", "Big4", "Outbound Evidence Gate™", CHANNEL_PROOF_CONNECTOR, CASH_AUTOPILOT_LAYER, "CEA Heritage Revenue Loop™"],
     }
 
 
@@ -544,3 +549,107 @@ def cash_finalization_check():
         "next_frontier": "connect_live_channel_proofs_and_verified_payment",
         "finalization_boundary": "product core finalized; commercial live finalization depends on external proof adapters and verified payment",
     }
+
+
+
+@app.post("/cea/lead/qualify")
+def qualify_cea_lead(payload: CeaReturnLeadInput):
+    return qualify_cea_return_lead(payload)
+
+
+@app.post("/cea/heritage/event/track")
+def track_cea_heritage_event(payload: HeritageAttributionEvent):
+    record = normalize_heritage_event(payload)
+    if not record["accepted"]:
+        return record
+
+    if payload.event_type != "PAYMENT_CONFIRMED":
+        return record
+
+    evidence_payload = OutboundEvidenceRequest(
+        lead_id=payload.lead_id or "",
+        channel="Payment",
+        evidence_type="payment_proof",
+        proof_ref=payload.proof_ref or "",
+        source=payload.source_campaign,
+        occurred_at=payload.occurred_at,
+        note=(
+            f"heritage_content_id={payload.content_id}; "
+            f"narrative_source={payload.narrative_source}; "
+            f"economic_value_usd={payload.economic_value_usd}"
+        ),
+    )
+    payment_evidence = _store_outbound_evidence(
+        evidence_payload,
+        connector_layer="CEA Heritage Revenue Loop™",
+    )
+    crm_application = _apply_crm_status(
+        CrmStatusApplyRequest(
+            lead_id=payload.lead_id or "",
+            from_status="Paiement demandé",
+            to_status="Payé",
+            evidence_ids=[payment_evidence["evidence_id"]],
+        )
+    )
+    return {
+        **record,
+        "payment_evidence": payment_evidence,
+        "crm_application": crm_application,
+        "revenue_attributed_usd": payload.economic_value_usd,
+        "verification_boundary": "STAGING_PROOF_GATED_ONLY",
+        "production_revenue_ready": PRODUCTION_REVENUE_READY,
+        "revenue_rule": "staging attribution requires payment proof reference; production cash remains false until an authorized payment adapter verifies live settlement",
+    }
+
+
+
+@app.post("/cea/crm/lead/persist")
+def persist_cea_crm_lead(payload: CeaCrmLead):
+    config = NotionCrmConfig.from_env()
+    if config is None:
+        return {
+            "persisted": False,
+            "classification": "activation_channel",
+            "product_blocker": False,
+            "lead_id": payload.lead_id,
+            "reason": "notion_crm_credentials_not_configured",
+            "next_action": "configure_NOTION_CRM_TOKEN_in_deployment_secret_store",
+            "data_source_id": "bf3a6c6b-4304-4a2c-a96d-0b788dc08600",
+        }
+
+    try:
+        return {
+            **NotionCrmAdapter(config).upsert_lead(payload),
+            "classification": "connected_persistent_crm",
+            "product_blocker": False,
+        }
+    except Exception as exc:
+        return {
+            "persisted": False,
+            "classification": "external_adapter_error",
+            "product_blocker": False,
+            "lead_id": payload.lead_id,
+            "reason": "notion_crm_write_failed",
+            "error_type": type(exc).__name__,
+            "next_action": "inspect_adapter_evidence_without_exposing_secrets",
+            "data_source_id": config.data_source_id,
+        }
+
+
+
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+FRONTEND_ASSETS = FRONTEND_DIST / "assets"
+
+if FRONTEND_DIST.exists():
+    if FRONTEND_ASSETS.exists():
+        app.mount("/assets", StaticFiles(directory=str(FRONTEND_ASSETS)), name="frontend-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_frontend(full_path: str):
+        root = FRONTEND_DIST.resolve()
+        candidate = (FRONTEND_DIST / full_path).resolve()
+        if candidate != root and root not in candidate.parents:
+            return FileResponse(root / "index.html")
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(root / "index.html")

@@ -1,0 +1,19 @@
+.cea-shell { padding-top: 24px; }
+.cea-hero { padding: clamp(28px, 6vw, 72px); border: 1px solid #70411f; border-radius: 36px; background: radial-gradient(circle at 82% 8%, rgba(242,184,75,.2), transparent 30%), linear-gradient(135deg, rgba(50,24,14,.97), rgba(18,9,7,.94)); box-shadow: 0 32px 90px rgba(0,0,0,.42); }
+.cea-hero h1 { max-width: 980px; }
+.cea-story { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+.cea-source { color: #d7b88f; font-size: .9rem; }
+.cea-form { margin-top: 20px; }
+.cea-form-heading { display: flex; align-items: start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
+.cea-no-charge { border: 1px solid #70411f; border-radius: 999px; padding: 8px 12px; color: #f4d7b2; white-space: nowrap; }
+.cea-form select { width: 100%; border: 1px solid #70411f; border-radius: 16px; background: #1e100c; color: #f8ead5; padding: .8rem; font: inherit; }
+.cea-long-field { display: grid; gap: 8px; margin-top: 14px; color: #d99a3f; font-weight: 700; }
+.cea-long-field textarea { min-height: 120px; }
+.cea-consent { margin-top: 18px; align-items: flex-start; line-height: 1.5; }
+.cea-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+.cea-actions span { color: #b77a39; font-size: .88rem; }
+.cea-state { border-left: 3px solid #f2b84b; padding-left: 12px; color: #f4d7b2; }
+.cea-result { margin-top: 20px; }
+.cea-result .evidence-grid span { font-size: 1rem; white-space: pre-line; }
+button:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 900px) { .cea-story { grid-template-columns: 1fr; } .cea-form-heading { display: grid; } .cea-no-charge { justify-self: start; } }
