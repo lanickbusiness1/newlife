@@ -1,11 +1,13 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { buildWhatsAppActivationLink } from "./activation";
 import {
   buildCeaCrmPayload,
+  buildCeaHeritageEventPayload,
   buildCeaQualifyPayload,
   buildCeaWhatsAppMessage,
   canPersistCeaLead,
   resolveCeaAttribution,
+  type CeaHeritageEventType,
   type CeaQualification,
   type CeaReturnForm,
 } from "./ceaReturn";
@@ -27,10 +29,19 @@ const initialForm: CeaReturnForm = {
   consentContact: false,
 };
 
-function newLeadId(): string {
+function newClientId(prefix: string): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? `CEA-${crypto.randomUUID()}`
-    : `CEA-${Date.now()}`;
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Date.now()}`;
+}
+
+function getOrCreateSessionId(): string {
+  const key = "cea_return_session_id";
+  const existing = window.sessionStorage.getItem(key);
+  if (existing) return existing;
+  const created = newClientId("CEA-SESSION");
+  window.sessionStorage.setItem(key, created);
+  return created;
 }
 
 export default function CeaReturnView() {
@@ -44,6 +55,29 @@ export default function CeaReturnView() {
     () => resolveCeaAttribution(window.location.search),
     [],
   );
+  const sessionId = useMemo(() => getOrCreateSessionId(), []);
+  const leadId = useMemo(() => newClientId("CEA-LEAD"), []);
+
+  async function trackEvent(
+    eventType: CeaHeritageEventType,
+    options: { leadId?: string; consentContact?: boolean } = {},
+  ) {
+    try {
+      await fetch("/cea/heritage/event/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          buildCeaHeritageEventPayload(sessionId, eventType, attribution, options),
+        ),
+      });
+    } catch {
+      // Measurement is best-effort and must never fabricate or block the user journey.
+    }
+  }
+
+  useEffect(() => {
+    void trackEvent("CONTENT_VIEW");
+  }, [sessionId, attribution]);
 
   function setField<K extends keyof CeaReturnForm>(field: K, value: CeaReturnForm[K]) {
     setForm(current => ({ ...current, [field]: value }));
@@ -54,6 +88,7 @@ export default function CeaReturnView() {
     setError("");
     setCrmState("");
     setSubmitting(true);
+    void trackEvent("CTA_CLICK");
 
     try {
       const qualifyResponse = await fetch("/cea/lead/qualify", {
@@ -78,7 +113,7 @@ export default function CeaReturnView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          buildCeaCrmPayload(form, attribution, qualified, newLeadId()),
+          buildCeaCrmPayload(form, attribution, qualified, leadId),
         ),
       });
       if (!crmResponse.ok) throw new Error("crm_request_failed");
@@ -92,6 +127,12 @@ export default function CeaReturnView() {
           ? "Votre demande a été enregistrée avec votre consentement."
           : `Diagnostic prêt. Persistance CRM non active sur cet environnement (${crm.classification ?? crm.reason}).`,
       );
+      if (crm.persisted) {
+        void trackEvent("LEAD_CREATED", {
+          leadId,
+          consentContact: form.consentContact,
+        });
+      }
     } catch {
       setError("Le diagnostic n’a pas pu être enregistré. Aucun paiement n’a été déclenché.");
     } finally {
@@ -143,6 +184,7 @@ export default function CeaReturnView() {
           <a
             className="button-link secondary-action"
             href={buildWhatsAppActivationLink(whatsappMessage)}
+            onClick={() => void trackEvent("WHATSAPP_START", { consentContact: form.consentContact })}
             target="_blank"
             rel="noreferrer"
           >
