@@ -1,6 +1,5 @@
 const CACHE = "supporter-2030-recovery-v3";
 const ASSETS = [
-  "./",
   "./index.html",
   "./styles.css",
   "./manifest.webmanifest",
